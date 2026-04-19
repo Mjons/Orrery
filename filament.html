@@ -1,0 +1,3613 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Filament — flow-field bead chains</title>
+    <style>
+      :root {
+        --bg: #111;
+        --panel: rgba(20, 20, 22, 0.78);
+        --panel-border: rgba(255, 255, 255, 0.08);
+        --text: #e8e8ea;
+        --muted: #9a9aa3;
+        --accent: #e8b8ff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        background: #0a0a0b;
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui,
+          sans-serif;
+        overflow: hidden;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(
+          1200px 800px at 50% 50%,
+          #1a1a1d 0%,
+          #0a0a0b 100%
+        );
+      }
+      canvas {
+        /* Lock display size so preview-res changes don't shrink the canvas visually */
+        width: min(100vh, calc(100vw - 360px));
+        height: min(100vh, calc(100vw - 360px));
+        max-width: calc(100vw - 360px);
+        max-height: 100vh;
+        image-rendering: -webkit-optimize-contrast;
+        box-shadow:
+          0 40px 120px rgba(0, 0, 0, 0.6),
+          0 0 0 1px rgba(255, 255, 255, 0.04);
+        background: #fff;
+      }
+      #panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 340px;
+        padding: 18px 18px 22px;
+        background: var(--panel);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-left: 1px solid var(--panel-border);
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      #panel h1 {
+        font-size: 14px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin: 2px 0 0;
+        color: #fff;
+        font-weight: 600;
+      }
+      #panel .sub {
+        font-size: 11px;
+        color: var(--muted);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .group {
+        border: 1px solid var(--panel-border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.015);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      label {
+        font-size: 12px;
+        color: var(--muted);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      label .v {
+        color: #fff;
+        font-variant-numeric: tabular-nums;
+      }
+      input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 2px;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        border: 2px solid #111;
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+        border: 2px solid #111;
+      }
+      select,
+      input[type="text"],
+      input[type="number"] {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.04);
+        color: #fff;
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-size: 12px;
+        font-family: inherit;
+      }
+      button {
+        flex: 1;
+        padding: 8px 10px;
+        border-radius: 7px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.06);
+        color: #fff;
+        border: 1px solid var(--panel-border);
+        font-size: 12px;
+        letter-spacing: 0.04em;
+      }
+      button.primary {
+        background: var(--accent);
+        color: #0b1220;
+        border-color: transparent;
+        font-weight: 600;
+      }
+      button:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      button.primary:hover {
+        background: #a7c5ff;
+      }
+      .pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .pill {
+        padding: 5px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--panel-border);
+        color: #ddd;
+      }
+      .pill.active {
+        background: var(--accent);
+        color: #0b1220;
+        border-color: transparent;
+      }
+      #status {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .swatches {
+        display: flex;
+        gap: 4px;
+        margin-top: 4px;
+      }
+      .swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        border: 1px solid rgba(0, 0, 0, 0.2);
+      }
+      footer {
+        margin-top: auto;
+        font-size: 10px;
+        color: #5e5e66;
+        letter-spacing: 0.06em;
+        line-height: 1.5;
+      }
+      footer a {
+        color: var(--muted);
+      }
+      .favs {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 260px;
+        overflow-y: auto;
+        margin: 0 -4px;
+        padding: 0 4px;
+      }
+      .fav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        cursor: pointer;
+        transition: background 0.1s;
+      }
+      .fav:hover {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .fav img {
+        width: 40px;
+        height: 40px;
+        border-radius: 4px;
+        object-fit: cover;
+        flex-shrink: 0;
+        background: #222;
+      }
+      .fav .meta {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .fav .meta .lbl {
+        font-size: 12px;
+        color: #fff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .fav .meta .sub2 {
+        font-size: 10px;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .fav .del {
+        width: 22px;
+        height: 22px;
+        flex-shrink: 0;
+        border-radius: 4px;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #888;
+        background: transparent;
+        border: none;
+        font-size: 14px;
+      }
+      .fav .del:hover {
+        background: rgba(255, 100, 100, 0.2);
+        color: #ff8080;
+      }
+      .fav-empty {
+        font-size: 11px;
+        color: var(--muted);
+        padding: 6px 2px;
+      }
+      .tlbl {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        min-width: 0;
+      }
+      .tip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--muted);
+        font-size: 9px;
+        font-style: normal;
+        font-weight: 700;
+        cursor: help;
+        flex-shrink: 0;
+        position: relative;
+        text-transform: none;
+        letter-spacing: 0;
+      }
+      .tip:hover {
+        background: var(--accent);
+        color: #111;
+      }
+      #tip-pop {
+        position: fixed;
+        z-index: 9999;
+        pointer-events: none;
+        padding: 7px 10px;
+        background: #000;
+        color: #fff;
+        border: 1px solid var(--panel-border);
+        border-radius: 6px;
+        font-size: 11px;
+        line-height: 1.45;
+        font-weight: 400;
+        text-transform: none;
+        letter-spacing: 0;
+        max-width: 240px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+        opacity: 0;
+        transform: translateY(-2px);
+        transition:
+          opacity 0.08s ease,
+          transform 0.08s ease;
+      }
+      #tip-pop.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+      .lock {
+        -webkit-appearance: none;
+        appearance: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        padding: 0;
+        margin: 0;
+        flex: 0 0 auto;
+        border-radius: 3px;
+        background: transparent;
+        border: 1px solid transparent;
+        cursor: pointer;
+        color: var(--muted);
+        opacity: 0.4;
+        transition:
+          opacity 0.1s,
+          color 0.1s,
+          background 0.1s;
+      }
+      .lock:hover {
+        opacity: 1;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .lock.locked {
+        opacity: 1;
+        color: var(--accent);
+      }
+      .lock svg {
+        width: 11px;
+        height: 11px;
+        display: block;
+      }
+      .sub .lock {
+        margin: 0 0 0 6px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .pill .lock {
+        width: 13px;
+        height: 13px;
+        border-radius: 2px;
+        margin: 0;
+      }
+      .pill .lock svg {
+        width: 9px;
+        height: 9px;
+      }
+      .pill.excluded {
+        opacity: 0.42;
+        text-decoration: line-through;
+      }
+      .pill.active.excluded {
+        text-decoration: line-through;
+      }
+      .pill-group-header {
+        flex: 0 0 100%;
+        font-size: 10px;
+        color: var(--muted);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-top: 6px;
+        margin-bottom: -2px;
+      }
+      .pill-group-header:first-child {
+        margin-top: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"><canvas id="c" width="2000" height="2000"></canvas></div>
+
+    <div id="panel">
+      <div>
+        <h1>Filament</h1>
+        <div class="sub">Beads along flow-field curves</div>
+      </div>
+
+      <div class="group">
+        <div class="row" style="gap: 6px">
+          <button class="primary" id="btnGen">Regenerate</button>
+          <button id="btnSeed">New seed</button>
+        </div>
+        <div class="row" style="gap: 6px">
+          <button id="btnDice" style="flex: 1">
+            Roll dice (randomize all)
+          </button>
+        </div>
+        <div class="row" style="gap: 6px; align-items: center">
+          <button id="btnDicePrev" disabled title="Previous dice roll">
+            ←
+          </button>
+          <span class="v" id="vDiceHist" style="flex: 1; text-align: center">
+            —
+          </span>
+          <button id="btnDiceNext" disabled title="Next dice roll">→</button>
+        </div>
+        <div class="row" style="gap: 6px">
+          <button
+            id="btnDiceSaveHistory"
+            style="flex: 1"
+            disabled
+            title="Re-render every roll in history and save to a folder you pick"
+          >
+            Save history to folder
+          </button>
+        </div>
+        <label>Seed <span class="v" id="vSeed">—</span></label>
+        <input type="text" id="seed" value="filament" />
+      </div>
+
+      <div class="group">
+        <div class="sub">
+          Favorites
+          <span style="float: right; color: #fff" id="favCount">0</span>
+        </div>
+        <div class="row" style="gap: 6px">
+          <input type="text" id="favLabel" placeholder="label (optional)" />
+          <button id="btnSaveFav" style="flex: 0 0 auto">★ Save</button>
+        </div>
+        <div class="favs" id="favList"></div>
+        <div class="row" style="gap: 6px">
+          <button id="btnExportFavs" style="font-size: 11px">Export</button>
+          <button id="btnImportFavs" style="font-size: 11px">Import</button>
+          <button id="btnClearFavs" style="font-size: 11px">Clear all</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="sub">Palette</div>
+        <div class="pills" id="palettePills"></div>
+        <div class="swatches" id="swatches"></div>
+      </div>
+
+      <div class="group">
+        <div class="sub">Scale</div>
+        <div class="pills" id="scalePills">
+          <div class="pill" data-scale="micro">Micro</div>
+          <div class="pill" data-scale="small">Small</div>
+          <div class="pill" data-scale="medium">Medium</div>
+          <div class="pill" data-scale="large">Large</div>
+          <div class="pill" data-scale="jumbo">Jumbo</div>
+          <div class="pill active" data-scale="mixed">Mixed</div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="sub">Preset</div>
+        <div class="pills" id="presetPills">
+          <div class="pill" data-preset="refs">Classic</div>
+          <div class="pill" data-preset="rosary">Rosary</div>
+          <div class="pill" data-preset="nebula">Nebula</div>
+          <div class="pill" data-preset="cellular">Cellular</div>
+          <div class="pill" data-preset="cosmic">Cosmic</div>
+          <div class="pill" data-preset="whisper">Whisper</div>
+        </div>
+      </div>
+
+      <div class="group">
+        <label
+          ><span class="tlbl"
+            >Turbulence
+            <i
+              class="tip"
+              data-tip="How strongly the flow field bends. Higher = more chaotic curves."
+              >?</i
+            ></span
+          ><span class="v" id="vTurb">0.00</span></label
+        >
+        <input type="range" id="turb" min="0" max="1" step="0.01" value="0" />
+        <label
+          ><span class="tlbl"
+            >Curl
+            <i
+              class="tip"
+              data-tip="How much the noise deflects each curve. 0 = straight lines in tilt direction; 1 = full curl."
+              >?</i
+            ></span
+          ><span class="v" id="vCurl">1.00</span></label
+        >
+        <input
+          type="range"
+          id="curl"
+          min="0"
+          max="1"
+          step="0.01"
+          value="1.00"
+        />
+        <label
+          ><span class="tlbl"
+            >Noise freq
+            <i
+              class="tip"
+              data-tip="Noise scale. Higher = tighter swirls, lower = broad sweeps."
+              >?</i
+            ></span
+          ><span class="v" id="vFreq">1.00</span></label
+        >
+        <input
+          type="range"
+          id="freq"
+          min="0.3"
+          max="2.5"
+          step="0.05"
+          value="1.00"
+        />
+        <label
+          ><span class="tlbl"
+            >Curve length
+            <i class="tip" data-tip="Max length of each flow curve in pixels."
+              >?</i
+            ></span
+          ><span class="v" id="vLen">300</span></label
+        >
+        <input
+          type="range"
+          id="len"
+          min="20"
+          max="1200"
+          step="10"
+          value="300"
+        />
+        <label
+          ><span class="tlbl"
+            >Density
+            <i
+              class="tip"
+              data-tip="How densely curves pack the canvas. Higher = more curves."
+              >?</i
+            ></span
+          ><span class="v" id="vDen">1.20</span></label
+        >
+        <input
+          type="range"
+          id="den"
+          min="0.05"
+          max="4"
+          step="0.05"
+          value="1.20"
+        />
+        <label
+          ><span class="tlbl"
+            >Margin
+            <i class="tip" data-tip="Empty padding from canvas edge in pixels."
+              >?</i
+            ></span
+          ><span class="v" id="vMar">60</span></label
+        >
+        <input type="range" id="mar" min="0" max="300" step="5" value="60" />
+      </div>
+
+      <div class="group">
+        <div class="sub">Focal / spiral</div>
+        <label
+          ><span class="tlbl"
+            >Spiral
+            <i
+              class="tip"
+              data-tip="Blend flow with a CCW spiral around the focal point. 0 = none; 1 = pure spiral."
+              >?</i
+            ></span
+          ><span class="v" id="vSpiral">0.00</span></label
+        >
+        <input type="range" id="spiral" min="0" max="1" step="0.01" value="0" />
+        <label
+          ><span class="tlbl"
+            >Focal X
+            <i
+              class="tip"
+              data-tip="Horizontal position of the spiral center (0 = left, 1 = right)."
+              >?</i
+            ></span
+          ><span class="v" id="vFocalX">0.50</span></label
+        >
+        <input
+          type="range"
+          id="focalX"
+          min="0"
+          max="1"
+          step="0.01"
+          value="0.5"
+        />
+        <label
+          ><span class="tlbl"
+            >Focal Y
+            <i
+              class="tip"
+              data-tip="Vertical position of the spiral center (0 = top, 1 = bottom)."
+              >?</i
+            ></span
+          ><span class="v" id="vFocalY">0.50</span></label
+        >
+        <input
+          type="range"
+          id="focalY"
+          min="0"
+          max="1"
+          step="0.01"
+          value="0.5"
+        />
+      </div>
+
+      <div class="group">
+        <div class="sub">Refinement</div>
+        <label
+          ><span class="tlbl"
+            >Smoothness
+            <i
+              class="tip"
+              data-tip="Box-blur passes on each polyline. Higher = less jagged."
+              >?</i
+            ></span
+          ><span class="v" id="vSmooth">3</span></label
+        >
+        <input type="range" id="smooth" min="0" max="10" step="1" value="3" />
+        <label
+          ><span class="tlbl"
+            >Tangent window
+            <i
+              class="tip"
+              data-tip="Tangent averaging window. Higher = smoother end caps."
+              >?</i
+            ></span
+          ><span class="v" id="vTwin">4</span></label
+        >
+        <input type="range" id="twin" min="1" max="12" step="1" value="4" />
+        <label
+          ><span class="tlbl"
+            >Step size
+            <i
+              class="tip"
+              data-tip="Tracing step size. Smaller = smoother but slower."
+              >?</i
+            ></span
+          ><span class="v" id="vStep">1.0</span></label
+        >
+        <input
+          type="range"
+          id="step"
+          min="0.5"
+          max="3"
+          step="0.1"
+          value="1.0"
+        />
+        <label
+          ><span class="tlbl"
+            >Outline
+            <i
+              class="tip"
+              data-tip="Dark ink outline behind/around the stroke. 0 = none."
+              >?</i
+            ></span
+          ><span class="v" id="vOut">1.00</span></label
+        >
+        <input type="range" id="out" min="0" max="3" step="0.05" value="1.00" />
+      </div>
+
+      <div class="group">
+        <div class="sub">Chain</div>
+        <div class="pills" id="stylePills">
+          <div class="pill active" data-style="beads">Beads</div>
+          <div class="pill" data-style="mixed-style">Mixed (spines)</div>
+          <div class="pill" data-style="thin">Spine only</div>
+        </div>
+        <label
+          ><span class="tlbl"
+            >Bead size ×w
+            <i
+              class="tip"
+              data-tip="Bead radius as a multiple of curve half-width. 1 = fills the curve."
+              >?</i
+            ></span
+          ><span class="v" id="vBeadSize">0.95</span></label
+        >
+        <input
+          type="range"
+          id="beadSize"
+          min="0.25"
+          max="1.8"
+          step="0.01"
+          value="0.95"
+        />
+        <label
+          ><span class="tlbl"
+            >Bead gap ×d
+            <i
+              class="tip"
+              data-tip="Spacing between bead centers as a multiple of bead diameter. Negative overlaps."
+              >?</i
+            ></span
+          ><span class="v" id="vBeadGap">0.05</span></label
+        >
+        <input
+          type="range"
+          id="beadGap"
+          min="-0.4"
+          max="2"
+          step="0.02"
+          value="0.05"
+        />
+        <label
+          ><span class="tlbl"
+            >Bead variance
+            <i
+              class="tip"
+              data-tip="Random per-bead size wobble. 0 = uniform, 1 = large jumps."
+              >?</i
+            ></span
+          ><span class="v" id="vBeadVar">0.15</span></label
+        >
+        <input
+          type="range"
+          id="beadVar"
+          min="0"
+          max="1"
+          step="0.02"
+          value="0.15"
+        />
+        <label
+          ><span class="tlbl"
+            >Taper
+            <i
+              class="tip"
+              data-tip="Shrink beads at chain ends. 0 = uniform, 1 = strong taper."
+              >?</i
+            ></span
+          ><span class="v" id="vTaper">0.25</span></label
+        >
+        <input
+          type="range"
+          id="taper"
+          min="0"
+          max="1"
+          step="0.02"
+          value="0.25"
+        />
+        <label
+          ><span class="tlbl"
+            >Colors per chain
+            <i class="tip" data-tip="Distinct palette colors used per chain."
+              >?</i
+            ></span
+          ><span class="v" id="vCpc">3</span></label
+        >
+        <input type="range" id="cpc" min="1" max="8" step="1" value="3" />
+        <label
+          ><span class="tlbl"
+            >Spine underlay
+            <i
+              class="tip"
+              data-tip="Thin ink line drawn under each chain. 0 = none, 1 = full ink."
+              >?</i
+            ></span
+          ><span class="v" id="vSpine">0.00</span></label
+        >
+        <input
+          type="range"
+          id="spine"
+          min="0"
+          max="1"
+          step="0.02"
+          value="0.00"
+        />
+        <label
+          ><span class="tlbl"
+            >Cross-path gap
+            <i
+              class="tip"
+              data-tip="Minimum pixels between beads from different chains. 0 = allow overlap (fastest); higher = chains never touch."
+              >?</i
+            ></span
+          ><span class="v" id="vCrossGap">2.0</span></label
+        >
+        <input
+          type="range"
+          id="crossGap"
+          min="0"
+          max="20"
+          step="0.5"
+          value="2.0"
+        />
+        <label
+          ><span class="tlbl"
+            >Tilt angle
+            <i
+              class="tip"
+              data-tip="Global rotation of the flow field, in degrees."
+              >?</i
+            ></span
+          ><span class="v" id="vTilt">0°</span></label
+        >
+        <input type="range" id="tilt" min="0" max="180" step="1" value="0" />
+      </div>
+
+      <div class="group">
+        <div class="sub">Bead treatments</div>
+        <label
+          ><span class="tlbl"
+            >Solid disc
+            <i
+              class="tip"
+              data-tip="Weight for flat solid fills. Higher = more solids."
+              >?</i
+            ></span
+          ><span class="v" id="vSolid">0.45</span></label
+        >
+        <input
+          type="range"
+          id="solid"
+          min="0"
+          max="1"
+          step="0.02"
+          value="0.45"
+        />
+        <label
+          ><span class="tlbl"
+            >Concentric rings
+            <i class="tip" data-tip="Weight for concentric-ring beads."
+              >?</i
+            ></span
+          ><span class="v" id="vRings">0.20</span></label
+        >
+        <input
+          type="range"
+          id="rings"
+          min="0"
+          max="1"
+          step="0.02"
+          value="0.20"
+        />
+        <label
+          ><span class="tlbl"
+            >Two-tone split
+            <i class="tip" data-tip="Weight for half-and-half split beads."
+              >?</i
+            ></span
+          ><span class="v" id="vSplit">0.12</span></label
+        >
+        <input
+          type="range"
+          id="split"
+          min="0"
+          max="1"
+          step="0.02"
+          value="0.12"
+        />
+        <label
+          ><span class="tlbl"
+            >Pie slices
+            <i class="tip" data-tip="Weight for radial pie-slice beads."
+              >?</i
+            ></span
+          ><span class="v" id="vPie">0.08</span></label
+        >
+        <input type="range" id="pie" min="0" max="1" step="0.02" value="0.08" />
+        <label
+          ><span class="tlbl"
+            >Inner dots
+            <i class="tip" data-tip="Weight for bead-within-bead dot motifs."
+              >?</i
+            ></span
+          ><span class="v" id="vDots">0.10</span></label
+        >
+        <input
+          type="range"
+          id="dots"
+          min="0"
+          max="1"
+          step="0.02"
+          value="0.10"
+        />
+        <label
+          ><span class="tlbl"
+            >Hollow rings
+            <i class="tip" data-tip="Weight for donut-shaped hollow beads."
+              >?</i
+            ></span
+          ><span class="v" id="vHollow">0.05</span></label
+        >
+        <input
+          type="range"
+          id="hollow"
+          min="0"
+          max="1"
+          step="0.02"
+          value="0.05"
+        />
+      </div>
+
+      <div class="group">
+        <div class="row" style="gap: 6px">
+          <button id="btnSave">Save PNG</button>
+          <button id="btnHD">Render 4K</button>
+        </div>
+        <div class="row" style="gap: 6px">
+          <button class="primary" id="btnBatch">
+            Download variations (ZIP)
+          </button>
+        </div>
+        <label
+          ><span class="tlbl"
+            >Batch count
+            <i
+              class="tip"
+              data-tip="How many variations to include in the exported ZIP."
+              >?</i
+            ></span
+          ><span class="v" id="vBatchN">10</span></label
+        >
+        <input type="range" id="batchN" min="2" max="50" step="1" value="10" />
+        <label
+          ><span class="tlbl"
+            >Batch mode
+            <i
+              class="tip"
+              data-tip="Nudge = small tweaks off current settings. Dice = full randomize every variation."
+              >?</i
+            ></span
+          ></label
+        >
+        <div class="pills" id="batchModePills">
+          <div class="pill active" data-mode="nudge">Nudge</div>
+          <div class="pill" data-mode="dice">Dice roll</div>
+        </div>
+        <label
+          ><span class="tlbl"
+            >Output resolution
+            <i
+              class="tip"
+              data-tip="Pixel size of each exported image. Higher = sharper but slower and larger files."
+              >?</i
+            ></span
+          ></label
+        >
+        <select id="batchRes">
+          <option value="1000">1000 × 1000 (fast)</option>
+          <option value="2000">2000 × 2000 (standard)</option>
+          <option value="3000">3000 × 3000 (high)</option>
+          <option value="4000" selected>4000 × 4000 (4K)</option>
+        </select>
+        <label
+          ><span class="tlbl"
+            >Variation strength
+            <i
+              class="tip"
+              data-tip="How much each Nudge variation drifts from current settings. (Ignored in Dice mode.)"
+              >?</i
+            ></span
+          ><span class="v" id="vVary">0.35</span></label
+        >
+        <input
+          type="range"
+          id="vary"
+          min="0"
+          max="1"
+          step="0.05"
+          value="0.35"
+        />
+        <div id="status">Ready.</div>
+      </div>
+
+      <footer>
+        A cross of Fidenza flow fields and Orbits circle packing. Each curve
+        becomes a chain of beads. Non-commercial homage.
+      </footer>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+      /* =========================================================================
+   1. PRNG  (Mulberry32 seeded from a string)
+   ========================================================================= */
+      function xmur3(str) {
+        let h = 1779033703 ^ str.length;
+        for (let i = 0; i < str.length; i++) {
+          h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+          h = (h << 13) | (h >>> 19);
+        }
+        return () => {
+          h = Math.imul(h ^ (h >>> 16), 2246822507);
+          h = Math.imul(h ^ (h >>> 13), 3266489909);
+          h ^= h >>> 16;
+          return h >>> 0;
+        };
+      }
+      function mulberry32(a) {
+        return function () {
+          a |= 0;
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      function makeRng(seedStr) {
+        const hash = xmur3(String(seedStr));
+        return mulberry32(hash());
+      }
+
+      /* =========================================================================
+   2. Simplex noise (2D, seeded)  — compact port
+   ========================================================================= */
+      function makeSimplex(rng) {
+        const p = new Uint8Array(256);
+        for (let i = 0; i < 256; i++) p[i] = i;
+        for (let i = 255; i > 0; i--) {
+          const j = Math.floor(rng() * (i + 1));
+          [p[i], p[j]] = [p[j], p[i]];
+        }
+        const perm = new Uint8Array(512);
+        const permMod12 = new Uint8Array(512);
+        for (let i = 0; i < 512; i++) {
+          perm[i] = p[i & 255];
+          permMod12[i] = perm[i] % 12;
+        }
+        const grad3 = [
+          [1, 1],
+          [-1, 1],
+          [1, -1],
+          [-1, -1],
+          [1, 0],
+          [-1, 0],
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+          [0, 1],
+          [0, -1],
+        ];
+        const F2 = 0.5 * (Math.sqrt(3) - 1);
+        const G2 = (3 - Math.sqrt(3)) / 6;
+
+        return function noise2(xin, yin) {
+          let n0 = 0,
+            n1 = 0,
+            n2 = 0;
+          const s = (xin + yin) * F2;
+          const i = Math.floor(xin + s),
+            j = Math.floor(yin + s);
+          const t = (i + j) * G2;
+          const X0 = i - t,
+            Y0 = j - t;
+          const x0 = xin - X0,
+            y0 = yin - Y0;
+          let i1, j1;
+          if (x0 > y0) {
+            i1 = 1;
+            j1 = 0;
+          } else {
+            i1 = 0;
+            j1 = 1;
+          }
+          const x1 = x0 - i1 + G2,
+            y1 = y0 - j1 + G2;
+          const x2 = x0 - 1 + 2 * G2,
+            y2 = y0 - 1 + 2 * G2;
+          const ii = i & 255,
+            jj = j & 255;
+          const gi0 = permMod12[ii + perm[jj]];
+          const gi1 = permMod12[ii + i1 + perm[jj + j1]];
+          const gi2 = permMod12[ii + 1 + perm[jj + 1]];
+          let t0 = 0.5 - x0 * x0 - y0 * y0;
+          if (t0 >= 0) {
+            t0 *= t0;
+            n0 = t0 * t0 * (grad3[gi0][0] * x0 + grad3[gi0][1] * y0);
+          }
+          let t1 = 0.5 - x1 * x1 - y1 * y1;
+          if (t1 >= 0) {
+            t1 *= t1;
+            n1 = t1 * t1 * (grad3[gi1][0] * x1 + grad3[gi1][1] * y1);
+          }
+          let t2 = 0.5 - x2 * x2 - y2 * y2;
+          if (t2 >= 0) {
+            t2 *= t2;
+            n2 = t2 * t2 * (grad3[gi2][0] * x2 + grad3[gi2][1] * y2);
+          }
+          return 70 * (n0 + n1 + n2);
+        };
+      }
+
+      /* =========================================================================
+   3. Palettes (inspired by the real Fidenza drops)
+   ========================================================================= */
+      const PALETTES = {
+        Classic: {
+          bg: "#ede5d3",
+          ink: "#1f1a14",
+          colors: [
+            "#23395b",
+            "#d44b3d",
+            "#e9b42a",
+            "#d88228",
+            "#2d221a",
+            "#92c7b0",
+            "#e7a3a3",
+            "#2a8880",
+            "#8aaed2",
+            "#efe9dc",
+          ],
+        },
+        Pink: {
+          bg: "#f0b6b6",
+          ink: "#1a1a1a",
+          colors: [
+            "#23395b",
+            "#d44b3d",
+            "#e9b42a",
+            "#d88228",
+            "#2d221a",
+            "#92c7b0",
+            "#e7a3a3",
+            "#2a8880",
+            "#8aaed2",
+            "#efe9dc",
+          ],
+        },
+        Emerald: {
+          bg: "#1e8a7a",
+          ink: "#0f0f0f",
+          colors: [
+            "#f2e7c9",
+            "#f6c85f",
+            "#e6734a",
+            "#2c3e50",
+            "#a3d9c9",
+            "#b0306a",
+            "#efe9dc",
+            "#d9b96a",
+          ],
+        },
+        RadDark: {
+          bg: "#0f1936",
+          ink: "#f0eada",
+          colors: [
+            "#e8428c",
+            "#0f1936",
+            "#e8428c",
+            "#e8428c",
+            "#f0eada",
+            "#a02264",
+            "#ff72a8",
+          ],
+        },
+        Golf: {
+          bg: "#e4d9b9",
+          ink: "#1d1d1b",
+          colors: [
+            "#0f4c3a",
+            "#d7263d",
+            "#f4a300",
+            "#1b1b1d",
+            "#eae3c8",
+            "#2a7f62",
+            "#b83a26",
+          ],
+        },
+        Luxe: {
+          bg: "#efe4c9",
+          ink: "#2a2318",
+          colors: [
+            "#b8832d",
+            "#4d2f16",
+            "#a85a29",
+            "#d6a24f",
+            "#2e271d",
+            "#8a5a2b",
+            "#e1c98f",
+          ],
+        },
+        Rad: {
+          bg: "#111219",
+          ink: "#fbfbfb",
+          colors: [
+            "#ff4d8d",
+            "#ffd23f",
+            "#16c5c0",
+            "#9b5de5",
+            "#f15bb5",
+            "#00bbf9",
+            "#fee440",
+          ],
+        },
+        Seneca: {
+          bg: "#22201c",
+          ink: "#d9cfc0",
+          colors: [
+            "#9a8c6c",
+            "#6e5b3a",
+            "#b7663d",
+            "#3f5b56",
+            "#a0463a",
+            "#c5b08a",
+            "#433a2a",
+          ],
+        },
+        Acid: {
+          bg: "#0a0f0a",
+          ink: "#e9ffe4",
+          colors: [
+            "#39ff14",
+            "#f6ff00",
+            "#00f0ff",
+            "#ff00c8",
+            "#ffffff",
+            "#1affb8",
+            "#caff33",
+          ],
+        },
+        Kodak: {
+          bg: "#efe6d6",
+          ink: "#1a1713",
+          colors: [
+            "#b43b27",
+            "#e2a32e",
+            "#3a6a3d",
+            "#224a6b",
+            "#6f2a46",
+            "#2e2a26",
+            "#c88b4b",
+          ],
+        },
+        Cosmos: {
+          bg: "#0d1322",
+          ink: "#f0eefb",
+          colors: [
+            "#4e8cff",
+            "#2a2f59",
+            "#b96bff",
+            "#f0eefb",
+            "#4fd1c5",
+            "#294177",
+            "#8a78ff",
+          ],
+        },
+        Mono: {
+          bg: "#f5f2ea",
+          ink: "#0a0a0a",
+          colors: [
+            "#0a0a0a",
+            "#2a2a2a",
+            "#555",
+            "#8b8b8b",
+            "#c4c4c4",
+            "#0a0a0a",
+            "#333",
+          ],
+        },
+        Coral: {
+          bg: "#fff4ec",
+          ink: "#2b1a12",
+          colors: [
+            "#ff6b6b",
+            "#ffa36c",
+            "#ffd56b",
+            "#7ec4cf",
+            "#2b1a12",
+            "#e6794f",
+            "#f9c0a7",
+          ],
+        },
+        WhiteRed: {
+          bg: "#f6f3ee",
+          ink: "#1a0506",
+          colors: [
+            "#d1202e",
+            "#a81220",
+            "#e8524c",
+            "#6a0e14",
+            "#f4ede3",
+            "#b02a2a",
+            "#ffffff",
+          ],
+        },
+        Morandi: {
+          bg: "#e8e2d6",
+          ink: "#2a2521",
+          colors: [
+            "#a89f8c",
+            "#7a7a6c",
+            "#c9b39a",
+            "#b4623d",
+            "#5e6b65",
+            "#d9d3c2",
+            "#8a7a62",
+          ],
+        },
+        Montefeltro: {
+          bg: "#e8dfc8",
+          ink: "#1e1a1a",
+          colors: [
+            "#1a3a7a",
+            "#b38b2a",
+            "#7a1f2a",
+            "#305b8a",
+            "#b7a06a",
+            "#2a3554",
+            "#c3ae86",
+            "#4c1f2f",
+          ],
+        },
+        Carpaccio: {
+          bg: "#dbe4df",
+          ink: "#162025",
+          colors: [
+            "#2f5d68",
+            "#a93e2a",
+            "#caa046",
+            "#6c8e88",
+            "#d9c68f",
+            "#3a2018",
+            "#eee5d0",
+          ],
+        },
+        Appennino: {
+          bg: "#d2d4cf",
+          ink: "#17191a",
+          colors: [
+            "#3f4a45",
+            "#7a887a",
+            "#c2b89a",
+            "#4a5562",
+            "#b66b5a",
+            "#888c86",
+            "#252a2c",
+          ],
+        },
+        Notturno: {
+          bg: "#0e0d1c",
+          ink: "#f0e6c8",
+          colors: [
+            "#3f3458",
+            "#b39a5e",
+            "#c48a9a",
+            "#222038",
+            "#9e8dae",
+            "#4e2438",
+            "#e8d7a2",
+          ],
+        },
+        Piero: {
+          bg: "#e0e3d9",
+          ink: "#2a2418",
+          colors: [
+            "#9eb4c2",
+            "#d8c3bc",
+            "#c2a865",
+            "#7c8c79",
+            "#8b6a52",
+            "#c8b79a",
+            "#3e4a5d",
+          ],
+        },
+        Marche: {
+          bg: "#dfd2b4",
+          ink: "#1e1814",
+          colors: [
+            "#4a7ca8",
+            "#9b5b3f",
+            "#8ca36b",
+            "#e6d4a8",
+            "#2e3d5a",
+            "#b08c4e",
+            "#6e3828",
+          ],
+        },
+        Pesaro: {
+          bg: "#f1ece2",
+          ink: "#162531",
+          colors: [
+            "#2e6f85",
+            "#3a8a94",
+            "#c3502e",
+            "#b2bcb4",
+            "#5c9caf",
+            "#2a4858",
+            "#d7b58a",
+          ],
+        },
+        Foglio: {
+          bg: "#ece3c8",
+          ink: "#13100a",
+          colors: [
+            "#7a5a28",
+            "#58382a",
+            "#2e2a22",
+            "#c4a26a",
+            "#4a5d6c",
+            "#8a462e",
+            "#d5c595",
+          ],
+        },
+        Raffaello: {
+          bg: "#ead7cb",
+          ink: "#2b1e16",
+          colors: [
+            "#a23a3a",
+            "#7ba2c2",
+            "#ebe1d0",
+            "#7a3e3a",
+            "#647e58",
+            "#c48572",
+            "#2d4a68",
+          ],
+        },
+        Lucente: {
+          bg: "#1c1e28",
+          ink: "#f3f0e8",
+          colors: [
+            "#c9ebe4",
+            "#f3d2a0",
+            "#d8c3e8",
+            "#8fc9d8",
+            "#f6eec8",
+            "#b27e9f",
+            "#5e728a",
+          ],
+        },
+        Fresco: {
+          bg: "#eadfc8",
+          ink: "#1e140e",
+          colors: [
+            "#d44a2c",
+            "#5f7e68",
+            "#b8772c",
+            "#2a3828",
+            "#d8c6a0",
+            "#7a3828",
+            "#8c8a5e",
+          ],
+        },
+        Terra: {
+          bg: "#d8cdb4",
+          ink: "#211a12",
+          colors: [
+            "#8a3f2d",
+            "#5a4a32",
+            "#8e8e88",
+            "#5e7345",
+            "#8fa7b8",
+            "#b07a45",
+            "#3a3024",
+          ],
+        },
+        Ombra: {
+          bg: "#e6e1d4",
+          ink: "#141210",
+          colors: [
+            "#3e2e2a",
+            "#6a4a40",
+            "#2a1f1c",
+            "#a28a7c",
+            "#4c3a38",
+            "#d2c1b0",
+            "#6c5952",
+          ],
+        },
+      };
+
+      // Pills are grouped visually by category; the classic set is the
+      // original Fidenza-inspired list, the "Alts" set is ported from
+      // fidenza_live_alts.html (muted European/renaissance-leaning tones).
+      const PALETTE_GROUPS = [
+        {
+          label: null,
+          names: [
+            "Classic",
+            "Pink",
+            "Emerald",
+            "RadDark",
+            "Golf",
+            "Luxe",
+            "Rad",
+            "Seneca",
+            "Acid",
+            "Kodak",
+            "Cosmos",
+            "Mono",
+            "Coral",
+            "WhiteRed",
+          ],
+        },
+        {
+          label: "Alts",
+          names: [
+            "Morandi",
+            "Montefeltro",
+            "Carpaccio",
+            "Appennino",
+            "Notturno",
+            "Piero",
+            "Marche",
+            "Pesaro",
+            "Foglio",
+            "Raffaello",
+            "Lucente",
+            "Fresco",
+            "Terra",
+            "Ombra",
+          ],
+        },
+      ];
+
+      /* =========================================================================
+   4. Canvas + state
+   ========================================================================= */
+      const cvs = document.getElementById("c");
+      const ctx = cvs.getContext("2d", { alpha: false });
+
+      const state = {
+        seed: "filament",
+        palette: "Classic",
+        scale: "mixed",
+        style: "beads",
+        turb: 0.35,
+        freq: 0.9,
+        len: 500,
+        den: 1.4,
+        mar: 60,
+        tilt: 0,
+        curl: 1.0,
+        spiral: 0,
+        focalX: 0.5,
+        focalY: 0.5,
+        smooth: 4,
+        twin: 5,
+        step: 1.0,
+        out: 1.0,
+        beadSize: 0.95,
+        beadGap: 0.05,
+        beadVar: 0.15,
+        taper: 0.25,
+        cpc: 3,
+        spine: 0.0,
+        crossGap: 2.0,
+        solid: 0.45,
+        rings: 0.2,
+        split: 0.12,
+        pie: 0.08,
+        dots: 0.1,
+        hollow: 0.05,
+        W: 2000,
+        H: 2000,
+        locks: { turb: true, crossGap: true },
+      };
+
+      /* =========================================================================
+   5. Scale presets  (widths in px at 2000px canvas)
+   ========================================================================= */
+      const SCALES = {
+        micro: { min: 2, max: 6, step: 1.2, countMul: 4.0 },
+        small: { min: 4, max: 18, step: 1.6, countMul: 2.4 },
+        medium: { min: 10, max: 44, step: 2.0, countMul: 1.2 },
+        large: { min: 20, max: 90, step: 2.6, countMul: 0.55 },
+        jumbo: { min: 40, max: 180, step: 3.0, countMul: 0.25 },
+        mixed: { min: 3, max: 140, step: 2.0, countMul: 1.2 },
+      };
+
+      /* =========================================================================
+   6. Spatial hash grid for collision (oriented bounding boxes)
+   Each primitive: center (cx,cy), unit tangent (tx,ty), normal=(-ty,tx),
+   half-length along tangent (hl), half-width across tangent (hw).
+   Overlap test is SAT on 4 axes — circles would leave too much air around
+   elbows; OBBs aligned to flow let curves nestle tightly.
+   ========================================================================= */
+      // SAT overlap between two OBBs. Tangents assumed unit length.
+      function obbOverlap(
+        c1x,
+        c1y,
+        t1x,
+        t1y,
+        hw1,
+        hl1,
+        c2x,
+        c2y,
+        t2x,
+        t2y,
+        hw2,
+        hl2,
+      ) {
+        const dx = c2x - c1x,
+          dy = c2y - c1y;
+        // |t1·t2| and |t1·n2| — note |n1·n2| = |t1·t2|, |n1·t2| = |t1·n2|.
+        const A00 = Math.abs(t1x * t2x + t1y * t2y);
+        const A01 = Math.abs(t1y * t2x - t1x * t2y);
+        // Axis t1
+        if (Math.abs(dx * t1x + dy * t1y) > hl1 + hl2 * A00 + hw2 * A01)
+          return false;
+        // Axis n1 = (-t1y, t1x)
+        if (Math.abs(-dx * t1y + dy * t1x) > hw1 + hl2 * A01 + hw2 * A00)
+          return false;
+        // Axis t2
+        if (Math.abs(dx * t2x + dy * t2y) > hl2 + hl1 * A00 + hw1 * A01)
+          return false;
+        // Axis n2 = (-t2y, t2x)
+        if (Math.abs(-dx * t2y + dy * t2x) > hw2 + hl1 * A01 + hw1 * A00)
+          return false;
+        return true;
+      }
+
+      class Grid {
+        constructor(w, h, cell) {
+          this.w = w;
+          this.h = h;
+          this.cell = cell;
+          this.cols = Math.ceil(w / cell);
+          this.rows = Math.ceil(h / cell);
+          this.buckets = new Array(this.cols * this.rows);
+          for (let i = 0; i < this.buckets.length; i++) this.buckets[i] = [];
+        }
+        _key(cx, cy) {
+          return cy * this.cols + cx;
+        }
+        // AABB of the OBB → cell range. extX = |tx|*hl + |ty|*hw (and swap).
+        _range(cx, cy, tx, ty, hw, hl) {
+          const ex = Math.abs(tx) * hl + Math.abs(ty) * hw;
+          const ey = Math.abs(ty) * hl + Math.abs(tx) * hw;
+          const c = this.cell;
+          return [
+            Math.max(0, Math.floor((cx - ex) / c)),
+            Math.max(0, Math.floor((cy - ey) / c)),
+            Math.min(this.cols - 1, Math.floor((cx + ex) / c)),
+            Math.min(this.rows - 1, Math.floor((cy + ey) / c)),
+          ];
+        }
+        add(cx, cy, tx, ty, hw, hl) {
+          const [x0, y0, x1, y1] = this._range(cx, cy, tx, ty, hw, hl);
+          for (let yy = y0; yy <= y1; yy++)
+            for (let xx = x0; xx <= x1; xx++) {
+              this.buckets[this._key(xx, yy)].push(cx, cy, tx, ty, hw, hl);
+            }
+        }
+        hits(cx, cy, tx, ty, hw, hl) {
+          const [x0, y0, x1, y1] = this._range(cx, cy, tx, ty, hw, hl);
+          for (let yy = y0; yy <= y1; yy++)
+            for (let xx = x0; xx <= x1; xx++) {
+              const b = this.buckets[this._key(xx, yy)];
+              for (let i = 0; i < b.length; i += 6) {
+                if (
+                  obbOverlap(
+                    cx,
+                    cy,
+                    tx,
+                    ty,
+                    hw,
+                    hl,
+                    b[i],
+                    b[i + 1],
+                    b[i + 2],
+                    b[i + 3],
+                    b[i + 4],
+                    b[i + 5],
+                  )
+                )
+                  return true;
+              }
+            }
+          return false;
+        }
+      }
+
+      /* =========================================================================
+   6b. Bead grid — circle-vs-circle collision keyed by chain id so same-chain
+   beads can overlap freely (user controls that via beadGap) while beads from
+   different chains honor a configurable gap.
+   ========================================================================= */
+      class BeadGrid {
+        constructor(w, h, cell) {
+          this.cell = cell;
+          this.cols = Math.ceil(w / cell);
+          this.rows = Math.ceil(h / cell);
+          this.buckets = new Array(this.cols * this.rows);
+          for (let i = 0; i < this.buckets.length; i++) this.buckets[i] = [];
+        }
+        _k(cx, cy) {
+          return cy * this.cols + cx;
+        }
+        _range(x, y, r) {
+          const c = this.cell;
+          return [
+            Math.max(0, Math.floor((x - r) / c)),
+            Math.max(0, Math.floor((y - r) / c)),
+            Math.min(this.cols - 1, Math.floor((x + r) / c)),
+            Math.min(this.rows - 1, Math.floor((y + r) / c)),
+          ];
+        }
+        add(x, y, r, chainId) {
+          const [x0, y0, x1, y1] = this._range(x, y, r);
+          for (let cy = y0; cy <= y1; cy++)
+            for (let cx = x0; cx <= x1; cx++)
+              this.buckets[this._k(cx, cy)].push(x, y, r, chainId);
+        }
+        // True if (x,y,r) intersects a bead from a different chain within `gap` px.
+        hitsOther(x, y, r, chainId, gap) {
+          const reach = r + gap;
+          const [x0, y0, x1, y1] = this._range(x, y, reach);
+          for (let cy = y0; cy <= y1; cy++)
+            for (let cx = x0; cx <= x1; cx++) {
+              const b = this.buckets[this._k(cx, cy)];
+              for (let i = 0; i < b.length; i += 4) {
+                if (b[i + 3] === chainId) continue;
+                const dx = b[i] - x,
+                  dy = b[i + 1] - y;
+                const total = b[i + 2] + r + gap;
+                if (dx * dx + dy * dy < total * total) return true;
+              }
+            }
+          return false;
+        }
+      }
+
+      /* =========================================================================
+   7. Main generator
+   ========================================================================= */
+      // Proportional scale factor applied during drag-preview renders.
+      // 0.5 → ~4x fewer curves and ~4x fewer pixels, so ~8-16x faster.
+      // CSS locks the display size so the smaller canvas still fills the stage (upscaled).
+      const PREVIEW_SCALE = 0.5;
+
+      function generate(opts) {
+        const preview = !!(opts && opts.preview);
+        const ps = preview ? PREVIEW_SCALE : 1.0;
+        // A full render supersedes any queued preview.
+        if (!preview && rafHandle) {
+          cancelAnimationFrame(rafHandle);
+          rafHandle = 0;
+        }
+
+        const t0 = performance.now();
+        const rng = makeRng(state.seed);
+        const noise = makeSimplex(rng);
+        document.getElementById("vSeed").textContent = state.seed;
+
+        const pal = PALETTES[state.palette];
+        const W = Math.round(state.W * ps);
+        const H = Math.round(state.H * ps);
+        cvs.width = W;
+        cvs.height = H;
+
+        // background
+        ctx.fillStyle = pal.bg;
+        ctx.fillRect(0, 0, W, H);
+
+        // no grain — Fidenza is flat color. Keep the bg clean.
+
+        // flow field parameters
+        const turb = state.turb;
+        const tiltRad = (state.tilt * Math.PI) / 180;
+        // Divide noiseScale by ps so the noise pattern stays stable in display space
+        // (smaller world at same noiseScale would zoom into the noise).
+        const noiseScale = ((0.0012 + turb * 0.0025) * state.freq) / ps;
+        const curlAmt = state.curl;
+        const spiralAmt = state.spiral;
+        const hasSpiral = spiralAmt > 0.0001;
+        const fx = state.focalX * W;
+        const fy = state.focalY * H;
+        const fieldAngle = (x, y) => {
+          // layered noise for richer curls
+          const n1 = noise(x * noiseScale, y * noiseScale);
+          const n2 =
+            noise(x * noiseScale * 2.1 + 100, y * noiseScale * 2.1 + 100) * 0.4;
+          const noiseAngle = (n1 + n2) * Math.PI * (1.0 + turb * 2.0);
+          const a = tiltRad + curlAmt * noiseAngle;
+          if (!hasSpiral) return a;
+          // Blend the flow direction with the tangent of a circle around (fx, fy).
+          // spiralAmt = 0 → pure flow; 1 → pure CCW spiral around the focal point.
+          const dx = x - fx,
+            dy = y - fy;
+          const r = Math.hypot(dx, dy) || 1;
+          const tx = -dy / r,
+            ty = dx / r;
+          const vx = Math.cos(a) * (1 - spiralAmt) + tx * spiralAmt;
+          const vy = Math.sin(a) * (1 - spiralAmt) + ty * spiralAmt;
+          return Math.atan2(vy, vx);
+        };
+
+        const scaleDef = SCALES[state.scale];
+        const maxR = scaleDef.max * 0.5 * ps;
+        const grid = new Grid(W, H, Math.max(10, maxR * 0.75));
+        const margin = state.mar * ps;
+
+        // seed candidate points — lots of them, we filter by collision.
+        // Scale attempts by ps² so density-per-area matches the full render.
+        const attempts = Math.round(
+          1400 * scaleDef.countMul * state.den * ps * ps,
+        );
+        const curves = [];
+
+        for (let k = 0; k < attempts; k++) {
+          const sx = margin + rng() * (W - 2 * margin);
+          const sy = margin + rng() * (H - 2 * margin);
+
+          // width — per curve, weighted toward smaller in mixed
+          let w;
+          if (state.scale === "mixed") {
+            const r = rng();
+            w =
+              r < 0.7
+                ? (scaleDef.min + rng() * 20) * ps
+                : (20 + rng() * (scaleDef.max - 20)) * ps;
+          } else {
+            w = (scaleDef.min + rng() * (scaleDef.max - scaleDef.min)) * ps;
+          }
+          const radius = w * 0.5;
+          const stepPx = scaleDef.step * state.step * ps;
+          const halfLen = stepPx * 0.5;
+
+          // OBB seed check using the local flow tangent at (sx, sy).
+          const seedA = fieldAngle(sx, sy);
+          if (
+            grid.hits(
+              sx,
+              sy,
+              Math.cos(seedA),
+              Math.sin(seedA),
+              radius + 2,
+              halfLen + 2,
+            )
+          )
+            continue;
+
+          let pts = tracePath(
+            sx,
+            sy,
+            radius,
+            fieldAngle,
+            grid,
+            state.len,
+            stepPx,
+            margin,
+            W,
+            H,
+          );
+          if (pts.length < 6) continue;
+
+          // Smooth the path — removes kinks from flow field noise
+          pts = smoothPath(pts, state.smooth);
+
+          // Pre-pick a palette bias per curve so some curves lean warm, some cool
+          const bias = pickCurvePalette(pal, rng, state.cpc);
+          curves.push({ pts, w, bias, radius });
+          // Commit to grid AFTER accepting so earlier curves can't self-block.
+          // Tangent per point = finite difference along the smoothed polyline.
+          for (let i = 0; i < pts.length; i++) {
+            const a = Math.max(0, i - 1),
+              b = Math.min(pts.length - 1, i + 1);
+            let dxp = pts[b].x - pts[a].x,
+              dyp = pts[b].y - pts[a].y;
+            const L = Math.hypot(dxp, dyp) || 1;
+            dxp /= L;
+            dyp /= L;
+            grid.add(pts[i].x, pts[i].y, dxp, dyp, radius, halfLen);
+          }
+        }
+
+        // render — big chains first so small detail pops on top
+        curves.sort((a, b) => b.w - a.w);
+        // Bead collision grid: cell = largest likely bead diameter, so neighbor
+        // lookups stay cheap. scaleDef.max is the biggest curve width; factor
+        // in beadSize + variance headroom so the grid remains balanced.
+        const maxBeadR =
+          scaleDef.max * 0.5 * ps * state.beadSize * (1 + state.beadVar);
+        const crossGap = Math.max(0, state.crossGap) * ps;
+        const useGrid = crossGap > 0.01;
+        const beadGrid = useGrid
+          ? new BeadGrid(W, H, Math.max(8, maxBeadR * 2))
+          : null;
+        for (let i = 0; i < curves.length; i++) {
+          drawCurveAsBeads(
+            curves[i],
+            pal,
+            rng,
+            state.style,
+            beadGrid,
+            i,
+            crossGap,
+          );
+        }
+
+        const ms = (performance.now() - t0) | 0;
+        setStatus(
+          `${curves.length} chains · ${ms} ms${preview ? " · preview" : ""}`,
+        );
+      }
+
+      /* -------- box-blur a polyline N times, keep endpoints fixed -------- */
+      function smoothPath(pts, passes) {
+        if (!passes || pts.length < 5) return pts;
+        let cur = pts.map((p) => ({ x: p.x, y: p.y }));
+        for (let pass = 0; pass < passes; pass++) {
+          const next = new Array(cur.length);
+          next[0] = cur[0];
+          next[cur.length - 1] = cur[cur.length - 1];
+          for (let i = 1; i < cur.length - 1; i++) {
+            next[i] = {
+              x: (cur[i - 1].x + 2 * cur[i].x + cur[i + 1].x) * 0.25,
+              y: (cur[i - 1].y + 2 * cur[i].y + cur[i + 1].y) * 0.25,
+            };
+          }
+          cur = next;
+        }
+        return cur;
+      }
+
+      /* -------- trace one curve through the flow field, avoiding collisions --------
+       * hw = half-width across flow (= curve radius), hl = half-length along flow
+       * (= step/2). OBBs during trace are thin slabs aligned to the local tangent.
+       */
+      function tracePath(
+        sx,
+        sy,
+        hw,
+        fieldAngle,
+        grid,
+        maxLen,
+        step,
+        margin,
+        W,
+        H,
+      ) {
+        const hl = step * 0.5;
+        const pts = [{ x: sx, y: sy }];
+        // forward
+        let x = sx,
+          y = sy;
+        for (let i = 0; i < maxLen; i++) {
+          const a = fieldAngle(x, y);
+          const cx = Math.cos(a),
+            sy_ = Math.sin(a);
+          x += cx * step;
+          y += sy_ * step;
+          if (x < margin || y < margin || x > W - margin || y > H - margin)
+            break;
+          if (grid.hits(x, y, cx, sy_, hw, hl)) break;
+          pts.push({ x, y });
+        }
+        // backward — OBBs are symmetric under tangent flip, so reuse cos/sin of a.
+        x = sx;
+        y = sy;
+        for (let i = 0; i < maxLen; i++) {
+          const a = fieldAngle(x, y);
+          const cx = Math.cos(a),
+            sy_ = Math.sin(a);
+          x -= cx * step;
+          y -= sy_ * step;
+          if (x < margin || y < margin || x > W - margin || y > H - margin)
+            break;
+          if (grid.hits(x, y, cx, sy_, hw, hl)) break;
+          pts.unshift({ x, y });
+        }
+        return pts;
+      }
+
+      /* -------- render one curve as a chain of beads (Filament style) --------
+       * Walk the smoothed polyline by arc length, placing a bead at each step.
+       * Bead radius = curve halfwidth × beadSize × taperK × (1 ± beadVar).
+       * Advance = diameter × (1 + beadGap).  Negative gaps let beads overlap.
+       * Each bead picks a treatment (solid / rings / split / pie / dots / hollow)
+       * weighted by the bead-treatment sliders.
+       */
+      function drawCurveAsBeads(
+        curve,
+        pal,
+        rng,
+        style,
+        beadGrid,
+        chainId,
+        crossGap,
+      ) {
+        const pts = curve.pts;
+        const w = curve.w;
+        if (pts.length < 3) return;
+
+        // Arc-length table along polyline
+        const arc = new Float32Array(pts.length);
+        for (let i = 1; i < pts.length; i++) {
+          arc[i] =
+            arc[i - 1] +
+            Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+        }
+        const totalLen = arc[pts.length - 1];
+        if (totalLen < w * 0.6) return;
+
+        // Interpolate a sample at arc length s: returns position + unit tangent.
+        function sampleAt(s) {
+          let lo = 0,
+            hi = arc.length - 1;
+          while (lo < hi) {
+            const m = (lo + hi) >> 1;
+            if (arc[m] < s) lo = m + 1;
+            else hi = m;
+          }
+          const i1 = Math.max(1, lo);
+          const i0 = i1 - 1;
+          const span = Math.max(1e-6, arc[i1] - arc[i0]);
+          const t = Math.min(1, Math.max(0, (s - arc[i0]) / span));
+          const x = pts[i0].x + (pts[i1].x - pts[i0].x) * t;
+          const y = pts[i0].y + (pts[i1].y - pts[i0].y) * t;
+          const twin = state.twin | 0;
+          const a = Math.max(0, i0 - twin),
+            b = Math.min(pts.length - 1, i1 + twin);
+          let dx = pts[b].x - pts[a].x,
+            dy = pts[b].y - pts[a].y;
+          const L = Math.hypot(dx, dy) || 1;
+          dx /= L;
+          dy /= L;
+          return { x, y, tx: dx, ty: dy };
+        }
+
+        // Thin/spine-only mode — skip beads, just stroke the path.
+        const thinMode =
+          style === "thin" ||
+          (style === "mixed-style" && rng() < 0.18 && w < 40);
+
+        if (thinMode) {
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+          ctx.strokeStyle = pal.ink;
+          ctx.lineWidth = Math.max(1, w * 0.14);
+          ctx.lineCap = "round";
+          ctx.stroke();
+          return;
+        }
+
+        // Optional spine underlay — a faint ink line under the beads so the
+        // chain reads as a connected path even when beads are widely spaced.
+        if (state.spine > 0.01) {
+          const prevAlpha = ctx.globalAlpha;
+          ctx.globalAlpha = state.spine;
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+          ctx.strokeStyle = pal.ink;
+          ctx.lineWidth = Math.max(0.6, w * 0.07);
+          ctx.lineCap = "round";
+          ctx.stroke();
+          ctx.globalAlpha = prevAlpha;
+        }
+
+        // Bead placement — walk the arc, compute r, advance, repeat.
+        const baseRadius = w * 0.5 * state.beadSize;
+        const gapMul = state.beadGap;
+        const varAmt = state.beadVar;
+        const taperAmt = state.taper;
+        const minR = Math.max(1, baseRadius * 0.25); // shrink floor for collision
+        const gap = crossGap || 0;
+
+        // Inset the first/last bead by one radius so endpoints don't get clipped.
+        let s = Math.min(baseRadius, totalLen * 0.5);
+        const endBuf = Math.min(baseRadius * 0.25, totalLen * 0.05);
+        const beads = [];
+        const maxIter = 2000;
+        let iter = 0;
+        while (s < totalLen - endBuf && iter++ < maxIter) {
+          const t = s / totalLen;
+          // Taper bell: full radius in the middle, shrink toward endpoints.
+          const fromEnd = Math.min(t, 1 - t); // 0 at endpoint, 0.5 at midpoint
+          const taperK = 1 - taperAmt + taperAmt * Math.min(1, fromEnd * 4);
+          const vFactor = 1 + (rng() - 0.5) * 2 * varAmt;
+          let r = Math.max(1, baseRadius * taperK * vFactor);
+          const p = sampleAt(s);
+
+          // Cross-chain collision: shrink the bead to clear other chains;
+          // if it can't fit even at minR, skip this slot and try further along.
+          let placed = true;
+          if (beadGrid) {
+            let tries = 0;
+            while (
+              beadGrid.hitsOther(p.x, p.y, r, chainId, gap) &&
+              r > minR &&
+              tries++ < 6
+            ) {
+              r *= 0.78;
+            }
+            if (beadGrid.hitsOther(p.x, p.y, r, chainId, gap)) placed = false;
+          }
+
+          if (placed) {
+            beads.push({ x: p.x, y: p.y, r, tx: p.tx, ty: p.ty });
+            if (beadGrid) beadGrid.add(p.x, p.y, r, chainId);
+            // Advance by diameter × (1+gap). Guard against zero/negative step.
+            const advance = Math.max(r * 0.6, r * 2 * (1 + gapMul));
+            s += advance;
+          } else {
+            // Nudge forward by ~half a base diameter and retry.
+            s += Math.max(baseRadius * 0.6, 2);
+          }
+        }
+
+        for (const b of beads) drawBead(b, pal, rng, curve.bias);
+      }
+
+      /* -------- draw a single bead with one of 6 treatments -------- */
+      function drawBead(b, pal, rng, bias) {
+        const { x, y, r, tx, ty } = b;
+        const treat = pickBeadTreatment(rng);
+        const outW =
+          Math.max(0, state.out) * Math.max(0.8, Math.min(3.0, r * 0.05 + 0.6));
+        const ink = pal.ink;
+        // Orient splits & pies along the local path tangent so dividers feel
+        // kinetic — the bead looks like it's flowing with the curve.
+        const along = Math.atan2(ty, tx);
+
+        ctx.lineJoin = "miter";
+        ctx.lineCap = "butt";
+
+        if (treat === "solid") {
+          beadFill(x, y, r, pickBiased(bias, rng));
+          if (outW > 0.05) beadStroke(x, y, r, ink, outW);
+        } else if (treat === "rings") {
+          const n = 2 + Math.floor(rng() * 4); // 2..5 rings
+          for (let i = 0; i < n; i++) {
+            const rr = r * (1 - i / n);
+            beadFill(x, y, rr, pickBiased(bias, rng));
+            if (outW > 0.05 && i > 0)
+              beadStroke(x, y, rr, ink, Math.max(0.6, outW * 0.6));
+          }
+          if (outW > 0.05) beadStroke(x, y, r, ink, outW);
+        } else if (treat === "split") {
+          // Divide across OR along the tangent — either reads well.
+          const angle = along + (rng() < 0.5 ? 0 : Math.PI * 0.5);
+          const cA = pickBiased(bias, rng);
+          let cB = pickBiased(bias, rng);
+          if (cB === cA) cB = pickBiased(bias, rng);
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.arc(x, y, r, angle, angle + Math.PI);
+          ctx.closePath();
+          ctx.fillStyle = cA;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.arc(x, y, r, angle + Math.PI, angle + Math.PI * 2);
+          ctx.closePath();
+          ctx.fillStyle = cB;
+          ctx.fill();
+          if (outW > 0.05) {
+            ctx.beginPath();
+            ctx.moveTo(x + Math.cos(angle) * r, y + Math.sin(angle) * r);
+            ctx.lineTo(
+              x + Math.cos(angle + Math.PI) * r,
+              y + Math.sin(angle + Math.PI) * r,
+            );
+            ctx.strokeStyle = ink;
+            ctx.lineWidth = outW;
+            ctx.stroke();
+            beadStroke(x, y, r, ink, outW);
+          }
+        } else if (treat === "pie") {
+          const n = 3 + Math.floor(rng() * 4); // 3..6 slices
+          const start = along;
+          for (let i = 0; i < n; i++) {
+            const a0 = start + (i / n) * Math.PI * 2;
+            const a1 = start + ((i + 1) / n) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.arc(x, y, r, a0, a1);
+            ctx.closePath();
+            ctx.fillStyle = pickBiased(bias, rng);
+            ctx.fill();
+          }
+          if (outW > 0.05) {
+            for (let i = 0; i < n; i++) {
+              const a = start + (i / n) * Math.PI * 2;
+              ctx.beginPath();
+              ctx.moveTo(x, y);
+              ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+              ctx.strokeStyle = ink;
+              ctx.lineWidth = Math.max(0.5, outW * 0.6);
+              ctx.stroke();
+            }
+            beadStroke(x, y, r, ink, outW);
+          }
+        } else if (treat === "dots") {
+          beadFill(x, y, r, pickBiased(bias, rng));
+          if (outW > 0.05) beadStroke(x, y, r, ink, outW);
+          const nDots = 1 + Math.floor(rng() * 2);
+          for (let i = 0; i < nDots; i++) {
+            const dr = r * (0.28 + rng() * 0.28);
+            beadFill(x, y, dr, pickBiased(bias, rng));
+            if (outW > 0.05)
+              beadStroke(x, y, dr, ink, Math.max(0.5, outW * 0.55));
+          }
+        } else if (treat === "hollow") {
+          const ringW = r * (0.15 + rng() * 0.25);
+          ctx.beginPath();
+          ctx.arc(x, y, Math.max(0.5, r - ringW * 0.5), 0, Math.PI * 2);
+          ctx.strokeStyle = pickBiased(bias, rng);
+          ctx.lineWidth = ringW;
+          ctx.stroke();
+          if (outW > 0.05) {
+            beadStroke(x, y, r, ink, outW);
+            beadStroke(x, y, Math.max(1, r - ringW), ink, outW);
+          }
+        }
+      }
+
+      function pickBeadTreatment(rng) {
+        const mix = [
+          ["solid", state.solid],
+          ["rings", state.rings],
+          ["split", state.split],
+          ["pie", state.pie],
+          ["dots", state.dots],
+          ["hollow", state.hollow],
+        ];
+        const total = mix.reduce((s, m) => s + m[1], 0);
+        if (total <= 0) return "solid";
+        let r = rng() * total;
+        for (const [name, w] of mix) {
+          r -= w;
+          if (r <= 0) return name;
+        }
+        return "solid";
+      }
+
+      function beadFill(x, y, r, color) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+      function beadStroke(x, y, r, color, lw) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lw;
+        ctx.stroke();
+      }
+
+      /* -------- helpers -------- */
+      function pickColor(pal, rng) {
+        return pal.colors[Math.floor(rng() * pal.colors.length)];
+      }
+      // Build a "bias" — a small weighted subset of palette colors per curve
+      function pickCurvePalette(pal, rng, n) {
+        n = Math.max(1, Math.min(pal.colors.length, n | 0 || 3));
+        const picks = [];
+        const pool = pal.colors.slice();
+        for (let i = 0; i < n && pool.length; i++) {
+          const idx = Math.floor(rng() * pool.length);
+          picks.push(pool.splice(idx, 1)[0]);
+        }
+        const weights = picks.map((_, i) => Math.pow(0.7, i));
+        return { picks, weights };
+      }
+      function pickBiased(bias, rng) {
+        const total = bias.weights.reduce((a, b) => a + b, 0);
+        let r = rng() * total;
+        for (let i = 0; i < bias.picks.length; i++) {
+          r -= bias.weights[i];
+          if (r <= 0) return bias.picks[i];
+        }
+        return bias.picks[bias.picks.length - 1];
+      }
+
+      function paperGrain(ctx, W, H, rng, amount) {
+        const img = ctx.getImageData(0, 0, W, H);
+        const d = img.data;
+        const a = amount * 255;
+        for (let i = 0; i < d.length; i += 4) {
+          const n = (rng() - 0.5) * a;
+          d[i] = clamp(d[i] + n, 0, 255);
+          d[i + 1] = clamp(d[i + 1] + n, 0, 255);
+          d[i + 2] = clamp(d[i + 2] + n, 0, 255);
+        }
+        ctx.putImageData(img, 0, 0);
+      }
+      function clamp(v, a, b) {
+        return v < a ? a : v > b ? b : v;
+      }
+
+      function edgeVignette(ctx, W, H, pal) {
+        const g = ctx.createRadialGradient(
+          W / 2,
+          H / 2,
+          Math.min(W, H) * 0.35,
+          W / 2,
+          H / 2,
+          Math.max(W, H) * 0.75,
+        );
+        g.addColorStop(0, "rgba(0,0,0,0)");
+        g.addColorStop(1, "rgba(0,0,0,0.18)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+      }
+
+      function setStatus(msg) {
+        document.getElementById("status").textContent = msg;
+      }
+
+      /* =========================================================================
+   8. UI wiring
+   ========================================================================= */
+      // Per-palette / per-scale lock keys used inside state.locks. Locked
+      // entries are skipped when randomizeState() picks a new value.
+      function palLockKey(name) {
+        return "pal:" + name;
+      }
+      function scaleLockKey(name) {
+        return "scale:" + name;
+      }
+
+      // SVG strings moved up so buildPalettePills() (which calls makeLockBtn)
+      // can run before the "Lock buttons" block below has initialized its
+      // own consts. Keep the originals deleted below.
+      const LOCK_SVG_OPEN =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v1"/></svg>';
+      const LOCK_SVG_CLOSED =
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a5 5 0 0 0-5 5v3.2A2 2 0 0 0 5.5 12v8A2 2 0 0 0 7.5 22h9a2 2 0 0 0 2-2v-8a2 2 0 0 0-1.5-1.8V7a5 5 0 0 0-5-5zm-3 8.2V7a3 3 0 0 1 6 0v3.2H9z"/></svg>';
+
+      function buildPalettePills() {
+        const pills = document.getElementById("palettePills");
+        pills.innerHTML = "";
+        for (const group of PALETTE_GROUPS) {
+          if (group.label) {
+            const h = document.createElement("div");
+            h.className = "pill-group-header";
+            h.textContent = group.label;
+            pills.appendChild(h);
+          }
+          for (const name of group.names) {
+            if (!PALETTES[name]) continue;
+            const el = document.createElement("div");
+            const excluded = !!state.locks[palLockKey(name)];
+            el.className =
+              "pill" +
+              (name === state.palette ? " active" : "") +
+              (excluded ? " excluded" : "");
+            el.dataset.name = name;
+
+            const label = document.createElement("span");
+            label.textContent = name;
+            el.appendChild(label);
+
+            const lock = makeLockBtn(palLockKey(name));
+            lock.title = excluded
+              ? `"${name}" excluded from dice rolls`
+              : `Lock — exclude "${name}" from dice rolls`;
+            // Keep pill's excluded visual in sync when the lock toggles.
+            lock.addEventListener("click", () => {
+              el.classList.toggle("excluded", !!state.locks[palLockKey(name)]);
+            });
+            el.appendChild(lock);
+
+            el.onclick = (ev) => {
+              // Clicks on the lock button must not also select the palette.
+              if (ev.target.closest(".lock")) return;
+              state.palette = name;
+              document
+                .querySelectorAll("#palettePills .pill")
+                .forEach((p) =>
+                  p.classList.toggle("active", p.dataset.name === name),
+                );
+              renderSwatches();
+              generate();
+            };
+            pills.appendChild(el);
+          }
+        }
+        renderSwatches();
+      }
+      function renderSwatches() {
+        const sw = document.getElementById("swatches");
+        sw.innerHTML = "";
+        const pal = PALETTES[state.palette];
+        const all = [pal.bg, ...pal.colors, pal.ink];
+        for (const c of all) {
+          const s = document.createElement("div");
+          s.className = "swatch";
+          s.style.background = c;
+          sw.appendChild(s);
+        }
+      }
+
+      function bindPills(id, key) {
+        document.querySelectorAll("#" + id + " .pill").forEach((el) => {
+          el.onclick = (ev) => {
+            // Lock-button clicks must not also trigger pill selection.
+            if (ev && ev.target && ev.target.closest(".lock")) return;
+            const val = el.dataset[key];
+            state[key] = val;
+            document
+              .querySelectorAll("#" + id + " .pill")
+              .forEach((p) => p.classList.toggle("active", p === el));
+            generate();
+          };
+        });
+      }
+
+      // Inject a per-pill lock button + excluded styling into pills that
+      // were rendered as static HTML (scale, style). Wraps the pill's text
+      // in a <span> so the lock button can be a sibling.
+      function augmentPillsWithLocks(containerId, dataKey, lockKeyFn) {
+        document
+          .querySelectorAll("#" + containerId + " .pill")
+          .forEach((el) => {
+            const name = el.dataset[dataKey];
+            if (!name) return;
+            // If this pill has already been augmented, skip.
+            if (el.querySelector(".lock")) return;
+
+            const txt = el.textContent.trim();
+            el.textContent = "";
+            const span = document.createElement("span");
+            span.textContent = txt;
+            el.appendChild(span);
+
+            const lock = makeLockBtn(lockKeyFn(name));
+            const excluded = !!state.locks[lockKeyFn(name)];
+            if (excluded) el.classList.add("excluded");
+            lock.title = excluded
+              ? `"${txt}" excluded from dice rolls`
+              : `Lock — exclude "${txt}" from dice rolls`;
+            lock.addEventListener("click", () => {
+              el.classList.toggle("excluded", !!state.locks[lockKeyFn(name)]);
+            });
+            el.appendChild(lock);
+          });
+      }
+
+      // rAF-throttled preview scheduler — coalesces rapid slider `input` events
+      // into at most one preview render per animation frame.
+      // (A pending preview is auto-cancelled by generate() when a full render starts.)
+      let rafHandle = 0;
+      function schedulePreview() {
+        if (rafHandle) return;
+        rafHandle = requestAnimationFrame(() => {
+          rafHandle = 0;
+          generate({ preview: true });
+        });
+      }
+
+      function bindRange(id, key, fmt) {
+        const el = document.getElementById(id);
+        const out = document.getElementById(
+          "v" + id[0].toUpperCase() + id.slice(1),
+        );
+        const update = () => {
+          state[key] = parseFloat(el.value);
+          if (out) out.textContent = fmt ? fmt(state[key]) : state[key];
+        };
+        el.addEventListener("input", () => {
+          update();
+          schedulePreview();
+        });
+        el.addEventListener("change", () => {
+          update();
+          generate();
+        });
+        update();
+      }
+
+      document.getElementById("btnGen").onclick = () => generate();
+      document.getElementById("btnSeed").onclick = () => {
+        const s = Math.random().toString(36).slice(2, 10);
+        document.getElementById("seed").value = s;
+        state.seed = s;
+        generate();
+      };
+      document.getElementById("seed").addEventListener("change", (e) => {
+        state.seed = e.target.value || "filament";
+        generate();
+      });
+
+      /* =========================================================================
+   Roll dice — fully randomize every range slider, palette, scale, style, seed.
+   Used by the "Roll dice" button and as the per-variation source in Dice batch mode.
+   ========================================================================= */
+      // All range-slider ids whose state is randomized.
+      const DICE_RANGE_IDS = [
+        "turb",
+        "freq",
+        "len",
+        "den",
+        "mar",
+        "tilt",
+        "curl",
+        "spiral",
+        "focalX",
+        "focalY",
+        "smooth",
+        "twin",
+        "step",
+        "out",
+        "beadSize",
+        "beadGap",
+        "beadVar",
+        "taper",
+        "cpc",
+        "spine",
+        "crossGap",
+        "solid",
+        "rings",
+        "split",
+        "pie",
+        "dots",
+        "hollow",
+      ];
+      const SCALE_KEYS = [
+        "micro",
+        "small",
+        "medium",
+        "large",
+        "jumbo",
+        "mixed",
+      ];
+      const STYLE_KEYS = ["beads", "mixed-style", "thin"];
+
+      function randInRange(el) {
+        const min = parseFloat(el.min);
+        const max = parseFloat(el.max);
+        const step = parseFloat(el.step) || 0.01;
+        const raw = min + Math.random() * (max - min);
+        const snapped = Math.round(raw / step) * step;
+        return Math.min(max, Math.max(min, snapped));
+      }
+
+      // Populate `state` with random values — does NOT sync UI or render.
+      // Respects state.locks: any key set to true is skipped.
+      // Call syncControlsFromState() + generate() after if you need the UI to reflect it.
+      function randomizeState() {
+        const L = state.locks || {};
+        for (const id of DICE_RANGE_IDS) {
+          if (L[id]) continue;
+          const el = document.getElementById(id);
+          if (!el) continue;
+          state[id] = randInRange(el);
+        }
+        if (!L.palette) {
+          const palKeys = Object.keys(PALETTES).filter((n) => !L["pal:" + n]);
+          // If user locked out every palette, keep the current one rather
+          // than picking from an empty list.
+          if (palKeys.length) {
+            state.palette = palKeys[Math.floor(Math.random() * palKeys.length)];
+          }
+        }
+        if (!L.scale) {
+          const scaleChoices = SCALE_KEYS.filter((n) => !L["scale:" + n]);
+          if (scaleChoices.length) {
+            state.scale =
+              scaleChoices[Math.floor(Math.random() * scaleChoices.length)];
+          }
+        }
+        if (!L.style)
+          state.style =
+            STYLE_KEYS[Math.floor(Math.random() * STYLE_KEYS.length)];
+        if (!L.seed) state.seed = Math.random().toString(36).slice(2, 10);
+      }
+
+      // Push current `state` values back into every slider, pill, and swatch.
+      function syncControlsFromState() {
+        for (const id of DICE_RANGE_IDS) {
+          const el = document.getElementById(id);
+          if (el && state[id] !== undefined) {
+            el.value = state[id];
+            // dispatch input so the readout span + rAF preview handler run
+            el.dispatchEvent(new Event("input"));
+          }
+        }
+        document.getElementById("seed").value = state.seed;
+        document
+          .querySelectorAll("#scalePills .pill")
+          .forEach((p) =>
+            p.classList.toggle("active", p.dataset.scale === state.scale),
+          );
+        document
+          .querySelectorAll("#stylePills .pill")
+          .forEach((p) =>
+            p.classList.toggle("active", p.dataset.style === state.style),
+          );
+        document
+          .querySelectorAll("#palettePills .pill")
+          .forEach((p) =>
+            p.classList.toggle("active", p.dataset.name === state.palette),
+          );
+        renderSwatches();
+      }
+
+      const DICE_HISTORY_MAX = 5;
+      const diceHistory = [];
+      let diceCursor = -1;
+
+      function snapshotDiceState() {
+        const s = {};
+        for (const id of DICE_RANGE_IDS) s[id] = state[id];
+        s.palette = state.palette;
+        s.scale = state.scale;
+        s.style = state.style;
+        s.seed = state.seed;
+        return s;
+      }
+
+      function restoreDiceSnapshot(snap) {
+        for (const id of DICE_RANGE_IDS) {
+          if (snap[id] !== undefined) state[id] = snap[id];
+        }
+        state.palette = snap.palette;
+        state.scale = snap.scale;
+        state.style = snap.style;
+        state.seed = snap.seed;
+        syncControlsFromState();
+        generate();
+      }
+
+      function updateDiceHistoryUI() {
+        const n = diceHistory.length;
+        document.getElementById("btnDicePrev").disabled = diceCursor <= 0;
+        document.getElementById("btnDiceNext").disabled =
+          n === 0 || diceCursor >= n - 1;
+        document.getElementById("vDiceHist").textContent = n
+          ? `${diceCursor + 1}/${n}`
+          : "—";
+        const saveBtn = document.getElementById("btnDiceSaveHistory");
+        saveBtn.disabled = n === 0;
+        saveBtn.textContent = n
+          ? `Save history (${n}) to folder`
+          : "Save history to folder";
+      }
+
+      function pushDiceHistory() {
+        if (diceCursor < diceHistory.length - 1) {
+          diceHistory.length = diceCursor + 1;
+        }
+        diceHistory.push(snapshotDiceState());
+        if (diceHistory.length > DICE_HISTORY_MAX) diceHistory.shift();
+        diceCursor = diceHistory.length - 1;
+        updateDiceHistoryUI();
+      }
+
+      document.getElementById("btnDice").onclick = () => {
+        randomizeState();
+        syncControlsFromState();
+        generate();
+        pushDiceHistory();
+      };
+
+      document.getElementById("btnDicePrev").onclick = () => {
+        if (diceCursor > 0) {
+          diceCursor--;
+          restoreDiceSnapshot(diceHistory[diceCursor]);
+          updateDiceHistoryUI();
+        }
+      };
+
+      document.getElementById("btnDiceNext").onclick = () => {
+        if (diceCursor < diceHistory.length - 1) {
+          diceCursor++;
+          restoreDiceSnapshot(diceHistory[diceCursor]);
+          updateDiceHistoryUI();
+        }
+      };
+
+      document.getElementById("btnDiceSaveHistory").onclick = async () => {
+        if (diceHistory.length === 0) return;
+        if (typeof window.showDirectoryPicker !== "function") {
+          setStatus(
+            "Folder picker not supported in this browser — try Chrome or Edge",
+          );
+          return;
+        }
+
+        let dirHandle;
+        try {
+          dirHandle = await window.showDirectoryPicker({ mode: "readwrite" });
+        } catch (e) {
+          if (e.name === "AbortError") return;
+          setStatus("Folder picker failed: " + e.message);
+          return;
+        }
+
+        const btn = document.getElementById("btnDiceSaveHistory");
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        const baseline = { ...state };
+        const n = diceHistory.length;
+        const outRes = parseInt(document.getElementById("batchRes").value, 10);
+
+        try {
+          for (let i = 0; i < n; i++) {
+            const snap = diceHistory[i];
+            for (const id of DICE_RANGE_IDS) {
+              if (snap[id] !== undefined) state[id] = snap[id];
+            }
+            state.palette = snap.palette;
+            state.scale = snap.scale;
+            state.style = snap.style;
+            state.seed = snap.seed;
+            state.W = outRes;
+            state.H = outRes;
+
+            setStatus(
+              `Rendering ${i + 1}/${n} @ ${outRes}px · seed ${state.seed}…`,
+            );
+            btn.textContent = `Saving ${i + 1}/${n}…`;
+            await new Promise((r) =>
+              requestAnimationFrame(() => setTimeout(r, 0)),
+            );
+            generate();
+
+            const blob = await new Promise((resolve) =>
+              cvs.toBlob(resolve, "image/png"),
+            );
+            const fname = `filament_${String(i + 1).padStart(2, "0")}_${state.seed}_${state.palette}_${state.scale}_${outRes}.png`;
+            const fileHandle = await dirHandle.getFileHandle(fname, {
+              create: true,
+            });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+          }
+          setStatus(
+            `Saved ${n} PNG${n === 1 ? "" : "s"} @ ${outRes}px to folder`,
+          );
+        } catch (err) {
+          setStatus("Save failed: " + err.message);
+        } finally {
+          Object.assign(state, baseline);
+          syncControlsFromState();
+          btn.disabled = false;
+          btn.textContent = originalText;
+          generate();
+          updateDiceHistoryUI();
+        }
+      };
+
+      document.getElementById("btnSave").onclick = () => {
+        // Always export at 4000x4000. Working canvas stays at 2000x2000 for
+        // interactive responsiveness — re-render at 4K just for the download,
+        // then restore the working resolution.
+        const prevW = state.W,
+          prevH = state.H;
+        state.W = 4000;
+        state.H = 4000;
+        setStatus("Rendering 4K for export…");
+        setTimeout(() => {
+          generate();
+          const a = document.createElement("a");
+          a.download = `filament_${state.seed}_${state.palette}_${state.scale}.png`;
+          a.href = cvs.toDataURL("image/png");
+          a.click();
+          state.W = prevW;
+          state.H = prevH;
+          generate();
+        }, 30);
+      };
+      document.getElementById("btnHD").onclick = () => {
+        state.W = 4000;
+        state.H = 4000;
+        setStatus("Rendering 4K…");
+        setTimeout(() => {
+          generate();
+          state.W = 2000;
+          state.H = 2000;
+        }, 30);
+      };
+
+      /* Batch — render N variations, pack into a single ZIP.
+         Mode = "nudge": tweak current settings by Variation strength.
+         Mode = "dice":  fully randomize every variation (same as Roll dice button). */
+      const varyEl = document.getElementById("vary");
+      varyEl.addEventListener("input", () => {
+        document.getElementById("vVary").textContent = parseFloat(
+          varyEl.value,
+        ).toFixed(2);
+      });
+
+      const batchNEl = document.getElementById("batchN");
+      batchNEl.addEventListener("input", () => {
+        document.getElementById("vBatchN").textContent = parseInt(
+          batchNEl.value,
+          10,
+        );
+      });
+
+      let batchMode = "nudge";
+      document.querySelectorAll("#batchModePills .pill").forEach((el) => {
+        el.onclick = () => {
+          batchMode = el.dataset.mode;
+          document
+            .querySelectorAll("#batchModePills .pill")
+            .forEach((p) => p.classList.toggle("active", p === el));
+        };
+      });
+
+      document.getElementById("btnBatch").onclick = async () => {
+        if (typeof JSZip === "undefined") {
+          setStatus("JSZip failed to load — check network");
+          return;
+        }
+        const btn = document.getElementById("btnBatch");
+        btn.disabled = true;
+        const originalBtnText = btn.textContent;
+
+        // Snapshot current state so we can tweak + restore.
+        const baseline = { ...state };
+        const strength = parseFloat(varyEl.value);
+        const N = parseInt(batchNEl.value, 10);
+        const outRes = parseInt(document.getElementById("batchRes").value, 10);
+        const zip = new JSZip();
+        const folder = zip.folder(`filament_batch_${baseline.seed}`);
+
+        // Utility: tweak a numeric param by ±pct of its range, clamped.
+        const tweak = (base, pct, lo, hi) => {
+          const delta = (Math.random() - 0.5) * 2 * pct * strength;
+          return Math.min(hi, Math.max(lo, base + (hi - lo) * delta));
+        };
+
+        try {
+          for (let i = 0; i < N; i++) {
+            if (batchMode === "dice") {
+              // Each variation is an independent full dice roll.
+              randomizeState();
+            } else {
+              // Nudge mode — first is exact baseline, rest are tweaks off it.
+              if (i === 0) {
+                Object.assign(state, baseline);
+              } else {
+                Object.assign(state, baseline);
+                const L = state.locks || {};
+                if (!L.seed)
+                  state.seed = Math.random().toString(36).slice(2, 10);
+                if (!L.turb) state.turb = tweak(baseline.turb, 0.15, 0, 1);
+                if (!L.freq) state.freq = tweak(baseline.freq, 0.2, 0.3, 2.5);
+                if (!L.den) state.den = tweak(baseline.den, 0.2, 0.05, 4);
+                if (!L.len)
+                  state.len = Math.round(tweak(baseline.len, 0.2, 20, 1200));
+                if (!L.tilt)
+                  state.tilt =
+                    (baseline.tilt +
+                      (Math.random() - 0.5) * 30 * strength +
+                      360) %
+                    360;
+              }
+            }
+            // Apply chosen export resolution (overrides whatever dice/baseline set).
+            state.W = outRes;
+            state.H = outRes;
+
+            setStatus(`Rendering ${i + 1}/${N} · seed ${state.seed}…`);
+            btn.textContent = `Rendering ${i + 1}/${N}…`;
+            // Let the UI breathe so the status line paints.
+            await new Promise((r) =>
+              requestAnimationFrame(() => setTimeout(r, 0)),
+            );
+
+            generate();
+
+            // Convert canvas → blob → zip entry.
+            const blob = await new Promise((resolve) =>
+              cvs.toBlob(resolve, "image/png"),
+            );
+            const fname = `filament_${String(i + 1).padStart(2, "0")}_${state.seed}_${state.palette}_${state.scale}_${outRes}.png`;
+            folder.file(fname, blob);
+          }
+
+          setStatus("Zipping…");
+          btn.textContent = "Zipping…";
+          const zipBlob = await zip.generateAsync({ type: "blob" });
+          const url = URL.createObjectURL(zipBlob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `filament_batch_${baseline.seed}_${batchMode}_${outRes}.zip`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+          setStatus(
+            `Downloaded ${N} variations · ${(zipBlob.size / 1024 / 1024).toFixed(1)} MB`,
+          );
+        } catch (err) {
+          setStatus("Batch failed: " + err.message);
+        } finally {
+          // Restore original state + sync UI + re-render.
+          Object.assign(state, baseline);
+          syncControlsFromState();
+          btn.disabled = false;
+          btn.textContent = originalBtnText;
+          generate();
+        }
+      };
+
+      buildPalettePills();
+      bindPills("scalePills", "scale");
+      bindPills("stylePills", "style");
+      augmentPillsWithLocks("scalePills", "scale", scaleLockKey);
+      bindRange("turb", "turb", (v) => v.toFixed(2));
+      bindRange("freq", "freq", (v) => v.toFixed(2));
+      bindRange("len", "len", (v) => String(v | 0));
+      bindRange("den", "den", (v) => v.toFixed(2));
+      bindRange("mar", "mar", (v) => String(v | 0));
+      bindRange("tilt", "tilt", (v) => String(v | 0) + "°");
+      bindRange("smooth", "smooth", (v) => String(v | 0));
+      bindRange("twin", "twin", (v) => String(v | 0));
+      bindRange("step", "step", (v) => v.toFixed(1));
+      bindRange("out", "out", (v) => v.toFixed(2));
+      bindRange("beadSize", "beadSize", (v) => v.toFixed(2));
+      bindRange("beadGap", "beadGap", (v) => v.toFixed(2));
+      bindRange("beadVar", "beadVar", (v) => v.toFixed(2));
+      bindRange("taper", "taper", (v) => v.toFixed(2));
+      bindRange("cpc", "cpc", (v) => String(v | 0));
+      bindRange("spine", "spine", (v) => v.toFixed(2));
+      bindRange("crossGap", "crossGap", (v) => v.toFixed(1));
+      bindRange("solid", "solid", (v) => v.toFixed(2));
+      bindRange("rings", "rings", (v) => v.toFixed(2));
+      bindRange("split", "split", (v) => v.toFixed(2));
+      bindRange("pie", "pie", (v) => v.toFixed(2));
+      bindRange("dots", "dots", (v) => v.toFixed(2));
+      bindRange("hollow", "hollow", (v) => v.toFixed(2));
+      bindRange("curl", "curl", (v) => v.toFixed(2));
+      bindRange("spiral", "spiral", (v) => v.toFixed(2));
+      bindRange("focalX", "focalX", (v) => v.toFixed(2));
+      bindRange("focalY", "focalY", (v) => v.toFixed(2));
+
+      /* =========================================================================
+   Lock buttons — per-control padlock so "Roll dice" / batch-dice / nudge
+   skip any key the user has locked. Toggle by clicking the icon.
+   (LOCK_SVG_OPEN / LOCK_SVG_CLOSED are declared earlier in the file, near
+   palLockKey(), so buildPalettePills() can reach them at init.)
+   ========================================================================= */
+      function makeLockBtn(key) {
+        const b = document.createElement("button");
+        b.type = "button";
+        const initiallyLocked = !!(state.locks && state.locks[key]);
+        b.className = "lock" + (initiallyLocked ? " locked" : "");
+        b.dataset.lockKey = key;
+        b.setAttribute("aria-pressed", initiallyLocked ? "true" : "false");
+        b.title = initiallyLocked
+          ? "Locked — dice roll will skip this"
+          : "Lock — dice roll will skip this";
+        b.innerHTML = initiallyLocked ? LOCK_SVG_CLOSED : LOCK_SVG_OPEN;
+        b.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const locked = !state.locks[key];
+          state.locks[key] = locked;
+          b.classList.toggle("locked", locked);
+          b.setAttribute("aria-pressed", locked ? "true" : "false");
+          b.innerHTML = locked ? LOCK_SVG_CLOSED : LOCK_SVG_OPEN;
+          b.title = locked
+            ? "Locked — dice roll will skip this"
+            : "Unlocked — dice roll will randomize this";
+        });
+        return b;
+      }
+
+      function initLocks() {
+        // Range sliders: put the lock at the start of the slider's label.
+        for (const id of DICE_RANGE_IDS) {
+          const input = document.getElementById(id);
+          if (!input) continue;
+          const label = input.previousElementSibling;
+          if (!label || label.tagName !== "LABEL") continue;
+          const tlbl = label.querySelector(".tlbl");
+          const lock = makeLockBtn(id);
+          if (tlbl) tlbl.insertBefore(lock, tlbl.firstChild);
+          else label.insertBefore(lock, label.firstChild);
+        }
+        // Pill groups: lock lives next to the group's sub-heading.
+        const attachToSub = (pillId, key) => {
+          const container = document.getElementById(pillId);
+          if (!container) return;
+          const sub = container.parentElement.querySelector(".sub");
+          if (!sub) return;
+          sub.appendChild(makeLockBtn(key));
+        };
+        attachToSub("palettePills", "palette");
+        attachToSub("scalePills", "scale");
+        attachToSub("stylePills", "style");
+        // Seed — wrap the label text in a .tlbl span so the lock nests
+        // cleanly inside the existing flex space-between layout.
+        const seedInput = document.getElementById("seed");
+        if (seedInput) {
+          const seedLabel = seedInput.previousElementSibling;
+          if (seedLabel && seedLabel.tagName === "LABEL") {
+            const vSpan = seedLabel.querySelector(".v");
+            const tlbl = document.createElement("span");
+            tlbl.className = "tlbl";
+            tlbl.textContent = "Seed";
+            tlbl.insertBefore(makeLockBtn("seed"), tlbl.firstChild);
+            seedLabel.innerHTML = "";
+            seedLabel.appendChild(tlbl);
+            if (vSpan) seedLabel.appendChild(vSpan);
+          }
+        }
+      }
+      initLocks();
+
+      /* presets — one-click configs */
+      const PRESETS = {
+        refs: {
+          turb: 0.35,
+          freq: 0.9,
+          len: 500,
+          den: 1.4,
+          mar: 60,
+          smooth: 4,
+          twin: 5,
+          step: 1.0,
+          out: 1.0,
+          beadSize: 0.95,
+          beadGap: 0.05,
+          beadVar: 0.15,
+          taper: 0.25,
+          cpc: 3,
+          spine: 0.0,
+          crossGap: 2.0,
+          solid: 0.45,
+          rings: 0.2,
+          split: 0.12,
+          pie: 0.08,
+          dots: 0.1,
+          hollow: 0.05,
+          scale: "mixed",
+          style: "beads",
+          palette: "Classic",
+        },
+        rosary: {
+          turb: 0.2,
+          freq: 0.7,
+          len: 700,
+          den: 0.9,
+          mar: 70,
+          smooth: 6,
+          twin: 7,
+          step: 0.9,
+          out: 1.1,
+          beadSize: 1.0,
+          beadGap: 0.35,
+          beadVar: 0.05,
+          taper: 0.15,
+          cpc: 3,
+          spine: 0.28,
+          crossGap: 3.0,
+          solid: 0.25,
+          rings: 0.45,
+          split: 0.05,
+          pie: 0.02,
+          dots: 0.18,
+          hollow: 0.05,
+          scale: "medium",
+          style: "beads",
+          palette: "Luxe",
+        },
+        nebula: {
+          turb: 0.75,
+          freq: 1.3,
+          len: 450,
+          den: 2.4,
+          mar: 40,
+          smooth: 2,
+          twin: 3,
+          step: 1.0,
+          out: 0.7,
+          beadSize: 1.1,
+          beadGap: -0.15,
+          beadVar: 0.55,
+          taper: 0.4,
+          cpc: 5,
+          spine: 0.0,
+          crossGap: 1.5,
+          solid: 0.5,
+          rings: 0.15,
+          split: 0.05,
+          pie: 0.05,
+          dots: 0.22,
+          hollow: 0.03,
+          scale: "mixed",
+          style: "beads",
+          palette: "Cosmos",
+        },
+        cellular: {
+          turb: 0.5,
+          freq: 1.0,
+          len: 400,
+          den: 1.8,
+          mar: 50,
+          smooth: 3,
+          twin: 4,
+          step: 1.0,
+          out: 1.0,
+          beadSize: 0.9,
+          beadGap: 0.1,
+          beadVar: 0.3,
+          taper: 0.3,
+          cpc: 4,
+          spine: 0.12,
+          crossGap: 2.5,
+          solid: 0.4,
+          rings: 0.3,
+          split: 0.08,
+          pie: 0.04,
+          dots: 0.16,
+          hollow: 0.04,
+          scale: "mixed",
+          style: "beads",
+          palette: "Emerald",
+        },
+        cosmic: {
+          turb: 0.4,
+          freq: 0.8,
+          len: 600,
+          den: 1.1,
+          mar: 60,
+          smooth: 5,
+          twin: 6,
+          step: 0.9,
+          out: 0.9,
+          beadSize: 1.15,
+          beadGap: 0.5,
+          beadVar: 0.2,
+          taper: 0.2,
+          cpc: 4,
+          spine: 0.4,
+          crossGap: 4.0,
+          solid: 0.25,
+          rings: 0.15,
+          split: 0.22,
+          pie: 0.22,
+          dots: 0.1,
+          hollow: 0.08,
+          scale: "mixed",
+          style: "mixed-style",
+          palette: "Rad",
+        },
+        whisper: {
+          turb: 0.3,
+          freq: 0.7,
+          len: 650,
+          den: 1.0,
+          mar: 80,
+          smooth: 6,
+          twin: 7,
+          step: 1.0,
+          out: 1.0,
+          beadSize: 0.55,
+          beadGap: 0.9,
+          beadVar: 0.1,
+          taper: 0.5,
+          cpc: 2,
+          spine: 0.55,
+          crossGap: 3.0,
+          solid: 0.5,
+          rings: 0.2,
+          split: 0.02,
+          pie: 0.02,
+          dots: 0.08,
+          hollow: 0.18,
+          scale: "small",
+          style: "mixed-style",
+          palette: "Mono",
+        },
+      };
+      function applyPreset(name) {
+        const p = PRESETS[name];
+        if (!p) return;
+        Object.assign(state, p);
+        // sync all sliders/pills to new state
+        const ids = [
+          "turb",
+          "freq",
+          "len",
+          "den",
+          "mar",
+          "tilt",
+          "smooth",
+          "twin",
+          "step",
+          "out",
+          "beadSize",
+          "beadGap",
+          "beadVar",
+          "taper",
+          "cpc",
+          "spine",
+          "crossGap",
+          "solid",
+          "rings",
+          "split",
+          "pie",
+          "dots",
+          "hollow",
+        ];
+        for (const id of ids) {
+          const el = document.getElementById(id);
+          if (el && state[id] !== undefined) {
+            el.value = state[id];
+            el.dispatchEvent(new Event("input"));
+          }
+        }
+        // pill groups
+        document
+          .querySelectorAll("#scalePills .pill")
+          .forEach((p2) =>
+            p2.classList.toggle("active", p2.dataset.scale === state.scale),
+          );
+        document
+          .querySelectorAll("#stylePills .pill")
+          .forEach((p2) =>
+            p2.classList.toggle("active", p2.dataset.style === state.style),
+          );
+        document
+          .querySelectorAll("#palettePills .pill")
+          .forEach((p2) =>
+            p2.classList.toggle("active", p2.dataset.name === state.palette),
+          );
+        renderSwatches();
+        generate();
+      }
+      document.querySelectorAll("#presetPills .pill").forEach((el) => {
+        el.onclick = () => {
+          document
+            .querySelectorAll("#presetPills .pill")
+            .forEach((p2) => p2.classList.toggle("active", p2 === el));
+          applyPreset(el.dataset.preset);
+        };
+      });
+
+      /* =========================================================================
+   Favorites — seed + full state + thumbnail, persisted to localStorage
+   ========================================================================= */
+      const FAV_KEY = "filament_favs_v1";
+      // Params to snapshot (everything except render dimensions)
+      const FAV_PARAMS = [
+        "seed",
+        "palette",
+        "scale",
+        "style",
+        "turb",
+        "freq",
+        "len",
+        "den",
+        "mar",
+        "tilt",
+        "curl",
+        "spiral",
+        "focalX",
+        "focalY",
+        "smooth",
+        "twin",
+        "step",
+        "out",
+        "beadSize",
+        "beadGap",
+        "beadVar",
+        "taper",
+        "cpc",
+        "spine",
+        "crossGap",
+        "solid",
+        "rings",
+        "split",
+        "pie",
+        "dots",
+        "hollow",
+      ];
+
+      function loadFavs() {
+        try {
+          return JSON.parse(localStorage.getItem(FAV_KEY) || "[]");
+        } catch {
+          return [];
+        }
+      }
+      function saveFavs(favs) {
+        try {
+          localStorage.setItem(FAV_KEY, JSON.stringify(favs));
+        } catch (e) {
+          setStatus("Save failed: storage full. Export & clear old favs.");
+        }
+      }
+      function makeThumbnail(size = 128) {
+        const tmp = document.createElement("canvas");
+        tmp.width = size;
+        tmp.height = size;
+        const tctx = tmp.getContext("2d");
+        tctx.imageSmoothingEnabled = true;
+        tctx.imageSmoothingQuality = "high";
+        tctx.drawImage(cvs, 0, 0, size, size);
+        return tmp.toDataURL("image/jpeg", 0.72);
+      }
+      function snapshotState() {
+        const snap = {};
+        for (const k of FAV_PARAMS) snap[k] = state[k];
+        return snap;
+      }
+      function saveCurrentFav() {
+        const label = (document.getElementById("favLabel").value || "").trim();
+        const favs = loadFavs();
+        const thumb = makeThumbnail(128);
+        const entry = {
+          id: Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+          label: label || state.seed,
+          ts: Date.now(),
+          thumb,
+          snap: snapshotState(),
+        };
+        favs.unshift(entry);
+        saveFavs(favs);
+        document.getElementById("favLabel").value = "";
+        renderFavs();
+        setStatus(`Saved "${entry.label}"`);
+      }
+      function applyFav(id) {
+        const favs = loadFavs();
+        const f = favs.find((x) => x.id === id);
+        if (!f) return;
+        Object.assign(state, f.snap);
+        // Sync all UI controls back to state
+        document.getElementById("seed").value = state.seed;
+        const rangeIds = [
+          "turb",
+          "freq",
+          "len",
+          "den",
+          "mar",
+          "tilt",
+          "curl",
+          "spiral",
+          "focalX",
+          "focalY",
+          "smooth",
+          "twin",
+          "step",
+          "out",
+          "beadSize",
+          "beadGap",
+          "beadVar",
+          "taper",
+          "cpc",
+          "spine",
+          "crossGap",
+          "solid",
+          "rings",
+          "split",
+          "pie",
+          "dots",
+          "hollow",
+        ];
+        for (const id of rangeIds) {
+          const el = document.getElementById(id);
+          if (el && state[id] !== undefined) {
+            el.value = state[id];
+            el.dispatchEvent(new Event("input"));
+          }
+        }
+        document
+          .querySelectorAll("#scalePills .pill")
+          .forEach((p) =>
+            p.classList.toggle("active", p.dataset.scale === state.scale),
+          );
+        document
+          .querySelectorAll("#stylePills .pill")
+          .forEach((p) =>
+            p.classList.toggle("active", p.dataset.style === state.style),
+          );
+        document
+          .querySelectorAll("#palettePills .pill")
+          .forEach((p) =>
+            p.classList.toggle("active", p.dataset.name === state.palette),
+          );
+        document
+          .querySelectorAll("#presetPills .pill")
+          .forEach((p) => p.classList.remove("active"));
+        renderSwatches();
+        generate();
+        setStatus(`Loaded "${f.label}"`);
+      }
+      function deleteFav(id) {
+        const favs = loadFavs().filter((f) => f.id !== id);
+        saveFavs(favs);
+        renderFavs();
+      }
+      function renderFavs() {
+        const list = document.getElementById("favList");
+        const favs = loadFavs();
+        document.getElementById("favCount").textContent = favs.length;
+        list.innerHTML = "";
+        if (favs.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "fav-empty";
+          empty.textContent = "No favorites yet. Save a composition with ★";
+          list.appendChild(empty);
+          return;
+        }
+        for (const f of favs) {
+          const row = document.createElement("div");
+          row.className = "fav";
+          row.innerHTML = `
+      <img src="${f.thumb}" alt="thumb">
+      <div class="meta">
+        <div class="lbl">${escapeHtml(f.label)}</div>
+        <div class="sub2">${escapeHtml(f.snap.palette)} · ${escapeHtml(f.snap.scale)} · ${escapeHtml(f.snap.seed)}</div>
+      </div>
+      <button class="del" title="Delete">×</button>
+    `;
+          row.querySelector(".del").onclick = (e) => {
+            e.stopPropagation();
+            deleteFav(f.id);
+          };
+          row.onclick = () => applyFav(f.id);
+          list.appendChild(row);
+        }
+      }
+      function escapeHtml(s) {
+        return String(s).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      }
+
+      document.getElementById("btnSaveFav").onclick = saveCurrentFav;
+      document.getElementById("btnClearFavs").onclick = () => {
+        if (!confirm("Delete all favorites?")) return;
+        saveFavs([]);
+        renderFavs();
+      };
+      document.getElementById("btnExportFavs").onclick = () => {
+        const favs = loadFavs();
+        const blob = new Blob([JSON.stringify(favs, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "filament_favorites.json";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      };
+      document.getElementById("btnImportFavs").onclick = () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "application/json";
+        input.onchange = async () => {
+          const f = input.files[0];
+          if (!f) return;
+          const txt = await f.text();
+          try {
+            const imported = JSON.parse(txt);
+            if (!Array.isArray(imported)) throw new Error("not an array");
+            const existing = loadFavs();
+            const byId = new Set(existing.map((x) => x.id));
+            const merged = existing.concat(
+              imported.filter((x) => x && x.id && !byId.has(x.id)),
+            );
+            saveFavs(merged);
+            renderFavs();
+            setStatus(`Imported ${merged.length - existing.length} favorites`);
+          } catch (e) {
+            setStatus("Import failed: " + e.message);
+          }
+        };
+        input.click();
+      };
+      // Save on Ctrl/Cmd+D
+      window.addEventListener("keydown", (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "d") {
+          e.preventDefault();
+          saveCurrentFav();
+        }
+      });
+
+      /* initial run — start with the "Classic" preset so the first frame
+         already shows beaded flow, not a flat empty canvas. */
+      applyPreset("refs");
+      document
+        .querySelectorAll("#presetPills .pill")
+        .forEach((p) =>
+          p.classList.toggle("active", p.dataset.preset === "refs"),
+        );
+      renderFavs();
+
+      /* keyboard */
+      window.addEventListener("keydown", (e) => {
+        if (
+          e.target &&
+          (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")
+        )
+          return;
+        if (e.key === " ") {
+          e.preventDefault();
+          document.getElementById("btnSeed").click();
+        }
+        if (e.key === "Enter") {
+          generate();
+        }
+        if (e.key === "s" && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          document.getElementById("btnSave").click();
+        }
+      });
+
+      /* =========================================================================
+   Tooltip — single shared popover, positioned in viewport space so it
+   never gets clipped by the scrolling panel.
+   ========================================================================= */
+      (() => {
+        let pop = document.getElementById("tip-pop");
+        if (!pop) {
+          pop = document.createElement("div");
+          pop.id = "tip-pop";
+          document.body.appendChild(pop);
+        }
+        const GAP = 8;
+        let shown = false;
+        const place = (tipEl) => {
+          const text = tipEl.getAttribute("data-tip") || "";
+          if (!text) return;
+          pop.textContent = text;
+          // temporarily make visible but invisible to measure
+          pop.style.visibility = "hidden";
+          pop.classList.add("show");
+          const r = tipEl.getBoundingClientRect();
+          const pw = pop.offsetWidth,
+            ph = pop.offsetHeight;
+          const vw = window.innerWidth,
+            vh = window.innerHeight;
+          // prefer left of the tip icon
+          let x = r.left - pw - GAP;
+          let y = r.top + r.height / 2 - ph / 2;
+          if (x < 6) {
+            // not enough room to the left → flip right
+            x = r.right + GAP;
+          }
+          // clamp right edge
+          if (x + pw > vw - 6) x = vw - pw - 6;
+          // clamp vertical
+          if (y < 6) y = 6;
+          if (y + ph > vh - 6) y = vh - ph - 6;
+          pop.style.left = x + "px";
+          pop.style.top = y + "px";
+          pop.style.visibility = "visible";
+          shown = true;
+        };
+        const hide = () => {
+          if (!shown) return;
+          pop.classList.remove("show");
+          shown = false;
+        };
+        document.addEventListener("mouseover", (e) => {
+          const t = e.target.closest(".tip");
+          if (t) place(t);
+          else if (shown && !e.target.closest("#tip-pop")) hide();
+        });
+        document.addEventListener("mouseout", (e) => {
+          if (e.target.closest(".tip")) hide();
+        });
+        // hide when the panel scrolls (so the tooltip doesn't float disconnected)
+        const panel = document.getElementById("panel");
+        if (panel) panel.addEventListener("scroll", hide, { passive: true });
+        window.addEventListener("scroll", hide, { passive: true });
+        window.addEventListener("resize", hide);
+      })();
+    </script>
+  </body>
+</html>
