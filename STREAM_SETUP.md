@@ -67,7 +67,7 @@ between 24/7 and 24/6.
 
 **Create a dedicated user:** `streambot`. Run everything from this
 user, not your daily account. Keeps Chrome profiles / cookies /
-notifications clean.
+notifications clean. ***********************************
 
 ---
 
@@ -97,14 +97,14 @@ cd l:/Projects_claudecode/Universe_sim_4_7
 git init
 git add index.html CLAUDE.md README.md ssi_tracks/
 git commit -m "initial public version"
-# Create repo on github.com (e.g. smallsky), then:
-git remote add origin git@github.com:unrealape/smallsky.git
+# Create repo on github.com (e.g. orrery), then:
+git remote add origin git@github.com:unrealape/orrery.git
 git push -u origin main
 ```
 
 On GitHub: repo Settings → Pages → Source = `main` branch, `/` root.
 Save. In 60 seconds the sim is live at
-`https://unrealape.github.io/smallsky/` (or equivalent).
+`https://unrealape.github.io/Orrery/` (or equivalent).
 
 Load it from the stream box's browser. If it runs, you have a
 streamable URL. This URL is now the single source of truth for the
@@ -126,10 +126,10 @@ Create a launcher shortcut. Right-click desktop → New → Shortcut →
 paste:
 
 ```
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk --start-fullscreen --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --autoplay-policy=no-user-gesture-required --app=https://unrealape.github.io/smallsky/
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk --start-fullscreen --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --autoplay-policy=no-user-gesture-required --app=https://unrealape.github.io/Orrery/
 ```
 
-Name it `SmallSkyKiosk`. Double-click to test. Chrome should open
+Name it `OrreryKiosk`. Double-click to test. Chrome should open
 fullscreen showing the sim, no chrome (pun), no tab bar.
 
 Exit with `Alt+F4`. (Users can't see `Alt+F4` in your stream.)
@@ -228,7 +228,7 @@ One scene is enough. Call it `Main`.
 
 Sources (top to bottom = draw order):
 
-1. **Window Capture (WGC):** SmallSkyKiosk Chrome window. Method:
+1. **Window Capture (WGC):** OrreryKiosk Chrome window. Method:
    _Windows 10 (1903 and up)_. Capture cursor: _off_.
 2. **Audio Output Capture:** Default desktop (for VLC).
 3. **Browser Source:** your local overlay (see §8), URL
@@ -252,7 +252,7 @@ From the stream user's browser on _any_ machine:
 
 **Creator Dashboard → Channel:**
 
-- Title: `small sky · infinite universe with original music`
+- Title: `orrery · infinite universe with original music`
 - Category: **Software and Game Development** (week 1–2). Rotate to
   **ASMR** or **Music** after.
 - Tags: `generative`, `ambient`, `music`, `opensource`, `simulation`,
@@ -330,7 +330,7 @@ Create `C:\stream\overlay\index.html`:
   }
 </style>
 <div class="wrap">
-  <div class="brand">small sky · @unrealape</div>
+  <div class="brand">orrery · @unrealape</div>
   <div id="scene">—</div>
   <div id="track">—</div>
 </div>
@@ -469,7 +469,7 @@ client.on("message", (channel, tags, msg, self) => {
   } else if (cmd === "!info") {
     client.say(
       channel,
-      "small sky · https://github.com/unrealape/smallsky · runs in your browser",
+      "orrery · https://github.com/unrealape/orrery · runs in your browser",
     );
   }
 });
@@ -534,7 +534,7 @@ Task Scheduler → Create Task:
 ```powershell
 Stop-Process -Name chrome -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 3
-Start-Process "C:\stream\SmallSkyKiosk.lnk"
+Start-Process "C:\stream\OrreryKiosk.lnk"
 ```
 
 OBS will keep capturing — the "Window Capture" source re-binds to
@@ -624,7 +624,7 @@ Morning of launch, in order:
   twice/week.
 - **Music stopped, video fine** → VLC. Restart it, then check if
   playlist has bad MP3s.
-- **Bot not responding in chat** → `nssm restart SmallSkyBot`. Check
+- **Bot not responding in chat** → `nssm restart OrreryBot`. Check
   `bot.log`.
 - **Twitch says "offline" but OBS says streaming** → Twitch ingest
   issue. Switch ingest server in OBS → Stream settings. Usually
