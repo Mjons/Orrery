@@ -1312,6 +1312,22 @@
       };
       const DENSITY_ORDER = ["lite", "standard", "dense", "lush"];
       function loadInitialDensity() {
+        // URL param takes top priority — lets an embed / share link
+        // land a visitor at a specific density without them touching UI.
+        // Accepts either the key name (?objects=lush) or the short count
+        // (?objects=65k).  Case-insensitive.
+        try {
+          const url = new URL(location.href);
+          const raw = (url.searchParams.get("objects") || "")
+            .toLowerCase()
+            .trim();
+          if (raw) {
+            if (DENSITY_LEVELS[raw]) return raw;
+            for (const key of DENSITY_ORDER) {
+              if (DENSITY_LEVELS[key].shortCount === raw) return key;
+            }
+          }
+        } catch (_) {}
         try {
           const stored = localStorage.getItem("universeSim.density");
           if (stored && DENSITY_LEVELS[stored]) return stored;
@@ -3855,47 +3871,65 @@
 
       // Milky Way — a dedicated barred-spiral portrait.  Logarithmic spiral
       // arms (pitch ≈ 12°), elongated central bar aligned with +X, thin dust
-      // lanes leading the arms, sparse spheroidal halo, Sgr A* at origin.
-      // Uses kind 5 for the warm bulge tint and a custom TINT_MILKYWAY so
-      // the bulge reads gold against the slightly cooler disk.
+      // lanes on the trailing edge of the major arms, sparse spheroidal halo.
+      //
+      // Rendering uses the "mass" channel, so brighter stars come from
+      // higher body masses.  Mass is carefully tiered so arms stand out
+      // against inter-arm gaps: bulge >> arm-major > arm-minor > inter-arm.
+      // Sgr A* is intentionally tiny (mass 80, bhHighlight 0) so the core
+      // doesn't swallow the frame — real galaxies' central BH is visually
+      // negligible next to the surrounding stellar mass.
       function sceneMilkyWay() {
         zero();
-        const R_DISK = 300;
-        const R_BAR = 55;
-        const PITCH = (12 * Math.PI) / 180; // arm pitch angle
-        const COT_PITCH = 1 / Math.tan(PITCH); // ≈ 4.7
-        const BH_MASS = 45000;
-        const M_DISK = 14000; // total stellar mass for v_circ enclosed-mass model
-        const CORE_R = 30;
+        const R_DISK = 240;
+        const R_BAR = 48;
+        const PITCH = (13 * Math.PI) / 180; // arm pitch angle (MW is ~12–13°)
+        const COT_PITCH = 1 / Math.tan(PITCH); // ≈ 4.3
+        // Central anchor mass.  Heavy enough to dominate the 91 nucleus
+        // bulge stars around it (combined ~2400) so close encounters kick
+        // the *stars*, not the BH.  Rendered as kind 5 (bulge) instead of
+        // kind 2 so the shader's size×5 BH bonus doesn't turn it into a
+        // crater — it still reads as the galactic core via the warm
+        // TINT_MILKYWAY gold tint.
+        const BH_MASS = 3200;
         const SPIN = +1;
+        const SOFTENING = 2.5;
+        const EPS2 = SOFTENING * SOFTENING;
 
-        // Smooth flat-rotation-curve enclosed-mass profile
-        const mEnc = (r) =>
-          BH_MASS + (M_DISK * (r * r)) / (r * r + CORE_R * CORE_R);
+        // Temporary crude v_circ estimate for use during placement; real
+        // velocities are overwritten by the force-sum pass at the end.
+        const mEncGuess = (r) =>
+          BH_MASS + (25000 * (r * r)) / (r * r + 50 * 50);
 
-        // Sgr A*
-        setBody(0, 0, 0, 0, BH_MASS, 0, 0, 0, 2.0);
+        // Sgr A* — placed as kind 5 (bulge) so it picks up the warm gold
+        // tint and avoids the shader's kind-2 size×5 multiplier.  Heavy
+        // enough that neighbour stars bounce off it, not the other way.
+        setBody(0, 0, 0, 0, BH_MASS, 0, 0, 0, 5.0);
         let i = 1;
 
-        // ----- Bulge + bar (kind 5, warm tint via TINT_MILKYWAY) -----
-        // Elongated gaussian along X; vertically thin; moderate in Z.
-        const BAR_N = 200;
+        // ----- Bulge + bar (kind 5 → warm gold via TINT_MILKYWAY) -----
+        // Elongated gaussian along X, thin vertically.  High masses = bright
+        // gold bulge.  Inner dense core uses a tighter gaussian subset.
+        const BAR_N = 260;
         for (let k = 0; k < BAR_N && i < MAX_BODIES; k++) {
-          const x = randn() * 54;
-          const y = randn() * 4;
-          const z = randn() * 18;
+          // 35% of bulge stars form a tight inner nucleus
+          const nucleus = k < BAR_N * 0.35;
+          const x = randn() * (nucleus ? 16 : 44);
+          const y = randn() * 3.0;
+          const z = randn() * (nucleus ? 9 : 18);
           const r = Math.sqrt(x * x + z * z);
           const safeR = Math.max(r, 6);
-          const v = Math.sqrt(mEnc(safeR) / safeR) * 0.85;
+          const v = Math.sqrt(mEncGuess(safeR) / safeR) * 0.9;
           const tx = -z / Math.max(r, 0.5);
           const tz = x / Math.max(r, 0.5);
-          const disp = v * 0.12;
+          const disp = v * 0.14;
           setBody(
             i++,
             x,
             y,
             z,
-            2.5 + rng() * 3.5,
+            // Heavy mass so bulge stars map to the bright end of the palette
+            nucleus ? 18 + rng() * 18 : 10 + rng() * 14,
             tx * v * SPIN + randn() * disp,
             randn() * disp * 0.3,
             tz * v * SPIN + randn() * disp,
@@ -3904,29 +3938,37 @@
         }
 
         // ----- Disk + spiral arms (kind 0) -----
-        // Two major + two minor log-spiral arms; inter-arm stars are sparse.
-        const DISK_N = 3400;
+        // Two major arms + two minor + sparse inter-arm field.  Arm stars
+        // get heavier mass so they *read* as arms on the mass channel.
+        const DISK_N = 3300;
         for (let k = 0; k < DISK_N && i < MAX_BODIES; k++) {
-          let r = R_BAR + Math.pow(rng(), 0.6) * (R_DISK - R_BAR);
+          let r = R_BAR + Math.pow(rng(), 0.55) * (R_DISK - R_BAR);
           r = Math.min(Math.max(r, R_BAR + 2), R_DISK);
 
+          // Arm selection — 70% major, 15% minor, 15% inter-arm
           const armRoll = rng();
-          let armK, armSpread;
-          if (armRoll < 0.38) {
+          let armK, armSpread, starMass;
+          if (armRoll < 0.35) {
             armK = 0;
-            armSpread = 0.14 + 0.0006 * r;
-          } else if (armRoll < 0.72) {
+            armSpread = 0.11 + 0.0005 * r;
+            starMass = 4.5 + rng() * 6.5;
+          } else if (armRoll < 0.7) {
             armK = 1;
-            armSpread = 0.14 + 0.0006 * r;
-          } else if (armRoll < 0.86) {
+            armSpread = 0.11 + 0.0005 * r;
+            starMass = 4.5 + rng() * 6.5;
+          } else if (armRoll < 0.82) {
             armK = 2;
-            armSpread = 0.22 + 0.0008 * r;
-          } else if (armRoll < 0.95) {
+            armSpread = 0.18 + 0.0006 * r;
+            starMass = 2.0 + rng() * 3.5;
+          } else if (armRoll < 0.93) {
             armK = 3;
-            armSpread = 0.22 + 0.0008 * r;
+            armSpread = 0.18 + 0.0006 * r;
+            starMass = 2.0 + rng() * 3.5;
           } else {
+            // Inter-arm field star — scatters broadly, dim
             armK = Math.floor(rng() * 4);
-            armSpread = 1.1; // inter-arm body — broad scatter
+            armSpread = 1.2;
+            starMass = 0.8 + rng() * 1.3;
           }
 
           const thetaArm =
@@ -3935,20 +3977,23 @@
 
           const x = r * Math.cos(theta);
           const z = r * Math.sin(theta);
-          // Disk flares gently with radius (real disks flare outward)
-          const y = randn() * (3.5 + r * 0.01);
+          // Thin disk, flares gently outward (real disks do this)
+          const y = randn() * (2.6 + r * 0.008);
 
-          const v = Math.sqrt(mEnc(r) / r);
+          const v = Math.sqrt(mEncGuess(r) / r);
           const tx = -Math.sin(theta) * SPIN;
           const tz = Math.cos(theta) * SPIN;
-          const disp = v * 0.04;
+          // Toomre Q ~ 1.5: dispersion ~12% of circular velocity keeps
+          // the disk marginally stable (hot enough not to fragment,
+          // cold enough that arms still read).
+          const disp = v * 0.12;
 
           setBody(
             i++,
             x,
             y,
             z,
-            0.9 + rng() * 1.8,
+            starMass,
             tx * v + randn() * disp,
             randn() * disp * 0.25,
             tz * v + randn() * disp,
@@ -3957,19 +4002,19 @@
         }
 
         // ----- Dust lanes (kind 3) -----
-        // Ride the density wave slightly on the trailing side of each major
-        // arm — this is how real dust lanes appear in edge-on photos.
-        const DUST_N = 140;
+        // Ride the trailing edge of each major arm — the tell-tale dark
+        // stripe in edge-on spiral photos.
+        const DUST_N = 180;
         for (let k = 0; k < DUST_N && i < MAX_BODIES; k++) {
           let r = R_BAR * 1.2 + Math.pow(rng(), 0.5) * (R_DISK * 0.8 - R_BAR);
           const armK = rng() < 0.5 ? 0 : 1;
           const thetaArm =
             SPIN * COT_PITCH * Math.log(r / R_BAR) + (armK * Math.PI) / 2;
-          const theta = thetaArm + randn() * 0.08 - 0.12 * SPIN;
+          const theta = thetaArm + randn() * 0.07 - 0.1 * SPIN;
           const x = r * Math.cos(theta);
           const z = r * Math.sin(theta);
-          const y = randn() * 1.6;
-          const v = Math.sqrt(mEnc(r) / r);
+          const y = randn() * 1.3;
+          const v = Math.sqrt(mEncGuess(r) / r);
           const tx = -Math.sin(theta) * SPIN;
           const tz = Math.cos(theta) * SPIN;
           setBody(
@@ -3977,7 +4022,7 @@
             x,
             y,
             z,
-            0.12 + rng() * 0.18,
+            0.2 + rng() * 0.3,
             tx * v + randn() * v * 0.02,
             randn() * v * 0.01,
             tz * v + randn() * v * 0.02,
@@ -3986,19 +4031,18 @@
         }
 
         // ----- Stellar halo (kind 4) -----
-        // Spheroidal, dispersion-supported (no net rotation).  Reaches
-        // beyond the disk — provides faint spherical glow in wide shots.
+        // Spheroidal, dispersion-supported.  Very sparse + dim — provides
+        // a faint spherical glow only visible in wide shots with showHalo.
         const HALO_BUDGET = MAX_BODIES - i;
         const HALO_N = Math.min(355, HALO_BUDGET);
         for (let k = 0; k < HALO_N && i < MAX_BODIES; k++) {
           const theta = Math.acos(2 * rng() - 1);
           const phi = rng() * 2 * Math.PI;
-          const r = 90 + Math.pow(rng(), 0.55) * 330;
+          const r = 80 + Math.pow(rng(), 0.55) * 280;
           const x = r * Math.sin(theta) * Math.cos(phi);
           const y = r * Math.cos(theta);
           const z = r * Math.sin(theta) * Math.sin(phi);
-          const v = Math.sqrt(mEnc(r) / r) * 0.55;
-          // Random tangential vector: cross(pos, rand)
+          const v = Math.sqrt(mEncGuess(r) / r) * 0.55;
           const pos = new THREE.Vector3(x, y, z);
           const rand = new THREE.Vector3(randn(), randn(), randn());
           const tang = new THREE.Vector3()
@@ -4010,7 +4054,7 @@
             x,
             y,
             z,
-            0.35 + rng() * 0.5,
+            0.6 + rng() * 0.8,
             tang.x + randn() * v * 0.22,
             tang.y + randn() * v * 0.22,
             tang.z + randn() * v * 0.22,
@@ -4019,6 +4063,60 @@
         }
 
         state.count = i;
+
+        // ----- Force-sum pass: set stable circular velocities -----
+        // Compute the actual radial gravitational force at each disk/bulge/
+        // dust body's position from every other placed body (same softened
+        // Newtonian formula the GPU shader uses), then derive v_circ =
+        // sqrt(F_inward · r).  This replaces the crude mEncGuess estimate
+        // with velocities matched to whatever mass distribution we actually
+        // ended up with — the disk can't collapse because v_circ is by
+        // construction the circular speed for the real potential here.
+        const N = state.count;
+        const P = state.positions;
+        const V = state.velocities;
+        for (let k = 1; k < N; k++) {
+          // 1 = skip BH itself (stays at 0,0,0 with zero velocity)
+          const kindK = Math.floor(V[k * 4 + 3]);
+          if (kindK === 4) continue; // halo keeps its dispersion-only velocity
+          const px = P[k * 4 + 0];
+          const py = P[k * 4 + 1];
+          const pz = P[k * 4 + 2];
+          let Fx = 0;
+          let Fz = 0;
+          for (let j = 0; j < N; j++) {
+            if (j === k) continue;
+            const dx = P[j * 4 + 0] - px;
+            const dy = P[j * 4 + 1] - py;
+            const dz = P[j * 4 + 2] - pz;
+            const mj = P[j * 4 + 3];
+            if (mj <= 0) continue;
+            const r2 = dx * dx + dy * dy + dz * dz + EPS2;
+            const inv = mj / (r2 * Math.sqrt(r2));
+            Fx += dx * inv;
+            Fz += dz * inv;
+          }
+          const r_xz = Math.sqrt(px * px + pz * pz);
+          if (r_xz < 0.5) continue;
+          // F · r_hat = (Fx·px + Fz·pz) / r_xz (negative = inward).
+          // v² = F_inward · r = -(Fx·px + Fz·pz).
+          const v2 = Math.max(0, -(Fx * px + Fz * pz));
+          const vcirc = Math.sqrt(v2);
+          const tx = (-pz / r_xz) * SPIN;
+          const tz = (px / r_xz) * SPIN;
+          // Keep kind-appropriate dispersion from the placement loop.
+          const dispFrac =
+            kindK === 3
+              ? 0.02 // dust — cold
+              : kindK === 5
+                ? 0.14 // bulge — pressure-supported
+                : 0.12; // disk — Toomre Q ~ 1.5
+          const disp = vcirc * dispFrac;
+          V[k * 4 + 0] = tx * vcirc + randn() * disp;
+          V[k * 4 + 1] = randn() * disp * 0.25;
+          V[k * 4 + 2] = tz * vcirc + randn() * disp;
+          // .w (kind) left as-is
+        }
       }
 
       // ===============================================================
@@ -4050,32 +4148,35 @@
           name: "Milky Way",
           caption: "Barred spiral · home",
           make: sceneMilkyWay,
-          // 3/4 elevation, angled so the bar runs diagonally across frame —
-          // the iconic poster composition
-          camera: { pos: [380, 240, 260], tgt: [0, 0, 0], fov: 46 },
+          // 3/4 elevation poster composition with the bar diagonal.
+          // Camera ~300 units back — close enough that individual stars
+          // read as glowing points rather than specks.
+          camera: { pos: [250, 160, 175], tgt: [0, 0, 0], fov: 48 },
           palette: "ember",
-          channel: "density",
+          channel: "mass",
           post: {
-            bloom: 1.2,
-            bloomRadius: 0.55,
-            exposure: 1.08,
-            ca: 0.22,
-            vignette: 0.42,
-            grain: 0.035,
-            trail: 0.35,
+            bloom: 1.55,
+            bloomRadius: 0.6,
+            exposure: 1.32,
+            ca: 0.2,
+            vignette: 0.32,
+            grain: 0.03,
+            trail: 0.2,
           },
-          physics: { G: 1.0, softening: 0.35, dt: 0.012, speed: 1.0 },
+          // Larger softening than other scenes — protects against hard
+          // 2-body kicks that would fling stars out of the disk over time.
+          physics: { G: 1.0, softening: 2.5, dt: 0.012, speed: 1.0 },
           K: "neutral",
           flock: 0.0,
-          radiation: 0.04,
+          radiation: 0.03,
           tint: TINT_MILKYWAY,
-          bhHighlight: 0.6,
-          speedMax: 60,
+          bhHighlight: 0.0, // no hot central glow — Sgr A* is tiny here
+          speedMax: 40,
           framing: {
-            rRange: [260, 620],
+            rRange: [220, 520],
             thetaRange: [0.45, 1.25],
-            fovRange: [38, 60],
-            focalBias: "bh",
+            fovRange: [40, 62],
+            focalBias: "density",
           },
         },
         sagittarius: {
@@ -4114,7 +4215,10 @@
             vignette: 0.4,
             grain: 0.025,
           },
-          physics: { G: 1.0, softening: 0.5, dt: 0.012, speed: 1.0 },
+          // Large softening protects the 2-BH integrator against close-
+          // encounter slingshots during the galactic merge.  See
+          // CENTER_VANISH.md cause 4.
+          physics: { G: 1.0, softening: 4.0, dt: 0.012, speed: 1.0 },
           K: "collision",
           flock: 0.05,
           radiation: 0.05,
@@ -4264,7 +4368,9 @@
             vignette: 0.35,
             grain: 0.035,
           },
-          physics: { G: 1.0, softening: 0.45, dt: 0.012, speed: 1.0 },
+          // Five galaxy BHs in close quarters — highest slingshot risk
+          // in the whole slate.  See CENTER_VANISH.md cause 4.
+          physics: { G: 1.0, softening: 4.0, dt: 0.012, speed: 1.0 },
           K: "neutral",
           flock: 0.1,
           radiation: 0.3,
@@ -4410,7 +4516,9 @@
             vignette: 0.35,
             grain: 0.035,
           },
-          physics: { G: 1.0, softening: 0.5, dt: 0.012, speed: 1.0 },
+          // Two cluster cores, halo-offset — still a 2-BH pair that can
+          // slingshot.  See CENTER_VANISH.md cause 4.
+          physics: { G: 1.0, softening: 3.5, dt: 0.012, speed: 1.0 },
           K: "haloIgnores",
           flock: 0.05,
           radiation: 0.1,
@@ -6204,92 +6312,133 @@
         recSec.appendChild(recHint);
         panelEl.appendChild(recSec);
 
-        // --- Fidenza: turn the current frame into a generative artwork ---
-        const fidSec = Section();
-        fidSec.appendChild(SectionTitle("Fidenza (art)"));
+        // --- Generative art: Fidenza (ink ribbons) or Filament (bead chains).
+        // Same flow-field pipeline, two render endpoints — pick one via the
+        // Style pill row. The mid-section swaps its pills to match.
+        const artSec = Section();
+        artSec.appendChild(SectionTitle("Generative art"));
 
-        // Density pills
-        const densLabel = el("div");
-        densLabel.style.cssText =
+        const sublabelCss =
           "font-size:10px; color:var(--text-2); letter-spacing:0.18em; text-transform:uppercase; margin:4px 0 6px;";
-        densLabel.textContent = "Density";
-        fidSec.appendChild(densLabel);
-        const densRow = el("div", "pill-row");
-        const DENS_PRESETS = [
-          { key: "sparse", label: "sparse", count: 700 },
-          { key: "normal", label: "normal", count: 1500 },
-          { key: "dense", label: "dense", count: 2600 },
-        ];
-        for (const d of DENS_PRESETS) {
-          const pill = el(
-            "button",
-            "pill" + (fidenzaOpts.density === d.count ? " active" : ""),
-          );
-          pill.textContent = d.label;
-          pill.addEventListener("click", () => {
-            fidenzaOpts.density = d.count;
-            if (activePanel === "capture") buildPanel("capture");
-          });
-          densRow.appendChild(pill);
-        }
-        fidSec.appendChild(densRow);
+        const addPillRow = (parent, labelText, options, getActive, onPick) => {
+          const label = el("div");
+          label.style.cssText = sublabelCss;
+          label.textContent = labelText;
+          parent.appendChild(label);
+          const row = el("div", "pill-row");
+          for (const opt of options) {
+            const pill = el(
+              "button",
+              "pill" + (getActive() === opt.value ? " active" : ""),
+            );
+            pill.textContent = opt.label;
+            pill.addEventListener("click", () => {
+              onPick(opt.value);
+              if (activePanel === "capture") buildPanel("capture");
+            });
+            row.appendChild(pill);
+          }
+          parent.appendChild(row);
+        };
 
-        // Thickness pills
-        const thickLabel = el("div");
-        thickLabel.style.cssText = densLabel.style.cssText;
-        thickLabel.textContent = "Thickness";
-        fidSec.appendChild(thickLabel);
-        const thickRow = el("div", "pill-row");
-        for (const t of ["thin", "mixed", "fat"]) {
-          const pill = el(
-            "button",
-            "pill" + (fidenzaOpts.thickness === t ? " active" : ""),
-          );
-          pill.textContent = t;
-          pill.addEventListener("click", () => {
-            fidenzaOpts.thickness = t;
-            if (activePanel === "capture") buildPanel("capture");
-          });
-          thickRow.appendChild(pill);
-        }
-        fidSec.appendChild(thickRow);
+        // Style — which renderer the primary Generate button uses.
+        addPillRow(
+          artSec,
+          "Style",
+          [
+            { value: "fidenza", label: "fidenza" },
+            { value: "filament", label: "filament" },
+          ],
+          () => captureStyle,
+          (v) => {
+            captureStyle = v;
+          },
+        );
 
-        // Background pills
-        const bgLabel = el("div");
-        bgLabel.style.cssText = densLabel.style.cssText;
-        bgLabel.textContent = "Background";
-        fidSec.appendChild(bgLabel);
-        const bgRow = el("div", "pill-row");
-        for (const b of ["ink", "cream", "void"]) {
-          const pill = el(
-            "button",
-            "pill" + (fidenzaOpts.bg === b ? " active" : ""),
+        if (captureStyle === "fidenza") {
+          // Fidenza-only: density + thickness.
+          const DENS_PRESETS = [
+            { value: 700, label: "sparse" },
+            { value: 1500, label: "normal" },
+            { value: 2600, label: "dense" },
+          ];
+          addPillRow(
+            artSec,
+            "Density",
+            DENS_PRESETS,
+            () => fidenzaOpts.density,
+            (v) => {
+              fidenzaOpts.density = v;
+            },
           );
-          pill.textContent = b;
-          pill.addEventListener("click", () => {
-            fidenzaOpts.bg = b;
-            if (activePanel === "capture") buildPanel("capture");
-          });
-          bgRow.appendChild(pill);
+          addPillRow(
+            artSec,
+            "Thickness",
+            ["thin", "mixed", "fat"].map((t) => ({ value: t, label: t })),
+            () => fidenzaOpts.thickness,
+            (v) => {
+              fidenzaOpts.thickness = v;
+            },
+          );
+        } else {
+          // Filament-only: scale + bead mix.
+          addPillRow(
+            artSec,
+            "Scale",
+            ["small", "mixed", "large"].map((s) => ({ value: s, label: s })),
+            () => filamentOpts.scale,
+            (v) => {
+              filamentOpts.scale = v;
+            },
+          );
+          addPillRow(
+            artSec,
+            "Beads",
+            ["classic", "bold", "quiet"].map((b) => ({ value: b, label: b })),
+            () => filamentOpts.beadMix,
+            (v) => {
+              filamentOpts.beadMix = v;
+            },
+          );
         }
-        fidSec.appendChild(bgRow);
 
-        // Generate button
-        fidSec.appendChild(
+        // Background — shared between both styles.
+        addPillRow(
+          artSec,
+          "Background",
+          ["ink", "cream", "void"].map((b) => ({ value: b, label: b })),
+          () => fidenzaOpts.bg,
+          (v) => {
+            fidenzaOpts.bg = v;
+            filamentOpts.bg = v;
+          },
+        );
+
+        // Single primary Generate button — respects the active Style. Both
+        // hotkeys (I for Fidenza, U for Filament) still work directly, so
+        // users who learned them keep their quick path.
+        const genLabel =
+          captureStyle === "fidenza" ? "Generate (I)" : "Generate (U)";
+        artSec.appendChild(
           ButtonRow([
             {
-              label: "Generate (I)",
+              label: genLabel,
               primary: true,
-              onClick: () => generateFidenza(),
+              onClick: () => {
+                if (captureStyle === "fidenza") generateFidenza();
+                else generateFilament();
+              },
             },
           ]).el,
         );
-        const fidHint = el("div", "vp-hint");
-        fidHint.style.marginTop = "8px";
-        fidHint.textContent =
-          "Turns this frame's motion into a flow-field ink drawing. ~1–2s to render; PNG auto-downloads.";
-        fidSec.appendChild(fidHint);
-        panelEl.appendChild(fidSec);
+        const artHint = el("div", "vp-hint");
+        artHint.style.marginTop = "8px";
+        artHint.textContent =
+          captureStyle === "fidenza"
+            ? "Flow-field ink ribbons from this frame's motion. ~1–2s; PNG auto-downloads."
+            : "Bead chains along this frame's gravity currents. ~1–2s; PNG auto-downloads.";
+        artSec.appendChild(artHint);
+        panelEl.appendChild(artSec);
       }
 
       function buildSettingsPanel() {
@@ -6637,7 +6786,8 @@
               ["P", "Screenshot (2×)"],
               ["Shift+P", "Screenshot (4×)"],
               ["K", "Capture panel"],
-              ["I", "Fidenza (frame → art PNG)"],
+              ["I", "Fidenza (ink ribbons PNG)"],
+              ["U", "Filament (bead chains PNG)"],
               ["Ctrl+S / Ctrl+O", "Export / import JSON"],
             ],
           },
@@ -7004,7 +7154,10 @@
         attachT: 0,
         attachDur: 1.2,
         age: 0,
-        maxAge: 90, // hard timeout so the feature keeps moving
+        // Effectively no hard timeout — user-initiated follows should last
+        // as long as the user wants them to. Scene transitions (cinematic /
+        // movie mode) and explicit release still end the follow.
+        maxAge: 86400,
         pulseT: 0,
         pulseDur: 1.4,
         // Chase-cam smoothing: low-pass the velocity direction so near-BH
@@ -7346,11 +7499,10 @@
         }
 
         // Append a trail sample if we're recording (see 22e).
-        if (
-          followCam.state === "FOLLOWING" &&
-          starTrail.recording &&
-          starTrail.count < starTrail.MAX
-        ) {
+        // In ring mode the trail never releases — once the buffer is
+        // full, the oldest samples get overwritten and the tail simply
+        // rolls forward.
+        if (followCam.state === "FOLLOWING" && starTrail.recording) {
           const d2 = followCam._bodyPos.distanceToSquared(
             starTrail.lastLoggedPos,
           );
@@ -7360,10 +7512,6 @@
           ) {
             appendTrailSample(followCam._bodyPos, followCam._bodyVel);
             starTrail.lastLoggedPos.copy(followCam._bodyPos);
-            if (starTrail.count >= starTrail.MAX) {
-              starTrail.recording = false;
-              showToast("Trail", "full · " + starTrail.MAX + " samples");
-            }
           }
         }
       }
@@ -7374,11 +7522,19 @@
       // A world-space line geometry that grows while follow-cam is attached.
       // Survives follow-cam release so the user can orbit around the frozen
       // path. Cleared on scene changes and on new follow-cam attach.
+      // Ring-buffer trail: once MAX samples are recorded, the oldest
+      // sample gets overwritten on each new append and the tail rolls
+      // forward.  Two Line meshes share one pair of BufferAttributes so
+      // we can draw [head..MAX) and [0..head) as separate chronological
+      // halves without shifting 3 MB of data per frame.  The seam at the
+      // wrap (one missing segment between slots MAX-1 and 0) is visually
+      // imperceptible at 131k samples.
       const starTrail = {
-        enabled: true, // user toggle — off = no recording, mesh stays hidden
+        enabled: true, // user toggle — off = no recording, meshes stay hidden
         recording: false,
-        MAX: 16384,
-        count: 0,
+        MAX: 131072, // 8× the old cap; ~3 MB of position + colour data
+        count: 0, // number of valid samples in the ring, 0..MAX
+        head: 0, // next write slot, 0..MAX (wraps)
         // Spatial downsample — skip a sample if it's within this distance
         // (squared, in sim units) of the last logged one. Keeps dense detail
         // on tight arcs and sparse points on long straight runs.
@@ -7386,42 +7542,79 @@
         lastLoggedPos: new THREE.Vector3(NaN, NaN, NaN),
         positions: null,
         colors: null,
-        geometry: null,
+        posAttr: null,
+        colAttr: null,
+        geomA: null, // draws [head..MAX) when full, or [0..count) pre-wrap
+        geomB: null, // draws [0..head) when full, hidden otherwise
         material: null,
-        mesh: null,
+        meshA: null,
+        meshB: null,
       };
       starTrail.positions = new Float32Array(starTrail.MAX * 3);
       starTrail.colors = new Float32Array(starTrail.MAX * 3);
-      starTrail.geometry = new THREE.BufferGeometry();
-      starTrail.geometry.setAttribute(
-        "position",
-        new THREE.BufferAttribute(starTrail.positions, 3).setUsage(
-          THREE.DynamicDrawUsage,
-        ),
-      );
-      starTrail.geometry.setAttribute(
-        "color",
-        new THREE.BufferAttribute(starTrail.colors, 3).setUsage(
-          THREE.DynamicDrawUsage,
-        ),
-      );
-      starTrail.geometry.setDrawRange(0, 0);
+      starTrail.posAttr = new THREE.BufferAttribute(
+        starTrail.positions,
+        3,
+      ).setUsage(THREE.DynamicDrawUsage);
+      starTrail.colAttr = new THREE.BufferAttribute(
+        starTrail.colors,
+        3,
+      ).setUsage(THREE.DynamicDrawUsage);
+
+      starTrail.geomA = new THREE.BufferGeometry();
+      starTrail.geomA.setAttribute("position", starTrail.posAttr);
+      starTrail.geomA.setAttribute("color", starTrail.colAttr);
+      starTrail.geomA.setDrawRange(0, 0);
+
+      starTrail.geomB = new THREE.BufferGeometry();
+      starTrail.geomB.setAttribute("position", starTrail.posAttr);
+      starTrail.geomB.setAttribute("color", starTrail.colAttr);
+      starTrail.geomB.setDrawRange(0, 0);
+
       starTrail.material = new THREE.LineBasicMaterial({
         vertexColors: true,
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
         depthTest: false,
-        linewidth: 1, // most drivers ignore this (>1 isn't portable), but harmless
+        linewidth: 1,
       });
-      starTrail.mesh = new THREE.Line(starTrail.geometry, starTrail.material);
-      starTrail.mesh.frustumCulled = false;
-      starTrail.mesh.renderOrder = 2; // draw on top of particles
-      scene.add(starTrail.mesh);
+      starTrail.meshA = new THREE.Line(starTrail.geomA, starTrail.material);
+      starTrail.meshB = new THREE.Line(starTrail.geomB, starTrail.material);
+      starTrail.meshA.frustumCulled = false;
+      starTrail.meshB.frustumCulled = false;
+      starTrail.meshA.renderOrder = 2;
+      starTrail.meshB.renderOrder = 2;
+      starTrail.meshB.visible = false;
+      scene.add(starTrail.meshA);
+      scene.add(starTrail.meshB);
+
+      function updateTrailDrawRanges() {
+        const { MAX, count, head, geomA, meshB, geomB } = starTrail;
+        if (count === 0) {
+          geomA.setDrawRange(0, 0);
+          meshB.visible = false;
+        } else if (count < MAX) {
+          // Pre-wrap: samples live contiguously at [0, count).
+          geomA.setDrawRange(0, count);
+          meshB.visible = false;
+        } else if (head === 0) {
+          // Ring is full and head wrapped exactly to 0 — contiguous again.
+          geomA.setDrawRange(0, MAX);
+          meshB.visible = false;
+        } else {
+          // Ring is full and head is mid-buffer.
+          //   Chronological: oldest at slot head → slot MAX-1 → slot 0 →
+          //   slot head-1 (newest).
+          //   Draw [head, MAX) as meshA and [0, head) as meshB.
+          geomA.setDrawRange(head, MAX - head);
+          geomB.setDrawRange(0, head);
+          meshB.visible = true;
+        }
+      }
 
       function appendTrailSample(pos, vel) {
-        const i = starTrail.count;
-        if (i >= starTrail.MAX) return;
+        const i = starTrail.head;
         starTrail.positions[i * 3 + 0] = pos.x;
         starTrail.positions[i * 3 + 1] = pos.y;
         starTrail.positions[i * 3 + 2] = pos.z;
@@ -7441,13 +7634,15 @@
         starTrail.colors[i * 3 + 0] = warmR + (coolR - warmR) * t;
         starTrail.colors[i * 3 + 1] = warmG + (coolG - warmG) * t;
         starTrail.colors[i * 3 + 2] = warmB + (coolB - warmB) * t;
-        starTrail.count = i + 1;
-        starTrail.geometry.setDrawRange(0, starTrail.count);
-        // Partial update: only the new vertex needs to be reuploaded.
-        const pAttr = starTrail.geometry.attributes.position;
-        const cAttr = starTrail.geometry.attributes.color;
-        if (pAttr.updateRanges) {
-          // three.js r160+: addUpdateRange
+
+        starTrail.head = (i + 1) % starTrail.MAX;
+        if (starTrail.count < starTrail.MAX) starTrail.count += 1;
+
+        updateTrailDrawRanges();
+
+        const pAttr = starTrail.posAttr;
+        const cAttr = starTrail.colAttr;
+        if (pAttr.addUpdateRange) {
           pAttr.addUpdateRange(i * 3, 3);
           cAttr.addUpdateRange(i * 3, 3);
         } else {
@@ -7462,9 +7657,10 @@
 
       function clearTrail() {
         starTrail.count = 0;
+        starTrail.head = 0;
         starTrail.recording = false;
         starTrail.lastLoggedPos.set(NaN, NaN, NaN);
-        starTrail.geometry.setDrawRange(0, 0);
+        updateTrailDrawRanges();
       }
 
       function startTrail() {
@@ -10370,6 +10566,9 @@
       // specific moment's motion, walk non-overlapping flow-field strokes,
       // render to a high-res canvas, download as PNG. Pure CPU render after
       // the one GPU readback; no composer / shader / sim changes.
+      // Active style for the single "Generate" button in the Capture panel.
+      // Hotkeys I / U still trigger their own style directly regardless.
+      let captureStyle = "fidenza"; // fidenza | filament
       const fidenzaOpts = {
         density: 1500, // target stroke count
         thickness: "mixed", // thin | mixed | fat
@@ -10572,7 +10771,9 @@
             const nx = (v3.x + 1) * 0.5;
             const ny = (v3.y + 1) * 0.5;
             if (nx < -0.05 || nx > 1.05 || ny < -0.05 || ny > 1.05) continue;
-            seeds.push({ nx, ny, mass: m });
+            // Kind is packed in the velocity texture's .w as floor(.w) + ageNorm.
+            const kind = Math.floor((frame.velBuf[i * 4 + 3] || 0) + 0.001);
+            seeds.push({ nx, ny, mass: m, kind });
           }
           if (seeds.length > opts.density) {
             for (let i = seeds.length - 1; i > 0; i--) {
@@ -10591,6 +10792,7 @@
                 nx: (ix + 0.5 + (Math.random() - 0.5) * 0.8) / n,
                 ny: (iy + 0.5 + (Math.random() - 0.5) * 0.8) / n,
                 mass: 1.0,
+                kind: 0,
               });
             }
           }
@@ -10689,6 +10891,7 @@
             points,
             thickness: seed.thickness,
             mass: seed.mass,
+            kind: seed.kind | 0,
           });
         }
         return strokes;
@@ -10808,6 +11011,502 @@
             showToast("Fidenza", "failed · see console");
           } finally {
             _fidenzaRunning = false;
+          }
+        }, 50);
+      }
+
+      // ===============================================================
+      // 23c. FILAMENT  (same flow field, rendered as bead chains)
+      // ===============================================================
+      // Sibling to Fidenza per FILAMENT.md. Reuses the snapshot, flow-field
+      // build, and stroke walker. The render step is different: each chain
+      // becomes a tapered string of decorative circles ("beads"), where
+      // every bead picks one of six treatments (solid / rings / split /
+      // pie / dots / hollow). Palette bias is per-chain rather than per-
+      // stroke, which creates the characteristic colour-region effect.
+      const filamentOpts = {
+        scale: "mixed", // small | mixed | large  — reshapes density/beadScale/thicknessPreset
+        beadMix: "classic", // classic | bold | quiet — treatment weights
+        // Render knobs (default to Mixed scale, Classic beads; apply() below
+        // overrides these from the current scale preset on every generate).
+        density: 800,
+        beadScale: 2.2,
+        thicknessPreset: "mixed",
+        taper: 0.7,
+        beadGap: 0.12,
+        beadVar: 0.15,
+        spineAlpha: 0.22,
+        thinRate: 0.1,
+        outline: 0.7,
+        bg: "ink", // shared with Fidenza
+      };
+
+      // Scale preset → chain count / bead size / walker thickness. Each gives
+      // a recognisably different composition: small = lattice, mixed =
+      // bimodal (default), large = jewellery.
+      const FILAMENT_SCALES = {
+        small: {
+          density: 1400,
+          beadScale: 1.2,
+          thicknessPreset: "thin",
+          thinRate: 0.22,
+        },
+        mixed: {
+          density: 800,
+          beadScale: 2.2,
+          thicknessPreset: "mixed",
+          thinRate: 0.1,
+        },
+        large: {
+          density: 380,
+          beadScale: 3.6,
+          thicknessPreset: "fat",
+          thinRate: 0.05,
+        },
+      };
+
+      // Bead-mix preset → treatment weights. Three voicings: Classic is the
+      // reference default; Bold leans graphic (solid + split, rare rings);
+      // Quiet leans airy (more hollow + rings, sparse bright infill).
+      const FILAMENT_BEAD_MIXES = {
+        classic: {
+          solid: 40,
+          rings: 18,
+          split: 14,
+          pie: 10,
+          dots: 12,
+          hollow: 6,
+        },
+        bold: { solid: 50, rings: 12, split: 22, pie: 8, dots: 6, hollow: 2 },
+        quiet: { solid: 25, rings: 30, split: 10, pie: 4, dots: 6, hollow: 25 },
+      };
+
+      function _filamentActiveMix() {
+        return (
+          FILAMENT_BEAD_MIXES[filamentOpts.beadMix] ||
+          FILAMENT_BEAD_MIXES.classic
+        );
+      }
+
+      // Map RGB (0..1) triples from scene palette to hex strings once per
+      // generate so the draw loop doesn't rebuild them per bead.
+      function _filamentHexPalette(frame) {
+        const stops = frame.palette
+          .map(([r, g, b]) => {
+            const R = Math.max(0, Math.min(255, Math.round(r * 255)));
+            const G = Math.max(0, Math.min(255, Math.round(g * 255)));
+            const B = Math.max(0, Math.min(255, Math.round(b * 255)));
+            return [R, G, B];
+          })
+          .map(
+            (rgb) =>
+              "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join(""),
+          );
+        if (stops.length === 0) stops.push("#cccccc");
+        return stops;
+      }
+
+      function _filamentHueScore(hex) {
+        // Warmness: R - B, normalised to roughly [-1, 1].
+        const r = parseInt(hex.slice(1, 3), 16) / 255;
+        const b = parseInt(hex.slice(5, 7), 16) / 255;
+        return r - b;
+      }
+      function _filamentLightness(hex) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return (r + g + b) / (3 * 255);
+      }
+
+      // Pick a curve-local palette: a small subset of the global palette,
+      // weighted so the first pick dominates. Kind-biased: BHs favour warm
+      // picks, dust favours pale, halos favour cool/dim, everything else
+      // is a fair random draw.
+      function _filamentPickCurveBias(globalStops, kind, rng) {
+        const pool = globalStops.slice();
+        if (kind === 2) {
+          // BH — sort warmest first so they're more likely picked.
+          pool.sort((a, b) => _filamentHueScore(b) - _filamentHueScore(a));
+        } else if (kind === 3) {
+          // Dust — palest first.
+          pool.sort((a, b) => _filamentLightness(b) - _filamentLightness(a));
+        } else if (kind === 4) {
+          // Halo — darkest/coolest first.
+          pool.sort((a, b) => _filamentHueScore(a) - _filamentHueScore(b));
+        } else {
+          // Stars / galaxy bodies — shuffle fairly.
+          for (let i = pool.length - 1; i > 0; i--) {
+            const j = Math.floor(rng() * (i + 1));
+            const tmp = pool[i];
+            pool[i] = pool[j];
+            pool[j] = tmp;
+          }
+        }
+        const n = 2 + Math.floor(rng() * 3); // 2..4 picks
+        const picks = pool.slice(0, Math.min(n, pool.length));
+        // Weight the kind-biased ordering by 0.7^i so pick[0] dominates.
+        // For fair shuffles we already shuffled, so weights still apply.
+        const weights = picks.map((_, i) => Math.pow(0.7, i));
+        return { picks, weights };
+      }
+
+      function _filamentPickBiased(bias, rng) {
+        let total = 0;
+        for (let i = 0; i < bias.weights.length; i++) total += bias.weights[i];
+        let r = rng() * total;
+        for (let i = 0; i < bias.picks.length; i++) {
+          r -= bias.weights[i];
+          if (r <= 0) return bias.picks[i];
+        }
+        return bias.picks[bias.picks.length - 1];
+      }
+
+      function _filamentPickTreatment(rng) {
+        const mix = _filamentActiveMix();
+        const entries = [
+          ["solid", mix.solid],
+          ["rings", mix.rings],
+          ["split", mix.split],
+          ["pie", mix.pie],
+          ["dots", mix.dots],
+          ["hollow", mix.hollow],
+        ];
+        let total = 0;
+        for (const [, w] of entries) total += w;
+        let r = rng() * total;
+        for (const [name, w] of entries) {
+          r -= w;
+          if (r <= 0) return name;
+        }
+        return "solid";
+      }
+
+      function _filamentDrawBead(ctx, b, bias, ink, outW, rng) {
+        const { x, y, r, tx, ty } = b;
+        const along = Math.atan2(ty, tx);
+        const treat = _filamentPickTreatment(rng);
+        // Guard tiny beads — complex treatments just smudge.
+        const effectiveTreat = r < 4 ? "solid" : treat;
+        const fill = (cx, cy, rr, color) => {
+          ctx.beginPath();
+          ctx.arc(cx, cy, Math.max(0.5, rr), 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        };
+        const stroke = (cx, cy, rr, color, lw) => {
+          ctx.beginPath();
+          ctx.arc(cx, cy, Math.max(0.5, rr), 0, Math.PI * 2);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lw;
+          ctx.stroke();
+        };
+        ctx.lineJoin = "miter";
+        ctx.lineCap = "butt";
+
+        if (effectiveTreat === "solid") {
+          fill(x, y, r, _filamentPickBiased(bias, rng));
+          if (outW > 0.05) stroke(x, y, r, ink, outW);
+        } else if (effectiveTreat === "rings") {
+          const n = 2 + Math.floor(rng() * 4);
+          for (let i = 0; i < n; i++) {
+            const rr = r * (1 - i / n);
+            fill(x, y, rr, _filamentPickBiased(bias, rng));
+            if (outW > 0.05 && i > 0)
+              stroke(x, y, rr, ink, Math.max(0.6, outW * 0.55));
+          }
+          if (outW > 0.05) stroke(x, y, r, ink, outW);
+        } else if (effectiveTreat === "split") {
+          const angle = along + (rng() < 0.5 ? 0 : Math.PI * 0.5);
+          const cA = _filamentPickBiased(bias, rng);
+          let cB = _filamentPickBiased(bias, rng);
+          if (cB === cA && bias.picks.length > 1) {
+            cB = _filamentPickBiased(bias, rng);
+          }
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.arc(x, y, r, angle, angle + Math.PI);
+          ctx.closePath();
+          ctx.fillStyle = cA;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.arc(x, y, r, angle + Math.PI, angle + Math.PI * 2);
+          ctx.closePath();
+          ctx.fillStyle = cB;
+          ctx.fill();
+          if (outW > 0.05) {
+            ctx.beginPath();
+            ctx.moveTo(x + Math.cos(angle) * r, y + Math.sin(angle) * r);
+            ctx.lineTo(
+              x + Math.cos(angle + Math.PI) * r,
+              y + Math.sin(angle + Math.PI) * r,
+            );
+            ctx.strokeStyle = ink;
+            ctx.lineWidth = outW;
+            ctx.stroke();
+            stroke(x, y, r, ink, outW);
+          }
+        } else if (effectiveTreat === "pie") {
+          const n = 3 + Math.floor(rng() * 4);
+          const start = along;
+          for (let i = 0; i < n; i++) {
+            const a0 = start + (i / n) * Math.PI * 2;
+            const a1 = start + ((i + 1) / n) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.arc(x, y, r, a0, a1);
+            ctx.closePath();
+            ctx.fillStyle = _filamentPickBiased(bias, rng);
+            ctx.fill();
+          }
+          if (outW > 0.05) {
+            for (let i = 0; i < n; i++) {
+              const a = start + (i / n) * Math.PI * 2;
+              ctx.beginPath();
+              ctx.moveTo(x, y);
+              ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+              ctx.strokeStyle = ink;
+              ctx.lineWidth = Math.max(0.5, outW * 0.6);
+              ctx.stroke();
+            }
+            stroke(x, y, r, ink, outW);
+          }
+        } else if (effectiveTreat === "dots") {
+          fill(x, y, r, _filamentPickBiased(bias, rng));
+          if (outW > 0.05) stroke(x, y, r, ink, outW);
+          const nDots = 1 + Math.floor(rng() * 2);
+          for (let i = 0; i < nDots; i++) {
+            const dr = r * (0.28 + rng() * 0.28);
+            fill(x, y, dr, _filamentPickBiased(bias, rng));
+            if (outW > 0.05) stroke(x, y, dr, ink, Math.max(0.5, outW * 0.55));
+          }
+        } else if (effectiveTreat === "hollow") {
+          const ringW = r * (0.15 + rng() * 0.25);
+          ctx.beginPath();
+          ctx.arc(x, y, Math.max(0.5, r - ringW * 0.5), 0, Math.PI * 2);
+          ctx.strokeStyle = _filamentPickBiased(bias, rng);
+          ctx.lineWidth = ringW;
+          ctx.stroke();
+          if (outW > 0.05) {
+            stroke(x, y, r, ink, outW);
+            stroke(x, y, Math.max(1, r - ringW), ink, outW);
+          }
+        }
+      }
+
+      function _filamentDrawChain(ctx, stroke, bias, opts, frame, rng, W, H) {
+        const pts = stroke.points;
+        if (pts.length < 3) return;
+        const minDim = Math.min(W, H);
+        const chainWidth = stroke.thickness * minDim;
+        const baseRadius = chainWidth * 0.5 * opts.beadScale;
+        const inkColor = opts.bg === "cream" ? "#1a140c" : "#f4eede"; // dark ink on cream, cream ink on dark
+        // Canvas coords for stroke points (Y flipped).
+        const cpts = new Array(pts.length);
+        for (let i = 0; i < pts.length; i++) {
+          cpts[i] = { x: pts[i].x * W, y: (1 - pts[i].y) * H };
+        }
+        // Arc-length table.
+        const arc = new Float32Array(cpts.length);
+        for (let i = 1; i < cpts.length; i++) {
+          arc[i] =
+            arc[i - 1] +
+            Math.hypot(cpts[i].x - cpts[i - 1].x, cpts[i].y - cpts[i - 1].y);
+        }
+        const totalLen = arc[cpts.length - 1];
+        if (totalLen < baseRadius * 1.2) return;
+
+        // Thin-chain mode — render as ink spine, skip beads.
+        if (rng() < opts.thinRate) {
+          ctx.beginPath();
+          ctx.moveTo(cpts[0].x, cpts[0].y);
+          for (let i = 1; i < cpts.length; i++)
+            ctx.lineTo(cpts[i].x, cpts[i].y);
+          ctx.strokeStyle = inkColor;
+          ctx.lineWidth = Math.max(0.8, chainWidth * 0.14);
+          ctx.lineCap = "round";
+          ctx.globalAlpha = 0.9;
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+          return;
+        }
+
+        // Faint spine underlay so widely-spaced bead chains still read as connected.
+        if (opts.spineAlpha > 0.01) {
+          const prev = ctx.globalAlpha;
+          ctx.globalAlpha = opts.spineAlpha;
+          ctx.beginPath();
+          ctx.moveTo(cpts[0].x, cpts[0].y);
+          for (let i = 1; i < cpts.length; i++)
+            ctx.lineTo(cpts[i].x, cpts[i].y);
+          ctx.strokeStyle = inkColor;
+          ctx.lineWidth = Math.max(0.6, chainWidth * 0.07);
+          ctx.lineCap = "round";
+          ctx.stroke();
+          ctx.globalAlpha = prev;
+        }
+
+        // Walk the arc placing beads. Taper radius toward endpoints.
+        const sampleAt = (s) => {
+          let lo = 0,
+            hi = arc.length - 1;
+          while (lo < hi) {
+            const m = (lo + hi) >> 1;
+            if (arc[m] < s) lo = m + 1;
+            else hi = m;
+          }
+          const i1 = Math.max(1, lo);
+          const i0 = i1 - 1;
+          const span = Math.max(1e-6, arc[i1] - arc[i0]);
+          const t = Math.min(1, Math.max(0, (s - arc[i0]) / span));
+          const x = cpts[i0].x + (cpts[i1].x - cpts[i0].x) * t;
+          const y = cpts[i0].y + (cpts[i1].y - cpts[i0].y) * t;
+          const twin = 2;
+          const a = Math.max(0, i0 - twin);
+          const b = Math.min(cpts.length - 1, i1 + twin);
+          let dx = cpts[b].x - cpts[a].x;
+          let dy = cpts[b].y - cpts[a].y;
+          const L = Math.hypot(dx, dy) || 1;
+          dx /= L;
+          dy /= L;
+          return { x, y, tx: dx, ty: dy };
+        };
+
+        let s = Math.min(baseRadius, totalLen * 0.5);
+        const endBuf = Math.min(baseRadius * 0.25, totalLen * 0.05);
+        const beads = [];
+        let iter = 0;
+        while (s < totalLen - endBuf && iter++ < 1500) {
+          const t = s / totalLen;
+          const fromEnd = Math.min(t, 1 - t);
+          const taperK = 1 - opts.taper + opts.taper * Math.min(1, fromEnd * 4);
+          const vFactor = 1 + (rng() - 0.5) * 2 * opts.beadVar;
+          const r = Math.max(1, baseRadius * taperK * vFactor);
+          const p = sampleAt(s);
+          beads.push({ x: p.x, y: p.y, r, tx: p.tx, ty: p.ty });
+          s += Math.max(r * 0.8, r * 2 * (1 + opts.beadGap));
+        }
+
+        const outW =
+          Math.max(0, opts.outline) *
+          Math.max(0.8, Math.min(3.0, baseRadius * 0.05 + 0.6));
+        for (const b of beads) {
+          _filamentDrawBead(ctx, b, bias, inkColor, outW, rng);
+        }
+      }
+
+      function _filamentBackground(bg) {
+        if (bg === "cream") return "#efe8d5";
+        if (bg === "void") return null;
+        return "#0a0a12";
+      }
+
+      function _filamentRender(strokes, opts, frame) {
+        const aspect = frame.aspect;
+        const longest = 2560;
+        let W, H;
+        if (aspect >= 1) {
+          W = longest;
+          H = Math.max(1, Math.round(longest / aspect));
+        } else {
+          H = longest;
+          W = Math.max(1, Math.round(longest * aspect));
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext("2d");
+        const bg = _filamentBackground(opts.bg);
+        if (bg) {
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, W, H);
+        }
+        const globalStops = _filamentHexPalette(frame);
+
+        // Simple deterministic-ish rng used for per-chain bias + bead rolls.
+        let rngSeed = (frame.seed || 12345) >>> 0;
+        const rng = () => {
+          rngSeed = (rngSeed + 0x6d2b79f5) | 0;
+          let t = rngSeed;
+          t = Math.imul(t ^ (t >>> 15), 1 | t);
+          t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+
+        for (const s of strokes) {
+          const bias = _filamentPickCurveBias(globalStops, s.kind | 0, rng);
+          _filamentDrawChain(ctx, s, bias, opts, frame, rng, W, H);
+        }
+        return canvas;
+      }
+
+      let _filamentRunning = false;
+      function generateFilament(userOpts) {
+        if (_filamentRunning || _fidenzaRunning) return;
+        _filamentRunning = true;
+        const opts = Object.assign({}, filamentOpts, userOpts || {});
+        // Apply the active Scale preset's knobs on top of defaults, unless
+        // the user passed an explicit override in userOpts.
+        const scaleCfg = FILAMENT_SCALES[opts.scale] || FILAMENT_SCALES.mixed;
+        for (const k of [
+          "density",
+          "beadScale",
+          "thicknessPreset",
+          "thinRate",
+        ]) {
+          if (!userOpts || userOpts[k] === undefined) opts[k] = scaleCfg[k];
+        }
+        // Honour Fidenza's background if set — users tend to toggle it there.
+        opts.bg = (userOpts && userOpts.bg) || fidenzaOpts.bg || opts.bg;
+        showToast("Filament", "generating…");
+        setTimeout(() => {
+          try {
+            const t0 = performance.now();
+            const frame = _fidenzaSnapshotFrame();
+            frame.seed = Math.floor(Math.random() * 0xffffffff);
+            const fieldRes = 256;
+            const field = _fidenzaBuildFlowField(frame, fieldRes, 0.2);
+            // Walk strokes using the filament-tuned thickness preset. We
+            // reuse the Fidenza walker verbatim; the difference is all in
+            // the render step.
+            const walkerOpts = {
+              density: opts.density,
+              thickness: opts.thicknessPreset,
+              seedSource: "bodies",
+            };
+            const strokes = _fidenzaWalkStrokes(
+              field,
+              fieldRes,
+              frame,
+              walkerOpts,
+            );
+            // Draw longer chains first so their bead placement claims the
+            // visual hierarchy (can't re-sort by length until after walking).
+            strokes.sort((a, b) => b.points.length - a.points.length);
+            const canvas = _filamentRender(strokes, opts, frame);
+            canvas.toBlob((blob) => {
+              if (!blob) {
+                showToast("Filament", "png encode failed");
+                return;
+              }
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download =
+                "filament_" + frame.sceneKey + "_" + Date.now() + ".png";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              setTimeout(() => URL.revokeObjectURL(url), 30000);
+              const ms = Math.round(performance.now() - t0);
+              showToast("Filament", strokes.length + " chains · " + ms + "ms");
+            }, "image/png");
+          } catch (e) {
+            console.error("Filament generate failed", e);
+            showToast("Filament", "failed · see console");
+          } finally {
+            _filamentRunning = false;
           }
         }, 50);
       }
@@ -11161,6 +11860,10 @@
           case "i":
           case "I":
             generateFidenza();
+            break;
+          case "u":
+          case "U":
+            generateFilament();
             break;
           case "j":
           case "J":
