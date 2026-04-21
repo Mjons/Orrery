@@ -16,12 +16,19 @@ export async function pickWorkspace() {
     throw new Error(
       "File System Access API unavailable — use Chrome, Edge, Arc, or Brave.",
     );
+  console.log("[bz] showDirectoryPicker...");
   const handle = await window.showDirectoryPicker({
     mode: "readwrite",
     id: "boltzsidian-workspace",
     startIn: "documents",
   });
-  await saveHandle(handle);
+  console.log("[bz] picker returned, saving handle to IDB...");
+  try {
+    await saveHandle(handle);
+    console.log("[bz] handle saved");
+  } catch (e) {
+    console.warn("[bz] saveHandle failed (continuing):", e);
+  }
   return handle;
 }
 

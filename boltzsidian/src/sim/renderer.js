@@ -1,8 +1,8 @@
-// Boltzsidian Phase 0 renderer.
-// Minimal three.js scene + procedural twinkling starfield ported from the sim.
-// No bodies yet — Phase 1 adds them.
+// Boltzsidian renderer. Scene, camera, OrbitControls, ambient starfield,
+// frame-subscription hook for per-frame callbacks (labels, body shaders, etc.).
 
 import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 const STAR_COUNT = 2400;
 
@@ -21,12 +21,21 @@ export function createRenderer(canvas) {
     55,
     window.innerWidth / window.innerHeight,
     0.1,
-    5000,
+    8000,
   );
-  camera.position.set(0, 0, 420);
-  camera.lookAt(0, 0, 0);
+  camera.position.set(0, 0, 1200);
 
-  scene.add(makeStarfield());
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.rotateSpeed = 0.6;
+  controls.zoomSpeed = 0.8;
+  controls.panSpeed = 0.6;
+  controls.minDistance = 20;
+  controls.maxDistance = 4000;
+  controls.target.set(0, 0, 0);
+
+  const starMat = addStarfield(scene);
 
   function resize() {
     const w = window.innerWidth;
@@ -39,32 +48,40 @@ export function createRenderer(canvas) {
   resize();
 
   const clock = new THREE.Clock();
+  const subscribers = new Set();
   let rafId = 0;
   function tick() {
+    const dt = clock.getDelta();
     const t = clock.getElapsedTime();
-    // slow camera drift — aesthetic idle
-    camera.position.x = Math.sin(t * 0.04) * 22;
-    camera.position.y = Math.cos(t * 0.028) * 14;
-    camera.lookAt(0, 0, 0);
-    scene.userData.starMat.uniforms.uTime.value = t;
+    starMat.uniforms.uTime.value = t;
+    controls.update();
+    for (const fn of subscribers) fn(dt, t);
     renderer.render(scene, camera);
     rafId = requestAnimationFrame(tick);
   }
   tick();
 
+  function onFrame(fn) {
+    subscribers.add(fn);
+    return () => subscribers.delete(fn);
+  }
+
   return {
     renderer,
     scene,
     camera,
+    controls,
+    onFrame,
     dispose() {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", resize);
+      controls.dispose();
       renderer.dispose();
     },
   };
 }
 
-function makeStarfield() {
+function addStarfield(scene) {
   const positions = new Float32Array(STAR_COUNT * 3);
   const phases = new Float32Array(STAR_COUNT);
   const sizes = new Float32Array(STAR_COUNT);
@@ -126,16 +143,6 @@ function makeStarfield() {
 
   const points = new THREE.Points(geom, mat);
   points.frustumCulled = false;
-  const group = new THREE.Group();
-  group.add(points);
-  group.userData = {};
-
-  // stash material on scene via the group userData pipe
-  const wrapper = new THREE.Group();
-  wrapper.add(group);
-  wrapper.userData = {};
-  // Expose uniform handle for main loop
-  Object.defineProperty(wrapper.userData, "starMat", { value: mat });
-  // Also expose at parent level so scene.userData.starMat works
-  return Object.assign(wrapper, { userData: { starMat: mat } });
+  scene.add(points);
+  return mat;
 }
