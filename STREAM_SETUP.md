@@ -67,7 +67,7 @@ between 24/7 and 24/6.
 
 **Create a dedicated user:** `streambot`. Run everything from this
 user, not your daily account. Keeps Chrome profiles / cookies /
-notifications clean. ***********************************
+notifications clean. **\*\***\*\*\*\***\*\***\*\*\***\*\***\*\*\*\***\*\***
 
 ---
 

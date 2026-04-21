@@ -60,6 +60,11 @@ export function createSearch({ getVault, getBodies, onArc, onOpen }) {
     return strip.classList.contains("open");
   }
 
+  function invalidate() {
+    index = null;
+    indexedCount = 0;
+  }
+
   function runSearch(q) {
     const trimmed = q.trim();
     if (!trimmed) {
@@ -120,5 +125,5 @@ export function createSearch({ getVault, getBodies, onArc, onOpen }) {
     }
   });
 
-  return { open, close, isOpen };
+  return { open, close, isOpen, invalidate };
 }

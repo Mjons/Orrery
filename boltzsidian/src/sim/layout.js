@@ -143,7 +143,61 @@ export function layoutNotes(vault, opts = {}) {
     positions[note.id] = [x[i], y[i], z];
   }
 
+  applyDailyFilament(positions, vault, o);
+  applyPinnedOverrides(positions, vault);
+
   return positions;
+}
+
+// Dailies are arranged on a sine-wave helix sorted by date. The curve is
+// big enough to clear the main cluster so the filament reads as a distinct
+// thread through the universe — not just a dense clump on one side.
+export function applyDailyFilament(positions, vault, opts = {}) {
+  const dailies = vault.notes.filter((n) => n.isDaily && n.dailyDate != null);
+  if (dailies.length < 2) {
+    if (dailies.length === 1) {
+      positions[dailies[0].id] = [0, 0, 0];
+    }
+    return positions;
+  }
+  dailies.sort((a, b) => a.dailyDate - b.dailyDate);
+
+  const W = opts.width || 900;
+  const H = opts.height || 900;
+  const D = opts.depth || 600;
+  const spread = Math.max(W * 1.8, 1400);
+  const ampY = Math.min(H * 0.42, 320);
+  const ampZ = Math.min(D * 0.55, 280);
+  const k = Math.PI * 2 * Math.max(1, Math.log2(dailies.length));
+
+  const minDate = dailies[0].dailyDate;
+  const maxDate = dailies[dailies.length - 1].dailyDate;
+  const range = Math.max(maxDate - minDate, 1);
+
+  for (let i = 0; i < dailies.length; i++) {
+    const n = dailies[i];
+    const t = (n.dailyDate - minDate) / range; // 0..1
+    const x = (t - 0.5) * spread;
+    const phase = t * k;
+    const y = Math.sin(phase) * ampY;
+    const z = Math.cos(phase * 0.5) * ampZ;
+    positions[n.id] = [x, y, z];
+  }
+  return positions;
+}
+
+function applyPinnedOverrides(positions, vault) {
+  for (const n of vault.notes) {
+    const fm = n.frontmatter || {};
+    const pos = fm.position;
+    if (
+      Array.isArray(pos) &&
+      pos.length === 3 &&
+      pos.every((v) => typeof v === "number")
+    ) {
+      positions[n.id] = [pos[0], pos[1], pos[2]];
+    }
+  }
 }
 
 function mulberry32(seed) {

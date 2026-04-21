@@ -1,0 +1,350 @@
+// Spring physics between linked bodies.
+//
+// Runs on the CPU. Symplectic-Euler-ish: velocity is damped, then forces are
+// applied, then position is integrated. This keeps settling stable even when
+// the user creates large numbers of links at once.
+//
+// Forces:
+//   - Spring per edge. Rest length ∝ log(mA*mB), so heavy anchors keep
+//     their distance and light notes bunch closer.
+//   - Lightweight pair repulsion between co-linked triangles only (cheap
+//     replacement for a full O(n²) repulsive term — keeps linked clusters
+//     from collapsing through each other).
+//   - Isotropic drag, scaled by mass (heavier = slower to drift).
+//
+// The integrator is tuned to be dream-sensitive: when sleep depth is high,
+// damping loosens and springs go softer. Phase 5 will wire that in; for
+// Phase 3 a fixed "wake" profile is enough.
+
+// Two regime profiles — wake (current-day physics) and dream (loose, fused,
+// low-resolution). The active profile is a linear blend driven by the
+// current sleep depth (0 = wake, 1 = deep dream). See DREAM.md §1 and
+// DREAM_ENGINE.md §11.9 (visible choreography).
+//
+// Phase 1 ("drifting off") sits at depth roughly 0.1–0.3. At that depth
+// the blend needs to produce a VISIBLE untethering — linked notes
+// should start to drift apart, clusters should loosen, the universe
+// should look noticeably different from wake. The DREAM profile below
+// is intentionally aggressive so the untethering reads as a dream
+// beginning, not as a physics subtle-drift.
+// IMPORTANT convention (this cost us a debug session): `damping` here is
+// a velocity MULTIPLIER per step. Every frame `v *= damping`. So
+// HIGHER values mean LESS friction (velocity preserved longer), and
+// LOWER values mean MORE friction. DREAM wants "loose" motion, which
+// means HIGHER damping than wake, not lower.
+const WAKE = {
+  springK: 0.55,
+  damping: 0.88,
+  maxSpeed: 600,
+  repulseK: 900,
+  repulseRadius: 50,
+  noise: 0,
+};
+const DREAM = {
+  // Aggressive Phase 1 tuning (DREAM_ENGINE.md §11.9).
+  springK: 0.04, // near-zero: tethers barely pull, notes drift free
+  damping: 0.94, // HIGHER than wake — drift carries instead of dying
+  maxSpeed: 1600,
+  repulseK: 250,
+  repulseRadius: 75,
+  noise: 140, // strong wander force — now the drift actually builds up
+};
+
+function profileForDepth(d) {
+  const clamped = Math.max(0, Math.min(1, d));
+  // Early-accelerating curve so Phase 1 ("warming", depth 0 → 0.55)
+  // produces a visible loosening rather than a linear subtle drift.
+  // sqrt(0.3) = 0.548 — so at Phase 1 mid-depth every physics param
+  // has already moved 55% of the way from WAKE to DREAM values.
+  const t = Math.sqrt(clamped);
+  return {
+    springK: WAKE.springK + (DREAM.springK - WAKE.springK) * t,
+    damping: WAKE.damping + (DREAM.damping - WAKE.damping) * t,
+    maxSpeed: WAKE.maxSpeed + (DREAM.maxSpeed - WAKE.maxSpeed) * t,
+    repulseK: WAKE.repulseK + (DREAM.repulseK - WAKE.repulseK) * t,
+    repulseRadius:
+      WAKE.repulseRadius + (DREAM.repulseRadius - WAKE.repulseRadius) * t,
+    noise: WAKE.noise + (DREAM.noise - WAKE.noise) * t,
+  };
+}
+
+export function createPhysics({
+  bodies,
+  vault,
+  getPinnedIds,
+  getFolderInfluence,
+  getDreamDepth,
+}) {
+  const positions = bodies.buffers.position;
+  const velocities = bodies.buffers.velocity;
+  const masses = bodies.buffers.mass;
+  const pinnedBuf = bodies.buffers.pinned;
+  const folderIdxBuf = bodies.buffers.folderIdx;
+  const force = new Float32Array(bodies.capacity * 3);
+
+  // Per-folder centroid cache, recomputed on a timer rather than every step —
+  // O(n) averaging adds up otherwise, and the target point barely moves
+  // between frames. Buffer grows if the vault ever exceeds 128 top folders.
+  let centroids = new Float32Array(128 * 3);
+  let centroidSlots = 128;
+  let centroidFolderCount = 0;
+  let centroidAge = 0; // seconds since last recompute
+
+  let edges = [];
+  rebuildEdges();
+
+  function rebuildEdges() {
+    const seen = new Set();
+    const out = [];
+    if (!vault) return;
+    for (const [srcId, targets] of vault.forward) {
+      const i = bodies.indexOfId(srcId);
+      if (i < 0) continue;
+      for (const dstId of targets) {
+        const j = bodies.indexOfId(dstId);
+        if (j < 0) continue;
+        const key = i < j ? `${i}:${j}` : `${j}:${i}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const mi = Math.max(masses[i], 0.5);
+        const mj = Math.max(masses[j], 0.5);
+        const rest = 55 + Math.log(mi * mj + 1) * 34;
+        out.push({ a: i, b: j, rest });
+      }
+    }
+    edges = out;
+  }
+
+  // Update the rest length for every edge touching a given body — called
+  // after a save that may have changed the note's mass.
+  function refreshEdgesFor(noteId) {
+    const i = bodies.indexOfId(noteId);
+    if (i < 0) return;
+    for (const e of edges) {
+      if (e.a !== i && e.b !== i) continue;
+      const mi = Math.max(masses[e.a], 0.5);
+      const mj = Math.max(masses[e.b], 0.5);
+      e.rest = 55 + Math.log(mi * mj + 1) * 34;
+    }
+  }
+
+  function step(dt) {
+    if (dt <= 0) return;
+    const live = bodies.count;
+    if (live === 0) return;
+    // Cap the step so a dropped frame doesn't launch bodies to infinity.
+    dt = Math.min(dt, 0.033);
+
+    const depth = getDreamDepth ? getDreamDepth() : 0;
+    const profile = depth <= 0 ? WAKE : profileForDepth(depth);
+
+    // Zero forces.
+    for (let i = 0; i < live * 3; i++) force[i] = 0;
+
+    // Spring forces.
+    for (const e of edges) {
+      if (e.a >= live || e.b >= live) continue;
+      const ai = e.a * 3;
+      const bi = e.b * 3;
+      const dx = positions[bi] - positions[ai];
+      const dy = positions[bi + 1] - positions[ai + 1];
+      const dz = positions[bi + 2] - positions[ai + 2];
+      const d2 = dx * dx + dy * dy + dz * dz + 1e-4;
+      const d = Math.sqrt(d2);
+      const disp = d - e.rest;
+      const f = (profile.springK * disp) / d;
+      force[ai] += f * dx;
+      force[ai + 1] += f * dy;
+      force[ai + 2] += f * dz;
+      force[bi] -= f * dx;
+      force[bi + 1] -= f * dy;
+      force[bi + 2] -= f * dz;
+    }
+
+    // Short-range repulsion: prevents two linked nodes from settling on top
+    // of each other. We only check neighbours-of-neighbours via edges to
+    // avoid O(n²). Cheap and surprisingly effective at this scale.
+    const rRad = profile.repulseRadius;
+    const rRad2 = rRad * rRad;
+    for (const e of edges) {
+      if (e.a >= live || e.b >= live) continue;
+      repel(e.a, e.b, profile.repulseK, rRad2);
+    }
+
+    // Dream wander force. When sleep depth is nonzero, every non-pinned
+    // body gets a small random push per frame. This is the "leashless
+    // drifting" of DREAM_ENGINE.md §1 — slack tethers let bodies be
+    // nudged by this noise into neighbourhoods they'd never reach at
+    // wake. The noise is per-frame (not per-second) so it reads as
+    // gentle Brownian jitter rather than sudden kicks.
+    if (profile.noise > 0) {
+      const nmag = profile.noise;
+      for (let i = 0; i < live; i++) {
+        if (pinnedBuf[i]) continue;
+        const fi = i * 3;
+        // Three uniform [-0.5, 0.5] samples per body. Cheap, correlated-
+        // enough-across-axes for a diffuse wander. If we ever see clumpy
+        // drift we can swap to box-muller for proper Gaussian noise.
+        force[fi] += (Math.random() - 0.5) * nmag;
+        force[fi + 1] += (Math.random() - 0.5) * nmag;
+        force[fi + 2] += (Math.random() - 0.5) * nmag;
+      }
+    }
+
+    // Folder basin: gentle pull toward each folder's centroid, strength set
+    // by the user. Off by default (influence 0), so this loop is a no-op on
+    // vaults whose user hasn't opted in.
+    const influence = getFolderInfluence ? getFolderInfluence() : 0;
+    if (influence > 0 && folderIdxBuf) {
+      centroidAge += dt;
+      if (centroidAge > 0.5) {
+        recomputeCentroids(live);
+        centroidAge = 0;
+      }
+      const basinStrength = influence * 36; // tuned so 1.0 = decisive basins
+      for (let i = 0; i < live; i++) {
+        const fi = folderIdxBuf[i];
+        if (fi < 0 || fi >= centroidFolderCount) continue;
+        const ai = i * 3;
+        const ci = fi * 3;
+        const dx = centroids[ci] - positions[ai];
+        const dy = centroids[ci + 1] - positions[ai + 1];
+        const dz = centroids[ci + 2] - positions[ai + 2];
+        force[ai] += dx * basinStrength * 0.01;
+        force[ai + 1] += dy * basinStrength * 0.01;
+        force[ai + 2] += dz * basinStrength * 0.01;
+      }
+    }
+
+    // Integrate.
+    const damp = profile.damping;
+    const maxV = profile.maxSpeed;
+    for (let i = 0; i < live; i++) {
+      if (pinnedBuf[i]) {
+        const vi = i * 3;
+        velocities[vi] = velocities[vi + 1] = velocities[vi + 2] = 0;
+        continue;
+      }
+      const m = Math.max(masses[i], 0.4);
+      const vi = i * 3;
+      const fi = i * 3;
+      velocities[vi] = (velocities[vi] + (force[fi] / m) * dt) * damp;
+      velocities[vi + 1] =
+        (velocities[vi + 1] + (force[fi + 1] / m) * dt) * damp;
+      velocities[vi + 2] =
+        (velocities[vi + 2] + (force[fi + 2] / m) * dt) * damp;
+
+      // Speed cap — keeps the physics from ever running away, even during
+      // an impulse from a big Cmd+N burst.
+      const sx = velocities[vi];
+      const sy = velocities[vi + 1];
+      const sz = velocities[vi + 2];
+      const sp = Math.sqrt(sx * sx + sy * sy + sz * sz);
+      if (sp > maxV) {
+        const k = maxV / sp;
+        velocities[vi] *= k;
+        velocities[vi + 1] *= k;
+        velocities[vi + 2] *= k;
+      }
+
+      positions[vi] += velocities[vi] * dt;
+      positions[vi + 1] += velocities[vi + 1] * dt;
+      positions[vi + 2] += velocities[vi + 2] * dt;
+    }
+
+    bodies.markPositionsDirty();
+  }
+
+  function recomputeCentroids(live) {
+    const fc = bodies.folderCount ? bodies.folderCount() : 0;
+    if (fc > centroidSlots) {
+      const nextSlots = Math.max(fc, centroidSlots * 2);
+      const next = new Float32Array(nextSlots * 3);
+      next.set(centroids);
+      centroids = next;
+      centroidSlots = nextSlots;
+    }
+    const used = fc;
+    const counts = new Int32Array(used);
+    for (let k = 0; k < used * 3; k++) centroids[k] = 0;
+    for (let i = 0; i < live; i++) {
+      const fi = folderIdxBuf[i];
+      if (fi < 0 || fi >= used) continue;
+      const si = fi * 3;
+      const pi = i * 3;
+      centroids[si] += positions[pi];
+      centroids[si + 1] += positions[pi + 1];
+      centroids[si + 2] += positions[pi + 2];
+      counts[fi]++;
+    }
+    for (let fi = 0; fi < used; fi++) {
+      const c = counts[fi];
+      if (c === 0) continue;
+      const si = fi * 3;
+      centroids[si] /= c;
+      centroids[si + 1] /= c;
+      centroids[si + 2] /= c;
+    }
+    centroidFolderCount = used;
+  }
+
+  function repel(a, b, strength, rRad2) {
+    const ai = a * 3;
+    const bi = b * 3;
+    const dx = positions[bi] - positions[ai];
+    const dy = positions[bi + 1] - positions[ai + 1];
+    const dz = positions[bi + 2] - positions[ai + 2];
+    const d2 = dx * dx + dy * dy + dz * dz + 1e-4;
+    if (d2 > rRad2) return;
+    const d = Math.sqrt(d2);
+    const f = strength / d2 / d; // falls off as 1/r³, very local
+    force[ai] -= f * dx;
+    force[ai + 1] -= f * dy;
+    force[ai + 2] -= f * dz;
+    force[bi] += f * dx;
+    force[bi + 1] += f * dy;
+    force[bi + 2] += f * dz;
+  }
+
+  // Push two bodies toward each other briefly, used on link creation so the
+  // settling is visible instead of a silent pulse through the buffer.
+  function kickTogether(idA, idB, strength = 180) {
+    const i = bodies.indexOfId(idA);
+    const j = bodies.indexOfId(idB);
+    if (i < 0 || j < 0) return;
+    const ai = i * 3;
+    const bi = j * 3;
+    const dx = positions[bi] - positions[ai];
+    const dy = positions[bi + 1] - positions[ai + 1];
+    const dz = positions[bi + 2] - positions[ai + 2];
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz) + 1;
+    const f = strength / d;
+    if (!pinnedBuf[i]) {
+      velocities[ai] += f * dx;
+      velocities[ai + 1] += f * dy;
+      velocities[ai + 2] += f * dz;
+    }
+    if (!pinnedBuf[j]) {
+      velocities[bi] -= f * dx;
+      velocities[bi + 1] -= f * dy;
+      velocities[bi + 2] -= f * dz;
+    }
+  }
+
+  function kickApart(idA, idB, strength = 120) {
+    kickTogether(idA, idB, -strength);
+  }
+
+  function getEdges() {
+    return edges;
+  }
+
+  return {
+    step,
+    rebuildEdges,
+    refreshEdgesFor,
+    kickTogether,
+    kickApart,
+    getEdges,
+  };
+}

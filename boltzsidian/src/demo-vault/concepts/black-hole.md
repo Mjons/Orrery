@@ -1,0 +1,22 @@
+# Black hole
+
+A region of spacetime where gravity is strong enough that nothing — not
+even light — can escape. Predicted by Schwarzschild in 1916 as an exact
+solution to Einstein's field equations; taken seriously only by the 1970s.
+
+Three categories:
+
+- **Stellar mass** (5–100 M☉), from [[Supernova]] core-collapse.
+  Cygnus X-1 in [[Cygnus]] is the canonical example.
+- **Intermediate mass** (100–10⁵ M☉), rare and poorly understood.
+- **Supermassive** (10⁵–10⁹ M☉) at galactic centers. Sgr A* at the
+  heart of the Milky Way. M87* — the one the Event Horizon Telescope
+  imaged in 2019.
+
+Amateurs don't "see" black holes. We see their accretion discs
+(X-ray binaries), their gravitational lenses, and occasionally the
+ripples they make when they merge (LIGO).
+
+Related: [[Redshift]].
+
+#concept #anchor

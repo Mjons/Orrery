@@ -199,9 +199,14 @@ The observer layer from §2 naturally reports on high-resonance events:
 "something in me is recognizing something else." This is where the two
 layers meet.
 
-### 5.3 The meaning filter
+### 5.3 The salience layer
 
-Most interactions are noise. The meaning layer is the scoring function that
+(Originally drafted as "the meaning filter"; renamed during Phase 6
+planning. "Salience" is more honest about what the scorer actually does —
+it measures what stands out from context, not what is true. See
+SALIENCE.md for the extended version of this section.)
+
+Most interactions are noise. The salience layer is the scoring function that
 decides which new ideas are kept, surfaced, or discarded.
 
 A provisional scoring function — to be tuned, not frozen:

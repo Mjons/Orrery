@@ -1,12 +1,14 @@
 // Vault orchestrator. Scans a workspace folder into an in-memory model:
 // notes + by-id index + by-title index + forward/backward link graph + stats.
 //
-// Phase 1 is read-only. Write-back lands in Phase 2.
+// Mutations (create, save, rename) live in ./mutations.js.
 
 import { walkMarkdown } from "./walker.js";
 import { readNote } from "./parser.js";
+import { assignKinds } from "./kind.js";
+import { detectCommunities } from "../sim/clusters.js";
 
-export async function openVault(rootHandle, { onProgress } = {}) {
+export async function openVault(rootHandle, { onProgress, settings } = {}) {
   const t0 = performance.now();
   const entries = await walkMarkdown(rootHandle);
   const notes = [];
@@ -52,6 +54,16 @@ export async function openVault(rootHandle, { onProgress } = {}) {
 
   const linkCount = [...forward.values()].reduce((s, set) => s + set.size, 0);
 
+  if (settings) assignKinds(notes, settings);
+
+  // Community detection on the link graph. Produces stable cluster ids
+  // per note; centroids + extents get filled in once positions exist
+  // (see computeLocalDensity in sim/clusters.js).
+  const clusters = detectCommunities({ notes, forward });
+  for (const n of notes) {
+    n.cluster = clusters.byNote.get(n.id) ?? null;
+  }
+
   const elapsed = Math.round(performance.now() - t0);
   return {
     root: rootHandle,
@@ -60,10 +72,14 @@ export async function openVault(rootHandle, { onProgress } = {}) {
     byTitle,
     forward,
     backward,
+    clusters,
+    // Populated by sim/clusters.computeLocalDensity after layout lands.
+    densityById: new Map(),
     stats: {
       notes: notes.length,
       tags: tagCounts.size,
       links: linkCount,
+      clusters: clusters.byId.size,
       elapsedMs: elapsed,
     },
     tagCounts,

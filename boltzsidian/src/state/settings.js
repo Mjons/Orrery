@@ -9,8 +9,15 @@ export const DEFAULT_SETTINGS = {
   idle_minutes_to_dream: 10,
   sleep_depth_cap: 0.85,
   observer_chorus: false,
-  utterance_backend: "template", // 'template' | 'webllm' | 'claude'
+  chorus_density: "med", // 'low' | 'med' | 'high'
+  chorus_font_size: 12,
+  utterance_backend: "template", // 'template' | 'local' | 'webllm' | 'claude'
   claude_api_key_ref: null,
+  // Local-rig (OpenAI-compatible HTTP) backend config. Empty = unset.
+  // Endpoint must include the full path, e.g. /v1/chat/completions.
+  utterance_local_endpoint: "",
+  utterance_local_model: "",
+  utterance_local_api_key: "", // optional bearer token for LM Studio / tabbyAPI
   tag_to_kind: {
     episode: 0,
     fact: 1,
@@ -29,6 +36,37 @@ export const DEFAULT_SETTINGS = {
     5: "Self",
     6: "Person",
   },
+  // Folders. Off by default; see FORMATIONS.md §1.
+  folder_influence: 0, // 0 = dissolve, 1 = strong basin
+  folder_tints: {}, // folder-name → palette key (cobalt, teal, sage, …)
+  // Ambience. See AMBIENCE.md §4. 'dream' is reserved — selected
+  // automatically at depth > 0.3; don't set it as the wake preset.
+  ambience_wake: "default", // 'default' | 'galactic' | 'clinical' | 'vintage'
+  ambience_intensity: 1.0, // 0..2 scalar on look-pass effects (temperature, vignette, grain)
+  // Label visibility. See LABELS.md.
+  // 'always' = current cursor-lens + ambient behavior
+  // 'hover'  = only the currently pointer-hovered body shows its title
+  // 'never'  = no titles at all; universe reads as pure space
+  label_mode: "always",
+  // Interaction safeguards.
+  confirm_unlink: true, // confirm before right-click deletes a tether
+  // Tend passes — per-pass opt-outs. Absent key = enabled by default so
+  // new passes added later opt-in automatically. See STATES.md §2.
+  tend_passes: {
+    "tag-infer": true,
+    "obvious-link": true,
+    "title-collision": true,
+    "fm-normalise": true,
+    stub: true,
+  },
+  // Weed — manual review of prune candidates. STATES.md §3,
+  // BUILD_PLAN Phase 6.6.
+  weed_enabled: true,
+  // How many new candidates since last Weed open triggers the soft toast.
+  weed_growth_threshold: 5,
+  // Brief — 90-second "where you are" panel on workspace open.
+  // STATES.md §4, BUILD_PLAN Phase 6.7.
+  brief_on_open: true,
 };
 
 export function loadSettings() {

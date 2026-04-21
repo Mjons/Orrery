@@ -16,6 +16,7 @@
     "@codemirror/lang-markdown": "^6.3.0",
     "@codemirror/state": "^6.4.1",
     "@codemirror/view": "^6.34.0",
+    "@mlc-ai/web-llm": "^0.2.82",
     "gray-matter": "^4.0.3",
     "marked": "^14.1.0",
     "minisearch": "^7.1.0",

@@ -110,21 +110,144 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        flex-direction: column;
-        gap: 22px;
         z-index: 20;
         pointer-events: none;
       }
-      #pick-pane .tagline {
-        font-size: 13px;
-        color: var(--text-dim);
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        max-width: 420px;
-        text-align: center;
-      }
       #pick-pane.hidden {
         display: none;
+      }
+      #pick-pane .welcome {
+        pointer-events: auto;
+        max-width: 520px;
+        padding: 36px 40px;
+        background: var(--glass);
+        backdrop-filter: blur(18px) saturate(140%);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px;
+        text-align: center;
+      }
+      #pick-pane .welcome-title {
+        font-size: 22px;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        margin: 0 0 6px;
+        color: var(--text);
+      }
+      #pick-pane .welcome-tagline {
+        font-size: 11px;
+        color: var(--text-faint);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin: 0 0 24px;
+      }
+      #pick-pane .welcome-blurb {
+        font-size: 14px;
+        color: var(--text-dim);
+        line-height: 1.65;
+        margin: 0 0 28px;
+      }
+      #pick-pane .welcome-buttons {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      #pick-pane .welcome-theme {
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin: 0 0 18px;
+        text-align: left;
+      }
+      #pick-pane .welcome-theme legend {
+        font-size: 10px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        padding: 0 6px;
+      }
+      #pick-pane .welcome-theme label {
+        display: grid;
+        grid-template-columns: 18px 1fr;
+        column-gap: 10px;
+        row-gap: 2px;
+        align-items: start;
+        padding: 8px 0;
+        cursor: pointer;
+      }
+      #pick-pane .welcome-theme label + label {
+        border-top: 1px solid var(--glass-border);
+      }
+      #pick-pane .welcome-theme input[type="radio"] {
+        grid-row: 1 / span 2;
+        grid-column: 1;
+        margin-top: 3px;
+        accent-color: var(--accent);
+      }
+      #pick-pane .welcome-theme .theme-label {
+        grid-column: 2;
+        font-size: 13px;
+        color: var(--text);
+      }
+      #pick-pane .welcome-theme .theme-blurb {
+        grid-column: 2;
+        font-size: 11px;
+        color: var(--text-dim);
+        line-height: 1.45;
+      }
+      #pick-pane .welcome-footer {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      #pick-pane .welcome-footer a {
+        color: var(--text-dim);
+        text-decoration: none;
+        border-bottom: 1px dotted rgba(215, 219, 228, 0.22);
+        cursor: pointer;
+      }
+      #pick-pane .welcome-footer a:hover {
+        color: var(--accent);
+      }
+      #pick-pane .welcome-progress {
+        font-size: 11px;
+        color: var(--text-dim);
+        letter-spacing: 0.06em;
+        margin-top: 14px;
+        min-height: 14px;
+      }
+      #pick-pane .welcome.busy .welcome-buttons button {
+        opacity: 0.5;
+        pointer-events: none;
+      }
+
+      button.secondary {
+        pointer-events: auto;
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        padding: 11px 18px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        font-family: inherit;
+        transition:
+          background 140ms ease,
+          color 140ms ease,
+          border-color 140ms ease;
+      }
+      button.secondary:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      button.secondary:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(138, 180, 255, 0.28);
       }
 
       button.primary {
@@ -179,21 +302,118 @@
         color: var(--text-dim);
         text-transform: uppercase;
       }
-      #settings pre {
-        font-size: 11px;
-        line-height: 1.7;
-        color: var(--text);
-        margin: 0;
-        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-      #settings .hint {
-        margin-top: 24px;
+      #settings h3 {
         font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        margin: 0 0 10px;
         color: var(--text-faint);
+        text-transform: uppercase;
+      }
+      #settings .settings-group {
+        margin-bottom: 26px;
+      }
+      #settings .settings-hint {
+        font-size: 11px;
+        color: var(--text-faint);
+        line-height: 1.6;
+        margin: 0 0 10px;
+      }
+      #settings .settings-footer {
+        margin-top: 10px;
         letter-spacing: 0.06em;
         text-transform: uppercase;
+      }
+      #settings .settings-footer a {
+        color: var(--text-dim);
+        text-decoration: none;
+        border-bottom: 1px dotted rgba(215, 219, 228, 0.25);
+      }
+      #settings .settings-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      #settings .settings-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+      }
+      #settings .settings-row > span:first-child {
+        flex: 0 0 60px;
+        color: var(--text-dim);
+        letter-spacing: 0.04em;
+      }
+      #settings .settings-row .tag-label {
+        flex: 1 1 auto;
+        color: var(--text);
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+      }
+      #settings .settings-row .tag-count {
+        flex: 0 0 34px;
+        text-align: right;
+        color: var(--text-faint);
+        font-size: 11px;
+      }
+      #settings .settings-row .kind-num {
+        flex: 0 0 22px;
+        color: var(--text-faint);
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+      }
+      #settings input[type="text"],
+      #settings input[type="number"],
+      #settings select {
+        flex: 1 1 auto;
+        background: rgba(0, 0, 0, 0.24);
+        border: 1px solid var(--glass-border);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        outline: none;
+        min-width: 0;
+      }
+      #settings input[type="text"]:focus,
+      #settings input[type="number"]:focus,
+      #settings select:focus {
+        border-color: rgba(138, 180, 255, 0.45);
+      }
+      #settings input[type="color"] {
+        width: 40px;
+        height: 26px;
+        padding: 0;
+        border: 1px solid var(--glass-border);
+        border-radius: 6px;
+        background: transparent;
+        cursor: pointer;
+      }
+      #settings button {
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        line-height: 1;
+      }
+      #settings button:hover {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.5);
+      }
+      #settings button.ghost {
+        border-color: transparent;
+        color: var(--text-faint);
+        padding: 4px 8px;
+      }
+      #settings button.ghost:hover {
+        color: var(--accent);
+      }
+      #settings .add-row {
+        margin-top: 10px;
       }
 
       /* ── Note panel ─────────────────────────────────────── */
@@ -202,7 +422,8 @@
         top: 0;
         right: 0;
         bottom: 0;
-        width: 480px;
+        width: var(--panel-width, 480px);
+        min-width: 320px;
         max-width: 92vw;
         background: var(--glass-strong);
         backdrop-filter: blur(22px) saturate(140%);
@@ -213,6 +434,35 @@
         display: flex;
         flex-direction: column;
         z-index: 28;
+      }
+      /* Thin invisible grab strip on the left edge of the note panel. Visible
+       * hover/drag state is a faint accent bar so it reads as "draggable"
+       * without cluttering the glass. */
+      #note-panel .panel-resize-handle {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: -3px;
+        width: 8px;
+        cursor: ew-resize;
+        z-index: 2;
+        background: transparent;
+        transition: background 140ms ease;
+      }
+      #note-panel .panel-resize-handle:hover,
+      #note-panel.resizing .panel-resize-handle {
+        background: linear-gradient(
+          to right,
+          transparent 0,
+          transparent 2px,
+          rgba(138, 180, 255, 0.35) 3px,
+          rgba(138, 180, 255, 0.35) 5px,
+          transparent 6px,
+          transparent 100%
+        );
+      }
+      #note-panel.resizing {
+        transition: none;
       }
       #note-panel.open {
         transform: translateX(0);
@@ -233,6 +483,60 @@
         line-height: 1.35;
         margin: 0;
       }
+      #note-panel .panel-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      #note-panel .panel-status {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        min-width: 56px;
+        text-align: right;
+      }
+      #note-panel .panel-pin {
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-faint);
+        font-size: 13px;
+        line-height: 1;
+        padding: 4px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      #note-panel .panel-pin:hover {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.5);
+      }
+      #note-panel[data-pinned="true"] .panel-pin {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.5);
+        background: rgba(138, 180, 255, 0.08);
+      }
+      #note-panel .panel-mode {
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 5px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #note-panel .panel-mode:hover {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.5);
+      }
+      #note-panel[data-mode="edit"] .panel-mode {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.5);
+        background: rgba(138, 180, 255, 0.08);
+      }
       #note-panel .panel-close {
         background: transparent;
         border: 0;
@@ -248,6 +552,1467 @@
         color: var(--text);
         background: rgba(255, 255, 255, 0.06);
       }
+
+      /* CodeMirror host in edit mode */
+      #note-panel .panel-editor {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+      }
+      #note-panel[data-mode="edit"] .panel-body {
+        padding: 0;
+        overflow: hidden;
+      }
+      #note-panel .cm-host {
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      /* Scrollbars inside the panel — both the CodeMirror scroller in
+       * edit mode and the panel-body itself in read mode. Native
+       * scrollbars on a dark glass background are invisible; this
+       * makes them a soft accent-tinted rail that brightens on hover.
+       * Firefox + Safari use the standard properties; Chromium /
+       * WebKit use the ::-webkit pseudos for finer control. */
+      #note-panel .cm-scroller,
+      #note-panel .panel-body {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(138, 180, 255, 0.28) transparent;
+      }
+      #note-panel .cm-scroller::-webkit-scrollbar,
+      #note-panel .panel-body::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      #note-panel .cm-scroller::-webkit-scrollbar-track,
+      #note-panel .panel-body::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      #note-panel .cm-scroller::-webkit-scrollbar-thumb,
+      #note-panel .panel-body::-webkit-scrollbar-thumb {
+        background: rgba(138, 180, 255, 0.22);
+        border: 2px solid transparent;
+        background-clip: content-box;
+        border-radius: 8px;
+        transition: background 140ms ease;
+      }
+      #note-panel .cm-scroller::-webkit-scrollbar-thumb:hover,
+      #note-panel .panel-body::-webkit-scrollbar-thumb:hover {
+        background: rgba(138, 180, 255, 0.5);
+        background-clip: content-box;
+      }
+      #note-panel .cm-scroller::-webkit-scrollbar-corner,
+      #note-panel .panel-body::-webkit-scrollbar-corner {
+        background: transparent;
+      }
+
+      /* Suggestions row — heuristic tag + link chips beneath the
+       * CodeMirror pane. Two labeled sections (tags / links). :empty
+       * hides the container so there's no visual cost when idle. */
+      #note-panel .panel-suggestions {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px 22px 12px;
+        border-top: 1px solid var(--glass-border);
+        background: rgba(0, 0, 0, 0.22);
+      }
+      #note-panel .panel-suggestions:empty {
+        display: none;
+      }
+      #note-panel .sug-section {
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        column-gap: 10px;
+        align-items: center;
+      }
+      #note-panel .sug-section + .sug-section {
+        margin-top: 4px;
+        padding-top: 6px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.06);
+      }
+      #note-panel .sug-label {
+        font-size: 9px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        text-align: right;
+        user-select: none;
+      }
+      #note-panel .sug-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+      #note-panel .sug-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px 3px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text-dim);
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+        transition:
+          color 120ms ease,
+          background 120ms ease,
+          border-color 120ms ease;
+      }
+      #note-panel .sug-chip:hover {
+        color: var(--text);
+        background: rgba(138, 180, 255, 0.1);
+        border-color: rgba(138, 180, 255, 0.4);
+      }
+      #note-panel .sug-chip-tag .sug-chip-text {
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+      }
+      #note-panel .sug-chip-link .sug-chip-text {
+        font-style: italic;
+      }
+      #note-panel .sug-chip-x {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        color: var(--text-faint);
+        font-size: 13px;
+        line-height: 1;
+        margin-left: 2px;
+        transition: color 120ms ease;
+      }
+      #note-panel .sug-chip-x:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      #note-panel .cm-editor {
+        height: 100%;
+      }
+
+      /* ── Ideas drawer (left side, mirror of note panel) ──── */
+      #ideas-drawer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 420px;
+        max-width: 92vw;
+        background: var(--glass-strong);
+        backdrop-filter: blur(22px) saturate(140%);
+        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        border-right: 1px solid var(--glass-border);
+        transform: translateX(-100%);
+        transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        z-index: 28;
+      }
+      #ideas-drawer.open {
+        transform: translateX(0);
+      }
+      #ideas-drawer .drawer-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 22px 24px 14px;
+        border-bottom: 1px solid var(--glass-border);
+      }
+      #ideas-drawer .drawer-title {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: 0.01em;
+      }
+      #ideas-drawer .drawer-sub {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin: 4px 0 0;
+      }
+      #ideas-drawer .drawer-close {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-family: inherit;
+      }
+      #ideas-drawer .drawer-close:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      #ideas-drawer .drawer-empty {
+        padding: 24px;
+        font-size: 13px;
+        color: var(--text-dim);
+        line-height: 1.65;
+      }
+      #ideas-drawer.has-items .drawer-empty,
+      #ideas-drawer.is-dreaming .drawer-empty {
+        display: none;
+      }
+      #ideas-drawer .drawer-list {
+        flex: 1 1 auto;
+        list-style: none;
+        margin: 0;
+        padding: 8px 0;
+        overflow-y: auto;
+      }
+      #ideas-drawer .idea-item {
+        padding: 14px 24px;
+        border-bottom: 1px solid var(--glass-border);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      #ideas-drawer .idea-dream-status {
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--glass-border);
+        background: linear-gradient(
+          90deg,
+          rgba(138, 180, 255, 0.06),
+          transparent 80%
+        );
+        animation: dream-status-breathe 3.6s ease-in-out infinite;
+        list-style: none;
+      }
+      #ideas-drawer .idea-dream-phase {
+        margin: 0;
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      #ideas-drawer .idea-dream-sub {
+        margin: 6px 0 0;
+        font-size: 12px;
+        color: var(--text-dim);
+        line-height: 1.55;
+      }
+      @keyframes dream-status-breathe {
+        0%,
+        100% {
+          opacity: 0.75;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+      #ideas-drawer .idea-item[data-unread="true"]::before {
+        content: "";
+        display: block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        position: absolute;
+        margin-left: -14px;
+        margin-top: 5px;
+      }
+      #ideas-drawer .idea-text {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--text);
+      }
+      #ideas-drawer .idea-parents {
+        margin: 0;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        color: var(--text-faint);
+      }
+      #ideas-drawer .idea-parents a {
+        color: var(--text-dim);
+        text-decoration: none;
+        border-bottom: 1px dotted rgba(215, 219, 228, 0.22);
+        cursor: pointer;
+      }
+      #ideas-drawer .idea-parents a:hover {
+        color: var(--accent);
+        border-bottom-color: rgba(138, 180, 255, 0.4);
+      }
+      #ideas-drawer .idea-score {
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      #ideas-drawer .idea-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      #ideas-drawer .idea-btn {
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        padding: 5px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #ideas-drawer .idea-btn:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+      #ideas-drawer .idea-btn-primary {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      #ideas-drawer .idea-btn-primary:hover {
+        background: rgba(138, 180, 255, 0.08);
+      }
+
+      /* ── Tend drawer (left side, amber/janitorial accent) ── */
+      /* Structurally mirrors #ideas-drawer — amber accent instead of the
+       * cool blue to read as "housekeeping" rather than "insight." */
+      #tend-drawer {
+        --tend-accent: #e6b85c;
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 460px;
+        max-width: 92vw;
+        background: var(--glass-strong);
+        backdrop-filter: blur(22px) saturate(140%);
+        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        border-right: 1px solid var(--glass-border);
+        transform: translateX(-100%);
+        transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        z-index: 28;
+      }
+      #tend-drawer.open {
+        transform: translateX(0);
+      }
+      #tend-drawer .drawer-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 22px 24px 14px;
+        border-bottom: 1px solid var(--glass-border);
+      }
+      #tend-drawer .drawer-title {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: 0.01em;
+        color: var(--tend-accent);
+      }
+      #tend-drawer .drawer-sub {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin: 4px 0 0;
+      }
+      #tend-drawer .drawer-close {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-family: inherit;
+      }
+      #tend-drawer .drawer-close:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      #tend-drawer .drawer-empty {
+        padding: 24px;
+        font-size: 13px;
+        color: var(--text-dim);
+        line-height: 1.65;
+      }
+      #tend-drawer.has-items .drawer-empty {
+        display: none;
+      }
+      #tend-drawer .tend-groups {
+        flex: 1 1 auto;
+        overflow-y: auto;
+      }
+      #tend-drawer .tend-group {
+        border-bottom: 1px solid var(--glass-border);
+      }
+      #tend-drawer .tend-group-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 24px 4px;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      #tend-drawer .tend-group-count {
+        color: var(--tend-accent);
+        font-weight: 600;
+      }
+      #tend-drawer .tend-bulk-btn {
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        padding: 3px 8px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #tend-drawer .tend-bulk-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      #tend-drawer .tend-bulk-btn:hover:not(:disabled) {
+        color: var(--tend-accent);
+        border-color: rgba(230, 184, 92, 0.45);
+      }
+      #tend-drawer .tend-item {
+        padding: 12px 24px;
+        border-top: 1px solid var(--glass-border);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      #tend-drawer .tend-item-diff {
+        font-size: 12px;
+        color: var(--tend-accent);
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+      }
+      #tend-drawer .tend-item-target {
+        font-size: 13px;
+        color: var(--text);
+        margin: 0;
+      }
+      #tend-drawer .tend-item-target a {
+        color: var(--text);
+        text-decoration: none;
+        border-bottom: 1px dotted rgba(215, 219, 228, 0.22);
+        cursor: pointer;
+      }
+      #tend-drawer .tend-item-target a:hover {
+        color: var(--accent);
+        border-bottom-color: rgba(138, 180, 255, 0.45);
+      }
+      #tend-drawer .tend-item-reason {
+        font-size: 12px;
+        line-height: 1.55;
+        color: var(--text-dim);
+        margin: 0;
+      }
+      #tend-drawer .tend-item-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 2px;
+      }
+      #tend-drawer .tend-btn {
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        padding: 5px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #tend-drawer .tend-btn:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.22);
+      }
+      #tend-drawer .tend-btn-primary {
+        border-color: var(--tend-accent);
+        color: var(--tend-accent);
+      }
+      #tend-drawer .tend-btn-primary:hover {
+        background: rgba(230, 184, 92, 0.08);
+      }
+      #tend-drawer .tend-item[data-state="applying"] {
+        opacity: 0.55;
+        pointer-events: none;
+      }
+
+      /* ── Weed drawer (left side, deliberately utilitarian) ─ */
+      /* No glass, no blur, no slide animation. The spec (STATES.md §3
+       * "uncomfortable by design") asks for this to feel like a file
+       * manager — the user should notice they're making destructive
+       * choices, not glide through them. */
+      #weed-drawer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 520px;
+        max-width: 94vw;
+        background: rgba(12, 14, 20, 0.98);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--text);
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+        font-size: 12px;
+        display: none;
+        flex-direction: column;
+        z-index: 28;
+      }
+      #weed-drawer.open {
+        display: flex;
+      }
+      #weed-drawer .drawer-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 20px 12px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      #weed-drawer .drawer-title {
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin: 0;
+        color: var(--text);
+      }
+      #weed-drawer .drawer-sub {
+        font-size: 11px;
+        color: var(--text-faint);
+        margin: 4px 0 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        letter-spacing: normal;
+        text-transform: none;
+      }
+      #weed-drawer .drawer-close {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 2px 6px;
+        font-family: inherit;
+      }
+      #weed-drawer .drawer-close:hover {
+        color: var(--text);
+      }
+      #weed-drawer .drawer-empty {
+        padding: 20px;
+        color: var(--text-dim);
+        line-height: 1.6;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        font-size: 12px;
+      }
+      #weed-drawer .weed-bulk {
+        display: flex;
+        gap: 8px;
+        padding: 10px 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      #weed-drawer .weed-bulk-btn {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      #weed-drawer .weed-bulk-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      #weed-drawer .weed-bulk-btn:hover:not(:disabled) {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+      #weed-drawer .weed-list {
+        flex: 1 1 auto;
+        overflow-y: auto;
+      }
+      #weed-drawer .weed-row {
+        padding: 12px 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      #weed-drawer .weed-row[data-state="applying"] {
+        opacity: 0.4;
+        pointer-events: none;
+      }
+      #weed-drawer .weed-row[data-state="error"] {
+        border-left: 2px solid #c66;
+      }
+      #weed-drawer .weed-title {
+        color: var(--text);
+        text-decoration: none;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        font-size: 13px;
+      }
+      #weed-drawer .weed-title:hover {
+        color: var(--accent);
+      }
+      #weed-drawer .weed-path {
+        font-size: 11px;
+        color: var(--text-faint);
+      }
+      #weed-drawer .weed-meta {
+        font-size: 11px;
+        color: var(--text-dim);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        line-height: 1.45;
+      }
+      #weed-drawer .weed-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      #weed-drawer .weed-btn {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      #weed-drawer .weed-btn:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+      #weed-drawer .weed-btn-keep:hover {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.45);
+      }
+      #weed-drawer .weed-btn-delete {
+        color: #d68a88;
+        border-color: rgba(198, 102, 100, 0.3);
+      }
+      #weed-drawer .weed-btn-delete:hover {
+        color: #f0a8a6;
+        border-color: rgba(240, 168, 166, 0.55);
+        background: rgba(198, 102, 100, 0.08);
+      }
+
+      /* ── Brief panel (centred glass, non-modal) ─────────── */
+      /* Shown once on workspace open when brief_on_open. Unlike the
+       * modal overlays above, Brief does NOT paint a scrim — the
+       * canvas behind stays visible. Dismisses on esc or any nav key. */
+      #brief-panel {
+        position: fixed;
+        top: 72px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-8px);
+        width: min(520px, 92vw);
+        max-height: 78vh;
+        overflow-y: auto;
+        background: var(--glass-strong);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: blur(22px) saturate(140%);
+        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        border-radius: 14px;
+        padding: 22px 26px 18px;
+        color: var(--text);
+        box-shadow: 0 14px 44px -14px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 180ms ease,
+          transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+        z-index: 30;
+      }
+      #brief-panel.show {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateX(-50%) translateY(0);
+      }
+      #brief-panel .brief-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      #brief-panel .brief-title {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        margin: 0;
+      }
+      #brief-panel .brief-sub {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin: 3px 0 0;
+      }
+      #brief-panel .brief-close {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-family: inherit;
+      }
+      #brief-panel .brief-close:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      #brief-panel .brief-body {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      #brief-panel .brief-section {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      #brief-panel .brief-section h3 {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin: 0;
+        color: var(--text);
+      }
+      #brief-panel .brief-section-sub {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin: 0 0 4px;
+      }
+      #brief-panel .brief-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      #brief-panel .brief-list li {
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--text-dim);
+      }
+      #brief-panel .brief-note-title {
+        color: var(--text);
+        text-decoration: none;
+        border-bottom: 1px dotted rgba(215, 219, 228, 0.22);
+        cursor: pointer;
+      }
+      #brief-panel .brief-note-title:hover {
+        color: var(--accent);
+        border-bottom-color: rgba(138, 180, 255, 0.45);
+      }
+      #brief-panel .brief-reason {
+        color: var(--text-faint);
+        font-size: 12px;
+      }
+      #brief-panel .brief-bridge {
+        font-size: 13px;
+        color: var(--text);
+        margin: 2px 0 4px;
+      }
+      #brief-panel .brief-bridge-reason {
+        font-size: 12px;
+        color: var(--text-faint);
+        margin: 0;
+        line-height: 1.5;
+      }
+      #brief-panel .brief-hint {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin: 14px 0 0;
+        text-align: right;
+      }
+
+      /* ── Model face — the observer's persona ─────────────── */
+      /* Persistent top-left HUD. Always visible while a workspace is
+       * open. Expression tracks job kind on every model call; glow
+       * tints by backend. SVG rather than sprites so the accent
+       * colour drives everything via CSS custom properties. */
+      #model-face {
+        position: fixed;
+        top: 16px;
+        left: 300px;
+        width: 112px;
+        height: 112px;
+        z-index: 26;
+        pointer-events: none;
+        transition: opacity 300ms ease;
+      }
+      #model-face .mface {
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+      }
+      /* Backend tint. Custom property drives the glow + stroke accent
+       * so switching between local / claude / webllm / template only
+       * needs one variable change, no SVG rewrites. */
+      #model-face .mface[data-backend="local"] {
+        --mface-glow: #8ab4ff;
+      }
+      #model-face .mface[data-backend="claude"] {
+        --mface-glow: #c288ff;
+      }
+      #model-face .mface[data-backend="webllm"] {
+        --mface-glow: #8affb0;
+      }
+      #model-face .mface[data-backend="template"] {
+        --mface-glow: #777c85;
+      }
+      #model-face .mface {
+        --mface-glow: #777c85;
+      }
+      /* Halo. Intensity rides on the expression — idle/template are
+       * dim, result expressions flash brighter for the dwell window. */
+      #model-face .mface-halo {
+        fill: var(--mface-glow);
+        opacity: 0.12;
+        filter: blur(6px);
+        transition:
+          opacity 280ms ease,
+          r 280ms ease;
+      }
+      #model-face .mface[data-expression="idle"] .mface-halo,
+      #model-face .mface[data-expression="template"] .mface-halo,
+      #model-face .mface[data-expression="sleeping"] .mface-halo {
+        opacity: 0.08;
+      }
+      #model-face .mface[data-expression="thinking"] .mface-halo {
+        opacity: 0.25;
+        animation: mface-pulse 1.2s ease-in-out infinite;
+      }
+      #model-face .mface[data-expression="snarky"] .mface-halo,
+      #model-face .mface[data-expression="dreaming"] .mface-halo,
+      #model-face .mface[data-expression="speculating"] .mface-halo {
+        opacity: 0.42;
+      }
+      #model-face .mface[data-expression="speculating"] .mface-halo {
+        animation: mface-flash 0.6s ease-out 1;
+      }
+      /* Only the currently-named expression group is visible. */
+      #model-face .mface-expr {
+        display: none;
+      }
+      #model-face .mface[data-expression="idle"] .mface-expr[data-name="idle"],
+      #model-face
+        .mface[data-expression="thinking"]
+        .mface-expr[data-name="thinking"],
+      #model-face
+        .mface[data-expression="snarky"]
+        .mface-expr[data-name="snarky"],
+      #model-face
+        .mface[data-expression="dreaming"]
+        .mface-expr[data-name="dreaming"],
+      #model-face
+        .mface[data-expression="speculating"]
+        .mface-expr[data-name="speculating"],
+      #model-face
+        .mface[data-expression="template"]
+        .mface-expr[data-name="template"],
+      #model-face
+        .mface[data-expression="sleeping"]
+        .mface-expr[data-name="sleeping"] {
+        display: initial;
+      }
+      /* Face part shapes. All strokes + fills key off --mface-glow so
+       * the face retints itself when the backend changes. */
+      #model-face .mface-eye,
+      #model-face .mface-eye-wide {
+        fill: var(--mface-glow);
+      }
+      #model-face .mface-pupil {
+        fill: rgba(0, 0, 0, 0.85);
+      }
+      #model-face .mface-eye-flat,
+      #model-face .mface-eye-arc,
+      #model-face .mface-eye-half,
+      #model-face .mface-brow,
+      #model-face .mface-mouth,
+      #model-face .mface-mouth-curve,
+      #model-face .mface-mouth-o,
+      #model-face .mface-spark,
+      #model-face .mface-z {
+        fill: none;
+        stroke: var(--mface-glow);
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      /* Scribble strokes — the eyes are drawn as two overlapping short
+       * curves with a deliberately thick round-capped stroke, so they
+       * read as hand-drawn marker squiggles rather than geometric shapes. */
+      #model-face .mface-scribble {
+        fill: none;
+        stroke: var(--mface-glow);
+        stroke-width: 2.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      /* Mouths get a touch more weight for character. */
+      #model-face .mface-mouth,
+      #model-face .mface-mouth-curve {
+        stroke-width: 2.6;
+      }
+      #model-face .mface-mouth-dot {
+        fill: var(--mface-glow);
+      }
+      #model-face .mface-mouth-o {
+        fill: rgba(0, 0, 0, 0.3);
+      }
+      #model-face .mface-z {
+        fill: var(--mface-glow);
+        stroke: none;
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+      }
+      #model-face .mface-z-small {
+        opacity: 0.6;
+      }
+      /* Dreaming breathes; speculating flashes once; thinking blinks. */
+      #model-face .mface[data-expression="dreaming"] {
+        animation: mface-breathe 3s ease-in-out infinite;
+      }
+      #model-face
+        .mface[data-expression="thinking"]
+        .mface-mouth-dot:nth-child(3) {
+        animation: mface-blink 1s steps(2, end) infinite;
+      }
+      #model-face
+        .mface[data-expression="thinking"]
+        .mface-mouth-dot:nth-child(4) {
+        animation: mface-blink 1s steps(2, end) infinite 0.2s;
+      }
+      #model-face
+        .mface[data-expression="thinking"]
+        .mface-mouth-dot:nth-child(5) {
+        animation: mface-blink 1s steps(2, end) infinite 0.4s;
+      }
+      @keyframes mface-pulse {
+        0%,
+        100% {
+          opacity: 0.18;
+        }
+        50% {
+          opacity: 0.38;
+        }
+      }
+      @keyframes mface-flash {
+        0% {
+          opacity: 0.65;
+        }
+        100% {
+          opacity: 0.42;
+        }
+      }
+      @keyframes mface-breathe {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.035);
+        }
+      }
+      @keyframes mface-blink {
+        0%,
+        100% {
+          opacity: 0.3;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      /* ── Settings status pill ──────────────────────────── */
+      /* Used by the Dream section header to show a live ON/OFF + phase
+       * indicator. Glows green when the dream loop is running, muted
+       * grey when idle — lets the user verify from Settings that the
+       * cycle is actually firing. */
+      .settings-status {
+        display: inline-block;
+        margin-left: 8px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        font-weight: 500;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text-faint);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        vertical-align: middle;
+        text-transform: uppercase;
+      }
+      .settings-status[data-state="on"] {
+        background: rgba(138, 180, 255, 0.12);
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.45);
+        box-shadow: 0 0 8px rgba(138, 180, 255, 0.3);
+      }
+
+      /* ── Dream banner (top-centre phase readout) ─────────── */
+      /* Appears only while a dream cycle is running. Shows phase,
+       * progress within phase, and live depth. Exists so the user
+       * never has to ask "is anything happening?" during a dream. */
+      #dream-banner {
+        position: fixed;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-12px);
+        min-width: 320px;
+        max-width: 520px;
+        padding: 9px 18px;
+        background: rgba(12, 14, 20, 0.7);
+        border: 1px solid rgba(138, 180, 255, 0.22);
+        border-radius: 999px;
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 280ms ease,
+          transform 280ms cubic-bezier(0.2, 0.7, 0.2, 1);
+        backdrop-filter: blur(14px) saturate(140%);
+        -webkit-backdrop-filter: blur(14px) saturate(140%);
+        z-index: 27;
+        box-shadow: 0 6px 22px -10px rgba(138, 180, 255, 0.35);
+      }
+      #dream-banner.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      #dream-banner .dream-banner-phase {
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        white-space: nowrap;
+      }
+      #dream-banner .dream-banner-bar {
+        flex: 1 1 140px;
+        height: 3px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 2px;
+        overflow: hidden;
+        min-width: 120px;
+      }
+      #dream-banner .dream-banner-fill {
+        height: 100%;
+        background: var(--accent);
+        width: 0;
+        transition: width 240ms linear;
+        box-shadow: 0 0 8px rgba(138, 180, 255, 0.45);
+      }
+      #dream-banner .dream-banner-depth {
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+        white-space: nowrap;
+      }
+
+      /* ── Payload preview modal (Phase 7 Claude backend) ──── */
+      /* Monospace, utilitarian, unmistakable. The whole point of this
+       * modal is to show exactly what bytes are about to leave the
+       * machine — it must NOT feel like a polished marketing surface. */
+      .payload-preview-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.62);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 60;
+        opacity: 0;
+        transition: opacity 160ms ease;
+      }
+      .payload-preview-modal.show {
+        opacity: 1;
+      }
+      .pp-card {
+        width: min(640px, 94vw);
+        max-height: 86vh;
+        overflow-y: auto;
+        background: rgba(12, 14, 20, 0.98);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 10px;
+        padding: 22px 24px 18px;
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      }
+      .pp-card h2 {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin: 0 0 6px;
+      }
+      .pp-card h3 {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin: 14px 0 6px;
+        color: var(--text-faint);
+      }
+      .pp-sub {
+        font-size: 12px;
+        color: var(--text-dim);
+        line-height: 1.55;
+        margin: 0 0 10px;
+      }
+      .pp-section {
+        display: flex;
+        flex-direction: column;
+      }
+      .pp-inline {
+        display: inline-block;
+        padding: 3px 7px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.05);
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 11px;
+        color: var(--text);
+      }
+      .pp-block {
+        margin: 0;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 6px;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--text);
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 260px;
+        overflow-y: auto;
+      }
+      .pp-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-top: 18px;
+      }
+      .pp-btn {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        padding: 7px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .pp-btn:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.3);
+      }
+      .pp-btn-primary {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .pp-btn-primary:hover {
+        background: rgba(138, 180, 255, 0.08);
+      }
+
+      /* ── Noticed pill (top-right counter) ───────────────── */
+      .noticed-pill {
+        position: fixed;
+        top: 16px;
+        right: 180px;
+        z-index: 25;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 14px;
+        background: var(--glass-strong);
+        border: 1px solid rgba(138, 180, 255, 0.38);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        backdrop-filter: blur(16px) saturate(140%);
+        -webkit-backdrop-filter: blur(16px) saturate(140%);
+        border-radius: 99px;
+        cursor: pointer;
+        box-shadow: 0 0 18px -6px rgba(138, 180, 255, 0.35);
+        transition:
+          background 140ms ease,
+          transform 140ms ease;
+      }
+      .noticed-pill:hover {
+        background: rgba(138, 180, 255, 0.12);
+        transform: translateY(-1px);
+      }
+      .noticed-pill[hidden] {
+        display: none;
+      }
+      .noticed-pill .noticed-count {
+        font-weight: 600;
+        color: var(--accent);
+        font-size: 12px;
+      }
+
+      /* ── Salience debug palette — Shift+S ───────────────── */
+      /* Deliberately utilitarian. Monospace table, no glass. Trust
+       * matters more than polish (SALIENCE.md §8.5). */
+      #salience-debug {
+        position: fixed;
+        top: 16px;
+        right: 16px;
+        bottom: 16px;
+        width: min(720px, 92vw);
+        background: rgba(10, 12, 20, 0.94);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        color: var(--text);
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+        font-size: 11px;
+        line-height: 1.4;
+        display: none;
+        flex-direction: column;
+        z-index: 44;
+      }
+      #salience-debug.show {
+        display: flex;
+      }
+      #salience-debug .sdbg-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 10px;
+        color: var(--text-dim);
+      }
+      #salience-debug .sdbg-close {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        font-size: 18px;
+        cursor: pointer;
+        line-height: 1;
+      }
+      #salience-debug .sdbg-params {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 14px;
+        padding: 10px 14px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      #salience-debug .sdbg-param-row {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        align-items: center;
+        gap: 6px;
+      }
+      #salience-debug .sdbg-param-name {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--text);
+      }
+      #salience-debug .sdbg-param-help {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        color: var(--text-faint);
+        font-size: 9px;
+        line-height: 1;
+        cursor: help;
+        user-select: none;
+      }
+      #salience-debug .sdbg-param-help:hover,
+      #salience-debug .sdbg-param-help:focus {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.55);
+        outline: none;
+      }
+      #salience-debug .sdbg-help-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      /* Default placement: BELOW the ? icon (panel sits near the top of
+       * the viewport, so "above" overflows for the first few rows). JS
+       * can flip via .tip-above and nudge horizontally via the custom
+       * property when the tip would cross a viewport edge. */
+      #salience-debug .sdbg-tip {
+        --tip-x-offset: 0px;
+        position: absolute;
+        top: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(calc(-50% + var(--tip-x-offset))) translateY(-4px);
+        min-width: 220px;
+        max-width: 300px;
+        padding: 8px 11px;
+        background: rgba(10, 12, 20, 0.96);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 6px;
+        color: var(--text);
+        font-size: 11px;
+        line-height: 1.5;
+        letter-spacing: 0.01em;
+        white-space: normal;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition:
+          opacity 120ms ease,
+          transform 120ms ease,
+          visibility 120ms;
+        z-index: 2;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+      }
+      #salience-debug .sdbg-help-wrap.tip-above .sdbg-tip {
+        top: auto;
+        bottom: calc(100% + 8px);
+        transform: translateX(calc(-50% + var(--tip-x-offset))) translateY(4px);
+      }
+      #salience-debug .sdbg-help-wrap:hover .sdbg-tip,
+      #salience-debug .sdbg-help-wrap:focus-within .sdbg-tip {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(calc(-50% + var(--tip-x-offset))) translateY(0);
+      }
+      #salience-debug input[type="number"] {
+        width: 90px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: var(--text);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: inherit;
+        font-size: 10px;
+      }
+      #salience-debug .sdbg-param-row button {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--text-faint);
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 11px;
+        line-height: 1;
+      }
+      #salience-debug .sdbg-list {
+        flex: 1 1 auto;
+        overflow: auto;
+        padding: 6px 14px;
+      }
+      #salience-debug .sdbg-empty {
+        padding: 24px 0;
+        color: var(--text-faint);
+        text-align: center;
+      }
+      #salience-debug .sdbg-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      #salience-debug .sdbg-table th,
+      #salience-debug .sdbg-table td {
+        padding: 3px 6px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        text-align: right;
+        vertical-align: top;
+        white-space: nowrap;
+      }
+      #salience-debug .sdbg-table th {
+        color: var(--text-faint);
+        font-weight: 400;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-size: 9px;
+      }
+      #salience-debug .sdbg-table .sdbg-text,
+      #salience-debug .sdbg-table .sdbg-parents {
+        text-align: left;
+        white-space: normal;
+      }
+      #salience-debug .sdbg-table .sdbg-text {
+        max-width: 260px;
+        color: var(--text);
+      }
+      #salience-debug .sdbg-table .sdbg-parents {
+        max-width: 180px;
+        color: var(--text-dim);
+        font-size: 10px;
+      }
+      #salience-debug .sdbg-table .sdbg-s {
+        color: var(--accent);
+      }
+      #salience-debug .sdbg-table tr.sdbg-surfaced .sdbg-s {
+        color: rgba(138, 180, 255, 1);
+        font-weight: 600;
+      }
+      #salience-debug .sdbg-table tr.sdbg-promoted {
+        opacity: 0.5;
+      }
+      #salience-debug .sdbg-foot {
+        padding: 6px 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        color: var(--text-faint);
+        font-size: 10px;
+      }
+
       #note-panel .panel-body {
         flex: 1 1 auto;
         overflow-y: auto;
@@ -387,7 +2152,7 @@
         font-weight: 500;
       }
 
-      /* ── Toast (errors) ─────────────────────────────────── */
+      /* ── Toast (errors + actions) ───────────────────────── */
       #toast {
         position: fixed;
         bottom: 60px;
@@ -398,20 +2163,697 @@
         border: 1px solid var(--glass-border);
         backdrop-filter: blur(18px);
         -webkit-backdrop-filter: blur(18px);
-        padding: 10px 16px;
+        padding: 8px 10px 8px 16px;
         border-radius: 10px;
         font-size: 12px;
         color: var(--text);
         pointer-events: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        max-width: 560px;
         transition:
           opacity 160ms ease,
           transform 160ms ease;
         z-index: 40;
-        max-width: 480px;
       }
       #toast.show {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
+        pointer-events: auto;
+      }
+      #toast .toast-label {
+        flex: 1 1 auto;
+      }
+      #toast .toast-btn {
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        padding: 4px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      #toast .toast-btn:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.22);
+      }
+      #toast .toast-btn-primary {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      #toast .toast-btn-primary:hover {
+        background: rgba(138, 180, 255, 0.08);
+      }
+
+      /* ── Observer chorus captions ──────────────────────── */
+      #chorus {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 15;
+        --chorus-font: 12px;
+      }
+      #chorus .caption {
+        position: absolute;
+        left: 0;
+        top: 0;
+        transform-origin: center bottom;
+        font-size: var(--chorus-font);
+        line-height: 1.4;
+        letter-spacing: 0.01em;
+        color: rgba(215, 219, 228, 0.86);
+        text-shadow: 0 0 10px rgba(0, 0, 0, 0.85);
+        max-width: 280px;
+        white-space: normal;
+        padding: 3px 10px;
+        background: rgba(14, 17, 28, 0.38);
+        border: 1px solid rgba(138, 180, 255, 0.18);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border-radius: 8px;
+        opacity: 0;
+        transition: opacity 320ms ease;
+        will-change: transform, opacity;
+      }
+      #chorus .caption.show {
+        opacity: 1;
+      }
+
+      /* ── Formations rail ────────────────────────────────── */
+      #formations-rail {
+        position: fixed;
+        top: 0;
+        left: 50%;
+        transform: translate(-50%, -110%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        z-index: 31;
+        transition:
+          transform 200ms cubic-bezier(0.2, 0.7, 0.2, 1),
+          opacity 200ms ease;
+        pointer-events: none;
+      }
+      #formations-rail.open {
+        transform: translate(-50%, 0);
+        pointer-events: auto;
+      }
+      #formations-rail.dimmed {
+        opacity: 0.25;
+      }
+      #formations-rail .fr-inner {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        background: var(--glass-strong);
+        backdrop-filter: blur(22px) saturate(140%);
+        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        border: 1px solid var(--glass-border);
+        border-top: 0;
+        border-radius: 0 0 14px 14px;
+      }
+      #formations-rail .fr-hint {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        padding-right: 4px;
+      }
+      #formations-rail .fr-pills {
+        display: flex;
+        gap: 6px;
+      }
+      #formations-rail .fr-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        padding: 6px 12px;
+        border-radius: 99px;
+        cursor: pointer;
+        transition:
+          color 140ms ease,
+          border-color 140ms ease,
+          background 140ms ease;
+      }
+      #formations-rail .fr-pill:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+      #formations-rail .fr-pill[data-active="true"] {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.5);
+        background: rgba(138, 180, 255, 0.08);
+      }
+      #formations-rail .fr-key {
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+        color: var(--text-faint);
+        font-size: 10px;
+      }
+      #formations-rail .fr-pill[data-active="true"] .fr-key {
+        color: var(--accent);
+      }
+      #formations-rail .fr-param {
+        color: var(--text-faint);
+        font-size: 10px;
+        letter-spacing: 0.04em;
+      }
+      #formations-rail .fr-pill[data-active="true"] .fr-param {
+        color: rgba(138, 180, 255, 0.85);
+      }
+      #formations-rail .fr-popover {
+        margin-top: 8px;
+        min-width: 180px;
+        transform: translateX(-50%);
+        background: var(--glass-strong);
+        backdrop-filter: blur(22px) saturate(140%);
+        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
+        padding: 6px 0;
+        position: absolute;
+        top: 100%;
+      }
+      #formations-rail .fr-popover-row {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        border: 0;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 12px;
+        padding: 6px 14px;
+        cursor: pointer;
+      }
+      #formations-rail .fr-popover-row:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--accent);
+      }
+      #formations-rail .fr-popover-row[data-current="true"] {
+        color: var(--accent);
+      }
+      #formations-rail .fr-popover-clear {
+        color: var(--text-faint);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        border-top: 1px solid var(--glass-border);
+        margin-top: 4px;
+      }
+      #formations-rail .fr-popover-empty {
+        padding: 10px 14px;
+        font-size: 11px;
+        color: var(--text-faint);
+      }
+
+      /* Settings — folder section extras */
+      #settings input[type="range"] {
+        flex: 1 1 auto;
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
+        padding: 0;
+      }
+      #settings input[type="range"]::-webkit-slider-runnable-track,
+      #settings input[type="range"]::-moz-range-track {
+        height: 3px;
+        background: rgba(255, 255, 255, 0.12);
+        border-radius: 3px;
+      }
+      #settings input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--accent);
+        margin-top: -6px;
+        cursor: pointer;
+      }
+      #settings input[type="range"]::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border: 0;
+        border-radius: 50%;
+        background: var(--accent);
+        cursor: pointer;
+      }
+      #settings .settings-row-num {
+        flex: 0 0 40px;
+        text-align: right;
+        color: var(--text-faint);
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+        font-size: 11px;
+      }
+      #settings .folder-swatch {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 1px solid var(--glass-border);
+        flex: 0 0 14px;
+      }
+
+      /* ── Gesture hint ──────────────────────────────────── */
+      /* One-line pill at top-center that explains the current modifier
+       * gesture. Visible only when the hint has content. */
+      #gesture-hint {
+        position: fixed;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%) translateY(-8px);
+        padding: 6px 14px;
+        background: var(--glass-strong);
+        border: 1px solid rgba(138, 180, 255, 0.32);
+        backdrop-filter: blur(14px) saturate(140%);
+        -webkit-backdrop-filter: blur(14px) saturate(140%);
+        border-radius: 999px;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text);
+        opacity: 0;
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease;
+        pointer-events: none;
+        z-index: 41;
+        white-space: nowrap;
+      }
+      #gesture-hint.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+      #gesture-hint kbd {
+        display: inline-block;
+        padding: 1px 6px;
+        margin: 0 3px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.06);
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+
+      #coachmark {
+        position: fixed;
+        z-index: 42;
+        pointer-events: none;
+        opacity: 0;
+        transition:
+          opacity 180ms ease,
+          transform 180ms ease;
+        will-change: transform, opacity;
+      }
+      #coachmark.show {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      #coachmark .cm-body {
+        background: var(--glass-strong);
+        border: 1px solid rgba(138, 180, 255, 0.3);
+        box-shadow: 0 6px 28px -8px rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(18px) saturate(140%);
+        -webkit-backdrop-filter: blur(18px) saturate(140%);
+        border-radius: 10px;
+        padding: 10px 12px 10px 16px;
+        font-size: 12px;
+        line-height: 1.45;
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        max-width: 320px;
+      }
+      #coachmark .cm-dismiss {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        font-size: 14px;
+        padding: 0 4px;
+        line-height: 1;
+        cursor: pointer;
+        font-family: inherit;
+      }
+      #coachmark .cm-dismiss:hover {
+        color: var(--accent);
+      }
+
+      /* ── Overlay modals (tag-prompt, about, morning) ────── */
+      .tag-prompt-modal,
+      .about-modal,
+      .morning-report-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+        opacity: 0;
+        transition: opacity 200ms ease;
+      }
+      .tag-prompt-modal.show,
+      .about-modal.show,
+      .morning-report-modal.show {
+        opacity: 1;
+      }
+
+      .tp-card,
+      .about-card,
+      .mr-card {
+        width: min(560px, 92vw);
+        max-height: 84vh;
+        overflow-y: auto;
+        background: var(--glass-strong);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: blur(22px) saturate(140%);
+        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        border-radius: 14px;
+        padding: 28px 28px 22px;
+        color: var(--text);
+        box-shadow: 0 12px 48px -12px rgba(0, 0, 0, 0.5);
+      }
+
+      .tp-card h2,
+      .about-card h2,
+      .mr-card h2 {
+        font-size: 16px;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        margin: 0 0 6px;
+      }
+      .tp-card h3,
+      .about-card h3,
+      .mr-card h3 {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin: 0 0 10px;
+        color: var(--text-faint);
+      }
+
+      /* tag-prompt */
+      .tp-sub {
+        font-size: 13px;
+        color: var(--text-dim);
+        line-height: 1.6;
+        margin: 0 0 20px;
+      }
+      .tp-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 0 0 20px;
+      }
+      .tp-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+      }
+      .tp-tag {
+        flex: 1 1 auto;
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+        color: var(--text);
+      }
+      .tp-count {
+        flex: 0 0 36px;
+        text-align: right;
+        color: var(--text-faint);
+        font-size: 11px;
+      }
+      .tp-kind {
+        flex: 0 0 180px;
+        background: rgba(0, 0, 0, 0.24);
+        border: 1px solid var(--glass-border);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 6px;
+      }
+      .tp-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+      .tp-actions .primary,
+      .tp-actions .ghost {
+        padding: 8px 18px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+      }
+      .tp-actions .primary {
+        background: transparent;
+        border: 1px solid var(--accent);
+        color: var(--accent);
+      }
+      .tp-actions .primary:hover {
+        background: rgba(138, 180, 255, 0.08);
+      }
+      .tp-actions .ghost {
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+      }
+      .tp-actions .ghost:hover {
+        color: var(--text);
+      }
+
+      /* about modal */
+      .about-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .about-close {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 2px 6px;
+      }
+      .about-close:hover {
+        color: var(--text);
+      }
+      .about-section {
+        margin-bottom: 18px;
+      }
+      .about-section p,
+      .about-section ul {
+        margin: 0;
+        font-size: 13px;
+        color: var(--text-dim);
+        line-height: 1.7;
+      }
+      .about-section ul {
+        padding-left: 20px;
+      }
+      .about-section li {
+        margin-bottom: 4px;
+      }
+      .about-colophon {
+        font-size: 12px;
+        color: var(--text-faint);
+      }
+      .about-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 10px;
+        border-top: 1px solid var(--glass-border);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      .about-links a {
+        color: var(--text-dim);
+        text-decoration: none;
+        border-bottom: 1px dotted rgba(215, 219, 228, 0.22);
+      }
+      .about-links a:hover {
+        color: var(--accent);
+      }
+
+      /* morning report */
+      .mr-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+      .mr-sub {
+        font-size: 11px;
+        color: var(--text-faint);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin: 4px 0 0;
+      }
+      .mr-close {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 2px 6px;
+      }
+      .mr-section {
+        margin-bottom: 18px;
+      }
+      /* Morning synthesis — one-line pull-quote above Weather. Renders
+       * three breathing dots while the model call is in flight, then
+       * swaps to the synthesis text. If the router fails / falls
+       * back, the block removes itself so the modal reads normally. */
+      .mr-synthesis {
+        margin: -4px 0 20px;
+        padding: 12px 16px;
+        border-left: 2px solid rgba(138, 180, 255, 0.45);
+        background: rgba(138, 180, 255, 0.05);
+        border-radius: 0 6px 6px 0;
+      }
+      .mr-synthesis-text {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--text);
+        font-style: italic;
+        letter-spacing: 0.01em;
+      }
+      .mr-synthesis-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        margin-right: 6px;
+        opacity: 0.3;
+        animation: mr-synth-breathe 1.1s ease-in-out infinite;
+      }
+      .mr-synthesis-dot:nth-child(2) {
+        animation-delay: 0.15s;
+      }
+      .mr-synthesis-dot:nth-child(3) {
+        animation-delay: 0.3s;
+      }
+      @keyframes mr-synth-breathe {
+        0%,
+        100% {
+          opacity: 0.3;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.3);
+        }
+      }
+      .mr-weather {
+        font-size: 13px;
+        color: var(--text-dim);
+        margin: 0;
+      }
+      .mr-things {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .mr-things li {
+        display: flex;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--text);
+        line-height: 1.55;
+      }
+      .mr-bullet {
+        color: var(--accent);
+        flex: 0 0 12px;
+      }
+      .mr-hint {
+        font-size: 11px;
+        color: var(--text-faint);
+        margin: 0 0 8px;
+      }
+      .mr-orphans ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        font-size: 12px;
+        color: var(--text-dim);
+      }
+      .mr-orphans li {
+        padding: 4px 0;
+        border-top: 1px solid var(--glass-border);
+      }
+      .mr-foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 10px;
+        border-top: 1px solid var(--glass-border);
+        gap: 10px;
+      }
+      .mr-note {
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      .mr-foot .primary,
+      .mr-foot .ghost {
+        background: transparent;
+        border: 1px solid var(--accent);
+        color: var(--accent);
+        padding: 8px 18px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+      }
+      .mr-foot .ghost {
+        border-color: var(--glass-border);
+        color: var(--text-dim);
+      }
+      .mr-foot .ghost:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+      .mr-foot .primary:hover {
+        background: rgba(138, 180, 255, 0.08);
+      }
+      .mr-foot .mr-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .mr-hint-inline {
+        color: var(--text-faint);
+        font-size: 11px;
       }
     </style>
   </head>
@@ -424,18 +2866,47 @@
       </div>
       <div class="corner bl" id="stats-hud">—</div>
       <div class="corner br" id="sleep-hud" title="Sleep depth">◐</div>
+      <div id="gesture-hint" aria-live="polite"></div>
     </div>
 
     <div id="pick-pane">
-      <div class="tagline">point at a folder — it becomes a universe</div>
-      <button class="primary" id="pick-button">Choose workspace folder</button>
+      <div class="welcome">
+        <h1 class="welcome-title">Boltzsidian</h1>
+        <p class="welcome-tagline">your notes as a universe</p>
+        <p class="welcome-blurb">
+          Every note is a star; links tug them into orbit. Point at a folder of
+          markdown and it becomes a universe you can walk through.
+        </p>
+        <div class="welcome-buttons">
+          <button class="primary" id="pick-button">Open my folder</button>
+          <button class="secondary" id="demo-button">Try the demo</button>
+        </div>
+        <fieldset class="welcome-theme" id="welcome-theme">
+          <legend>demo</legend>
+          <label>
+            <input type="radio" name="demo-theme" value="astronomer" checked />
+            <span class="theme-label">Astronomer's notebook</span>
+            <span class="theme-blurb"
+              >Stars, constellations, observation logs.</span
+            >
+          </label>
+          <label>
+            <input type="radio" name="demo-theme" value="project" />
+            <span class="theme-label">Project planner</span>
+            <span class="theme-blurb"
+              >Planning a software project, with clusters for vision, phases,
+              risks.</span
+            >
+          </label>
+        </fieldset>
+        <div class="welcome-progress" id="welcome-progress"></div>
+        <div class="welcome-footer">
+          <a id="about-link">about</a>
+        </div>
+      </div>
     </div>
 
-    <div id="settings" aria-hidden="true">
-      <h2>Settings</h2>
-      <pre id="settings-json"></pre>
-      <div class="hint">press \ to close · phase 0 read-only preview</div>
-    </div>
+    <div id="settings" aria-hidden="true"></div>
 
     <div id="search-strip" aria-hidden="true">
       <input
@@ -449,12 +2920,132 @@
       </div>
     </div>
 
-    <aside id="note-panel" aria-hidden="true">
+    <aside id="ideas-drawer" aria-hidden="true">
+      <header class="drawer-head">
+        <div>
+          <h1 class="drawer-title">Ideas</h1>
+          <p class="drawer-sub">Surfaced from the last dream.</p>
+        </div>
+        <button class="drawer-close" type="button" aria-label="Close">×</button>
+      </header>
+      <div class="drawer-empty">
+        Nothing surfaced yet. After a dream cycle, candidates the salience layer
+        thought were worth noticing will appear here.
+      </div>
+      <ul class="drawer-list"></ul>
+    </aside>
+
+    <aside id="tend-drawer" aria-hidden="true">
+      <header class="drawer-head">
+        <div>
+          <h1 class="drawer-title">Tend</h1>
+          <p class="drawer-sub">
+            Housekeeping proposals — obvious connections and tidying.
+          </p>
+        </div>
+        <button class="drawer-close" type="button" aria-label="Close">×</button>
+      </header>
+      <div class="drawer-empty">
+        Nothing obvious to tend right now. Run Tend from Settings → Workspace to
+        scan for tags, links, duplicates, and stubs.
+      </div>
+      <div class="tend-groups"></div>
+    </aside>
+
+    <div
+      id="model-face"
+      aria-label="Model voice indicator"
+      title="The observer. Expression tracks what backend is speaking."
+    ></div>
+
+    <div
+      id="dream-banner"
+      aria-live="polite"
+      aria-label="Dream phase indicator"
+    ></div>
+
+    <aside id="brief-panel" aria-hidden="true" role="complementary">
+      <header class="brief-head">
+        <div>
+          <h1 class="brief-title">Brief</h1>
+          <p class="brief-sub">Where you are, in 90 seconds.</p>
+        </div>
+        <button class="brief-close" type="button" aria-label="Dismiss">
+          ×
+        </button>
+      </header>
+      <div class="brief-body"></div>
+      <p class="brief-hint">
+        Press <b>esc</b> or any navigation key to dismiss.
+      </p>
+    </aside>
+
+    <aside id="weed-drawer" aria-hidden="true">
+      <header class="drawer-head">
+        <div>
+          <h1 class="drawer-title">Weed</h1>
+          <p class="drawer-sub">
+            Notes the system suspects are orphans. Keep, archive, or delete —
+            one at a time.
+          </p>
+        </div>
+        <button class="drawer-close" type="button" aria-label="Close">×</button>
+      </header>
+      <div class="weed-bulk">
+        <button type="button" class="weed-bulk-btn" data-bulk="keep">
+          Keep all remaining
+        </button>
+        <button type="button" class="weed-bulk-btn" data-bulk="archive">
+          Archive all remaining
+        </button>
+      </div>
+      <div class="drawer-empty">
+        Nothing to weed. Prune candidates are computed during the dream cycle —
+        if this is empty, no orphaned notes have aged past the threshold yet.
+      </div>
+      <div class="weed-list"></div>
+    </aside>
+
+    <button
+      id="noticed-pill"
+      class="noticed-pill"
+      type="button"
+      aria-label="Open ideas drawer"
+      hidden
+    >
+      <span class="noticed-count">0</span>
+      <span class="noticed-label">ideas surfaced</span>
+    </button>
+
+    <aside id="note-panel" aria-hidden="true" data-mode="read">
+      <div
+        class="panel-resize-handle"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize note panel"
+        tabindex="0"
+        title="Drag to resize"
+      ></div>
       <header class="panel-head">
         <h1 class="panel-title"></h1>
-        <button class="panel-close" aria-label="Close panel">×</button>
+        <div class="panel-actions">
+          <span class="panel-status" aria-live="polite"></span>
+          <button
+            class="panel-pin"
+            type="button"
+            aria-label="Pin note"
+            title="Pin position"
+          >
+            ◯
+          </button>
+          <button class="panel-mode" type="button" aria-label="Toggle edit">
+            Edit
+          </button>
+          <button class="panel-close" aria-label="Close panel">×</button>
+        </div>
       </header>
       <article class="panel-body"></article>
+      <aside class="panel-suggestions" aria-label="Suggestions"></aside>
       <footer class="panel-meta"></footer>
     </aside>
 

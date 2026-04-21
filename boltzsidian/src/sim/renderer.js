@@ -1,8 +1,10 @@
 // Boltzsidian renderer. Scene, camera, OrbitControls, ambient starfield,
-// frame-subscription hook for per-frame callbacks (labels, body shaders, etc.).
+// post-processing (EffectComposer + bloom + look pass), frame-subscription
+// hook for per-frame callbacks.
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { createPost } from "./post.js";
 
 const STAR_COUNT = 2400;
 
@@ -37,10 +39,13 @@ export function createRenderer(canvas) {
 
   const starMat = addStarfield(scene);
 
+  const post = createPost({ renderer, scene, camera });
+
   function resize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
     renderer.setSize(w, h, false);
+    post.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
@@ -54,9 +59,10 @@ export function createRenderer(canvas) {
     const dt = clock.getDelta();
     const t = clock.getElapsedTime();
     starMat.uniforms.uTime.value = t;
+    post.tickTime(t);
     controls.update();
     for (const fn of subscribers) fn(dt, t);
-    renderer.render(scene, camera);
+    post.composer.render();
     rafId = requestAnimationFrame(tick);
   }
   tick();
@@ -72,6 +78,7 @@ export function createRenderer(canvas) {
     camera,
     controls,
     onFrame,
+    applyAmbience: (preset, intensity) => post.apply(preset, intensity),
     dispose() {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", resize);
