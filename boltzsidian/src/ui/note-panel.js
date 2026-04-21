@@ -16,6 +16,9 @@ export function createNotePanel({
   onSave,
   onDirtyChange,
   onTogglePin,
+  onDelete, // async (note) => void — delete the note from disk + vault.
+  // Caller is responsible for the native confirm() and for closing
+  // the panel; we just call this when the user clicks the button.
 }) {
   const panel = document.getElementById("note-panel");
   const titleEl = panel.querySelector(".panel-title");
@@ -24,6 +27,7 @@ export function createNotePanel({
   const closeBtn = panel.querySelector(".panel-close");
   const modeBtn = panel.querySelector(".panel-mode");
   const pinBtn = panel.querySelector(".panel-pin");
+  const deleteBtn = panel.querySelector(".panel-delete");
   const statusEl = panel.querySelector(".panel-status");
   const resizeHandle = panel.querySelector(".panel-resize-handle");
   const suggestionsPanel = panel.querySelector(".panel-suggestions");
@@ -136,6 +140,24 @@ export function createNotePanel({
       const next = !(current.frontmatter && current.frontmatter.pinned);
       onTogglePin(current, next);
       reflectPin(next);
+    });
+  }
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", async () => {
+      if (!current || !onDelete) return;
+      // Native confirm — same irreversibility framing as Weed's
+      // Delete. Notes don't have undo on FS Access removeEntry so
+      // this is the only safety gate.
+      const label = current.title || current.path || "this note";
+      const ok = window.confirm(
+        `Delete "${label}" permanently?\n\nThis removes the file from disk. No undo.`,
+      );
+      if (!ok) return;
+      try {
+        await onDelete(current);
+      } catch (err) {
+        console.error("[bz] note-panel delete failed", err);
+      }
     });
   }
 

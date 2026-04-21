@@ -36,8 +36,8 @@ const GROUPS = [
         desc: "Alternate link-drag shortcut (same as Alt)",
       },
       {
-        keys: ["right-click"],
-        desc: "Delete a tether under the cursor",
+        keys: ["Alt", "right-click"],
+        desc: "Delete a tether under the cursor (Shift works too)",
       },
     ],
   },

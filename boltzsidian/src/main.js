@@ -370,6 +370,22 @@ const notePanel = createNotePanel({
   onNavigate: (noteId) => focusNote(noteId),
   onSave: handleSave,
   onTogglePin: handleTogglePin,
+  // Manual note deletion from the panel header. The panel's click
+  // handler fires the native confirm(); by the time we're called the
+  // user has already said yes. We reuse Weed's two-stage path:
+  // deleteNoteFile removes the file on disk via FS Access removeEntry,
+  // then removeNoteEverywhere scrubs vault indices + body pool + physics
+  // edges + tethers and closes the panel if it was showing this note.
+  onDelete: async (note) => {
+    if (!workspaceHandle || !note) return;
+    const result = await deleteNoteFile(workspaceHandle, note.path);
+    if (!result.ok) {
+      toast(`Delete failed: ${note.path}`);
+      return;
+    }
+    removeNoteEverywhere(note.id);
+    toast(`Deleted ${note.path}`, { duration: 3000 });
+  },
 });
 
 // ── Search ──────────────────────────────────────────────────
@@ -762,17 +778,23 @@ canvas.addEventListener("pointerup", (e) => {
   if (hit) openNote(hit);
 });
 
-// ── Right-click tether → delete ─────────────────────────────
-// We have to beat OrbitControls' pointerdown on the same canvas (it claims
-// button-2 for pan and preventDefaults, which also suppresses the
-// contextmenu event). Window-capture pointerdown runs before canvas
-// target-phase listeners. stopImmediatePropagation keeps OrbitControls
-// from seeing the event at all.
+// ── Modifier+right-click tether → delete ────────────────────
+// Right-click alone is for OrbitControls pan — it must pass through
+// untouched or right-drag navigation breaks the moment the pointer
+// crosses a tether. Tether-delete is spring-loaded by a held
+// modifier: Alt (primary, symmetric with Alt+drag for link create)
+// OR Shift (fallback for the same reasons link-drag.js accepts both).
+//
+// If no modifier is held, we don't touch the right-click at all —
+// OrbitControls gets its pan. If the modifier is held AND the click
+// lands on a tether, we intercept and delete immediately. The key is
+// the spring; the click is the trigger.
 window.addEventListener(
   "pointerdown",
   (e) => {
     if (e.button !== 2) return;
     if (e.target !== canvas) return;
+    if (!e.altKey && !e.shiftKey) return; // bare right-click = let pan through
     if (!tethers || !vault || !saver) return;
     const hit = tethers.pickAt(e.clientX, e.clientY);
     if (!hit) return;
@@ -782,6 +804,18 @@ window.addEventListener(
   },
   { capture: true },
 );
+
+// Cursor affordance — while Alt/Shift is held with the pointer over
+// the canvas, the cursor flips so the user sees delete is armed.
+// Cosmetic; the real gate is the key check in the handler above.
+function updateTetherCursor(e) {
+  if (!canvas) return;
+  const armed = !!(e.altKey || e.shiftKey) && !!tethers;
+  canvas.classList.toggle("tether-delete-armed", armed);
+}
+window.addEventListener("keydown", updateTetherCursor);
+window.addEventListener("keyup", updateTetherCursor);
+window.addEventListener("pointermove", updateTetherCursor);
 // Suppress the native context menu over the canvas so a right-click that
 // misses a tether doesn't open a Chromium menu mid-gesture.
 window.addEventListener(

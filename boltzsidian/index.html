@@ -43,6 +43,12 @@
         position: fixed;
         inset: 0;
       }
+      /* Tether delete is armed while Alt or Shift is held. Cursor
+       * flips to a warning glyph so the user can see the modifier
+       * took effect and right-click is now destructive. */
+      canvas#canvas.tether-delete-armed {
+        cursor: not-allowed;
+      }
 
       /* ── HUD ────────────────────────────────────────────── */
       #hud {
@@ -551,6 +557,25 @@
       #note-panel .panel-close:hover {
         color: var(--text);
         background: rgba(255, 255, 255, 0.06);
+      }
+      /* Delete button — reddish hover so the destructive nature reads
+       * at a glance. Native confirm() is still the safety net. */
+      #note-panel .panel-delete {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        font-size: 15px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 4px 7px;
+        border-radius: 6px;
+        font-family: inherit;
+        opacity: 0.7;
+      }
+      #note-panel .panel-delete:hover {
+        color: #f0a8a6;
+        background: rgba(198, 102, 100, 0.1);
+        opacity: 1;
       }
 
       /* CodeMirror host in edit mode */
@@ -3204,6 +3229,14 @@
           </button>
           <button class="panel-mode" type="button" aria-label="Toggle edit">
             Edit
+          </button>
+          <button
+            class="panel-delete"
+            type="button"
+            aria-label="Delete note"
+            title="Delete this note (no undo)"
+          >
+            🗑
           </button>
           <button class="panel-close" aria-label="Close panel">×</button>
         </div>
