@@ -1,0 +1,28 @@
+{
+  "name": "boltzsidian",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A local-first markdown note-taking app whose workspace is a GPU-accelerated particle universe.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.18.0",
+    "@codemirror/commands": "^6.7.0",
+    "@codemirror/lang-markdown": "^6.3.0",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.34.0",
+    "gray-matter": "^4.0.3",
+    "marked": "^14.1.0",
+    "minisearch": "^7.1.0",
+    "three": "^0.160.0",
+    "ulid": "^2.3.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

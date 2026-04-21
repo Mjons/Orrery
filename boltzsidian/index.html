@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Boltzsidian</title>
+    <style>
+      :root {
+        --accent: #8ab4ff;
+        --bg: #000;
+        --glass: rgba(20, 24, 40, 0.42);
+        --glass-strong: rgba(14, 17, 28, 0.78);
+        --glass-border: rgba(255, 255, 255, 0.08);
+        --text: #d7dbe4;
+        --text-dim: rgba(215, 219, 228, 0.55);
+        --text-faint: rgba(215, 219, 228, 0.28);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        overflow: hidden;
+        height: 100%;
+      }
+      body {
+        font-family:
+          -apple-system, ui-sans-serif, system-ui, "Segoe UI", Roboto,
+          "Helvetica Neue", sans-serif;
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      canvas#canvas {
+        display: block;
+        position: fixed;
+        inset: 0;
+      }
+
+      /* ── HUD ────────────────────────────────────────────── */
+      #hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 10;
+      }
+      #hud > * {
+        pointer-events: auto;
+      }
+
+      .corner {
+        position: absolute;
+        padding: 10px 14px;
+        background: var(--glass);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: blur(14px) saturate(140%);
+        -webkit-backdrop-filter: blur(14px) saturate(140%);
+        border-radius: 10px;
+        font-size: 12px;
+        letter-spacing: 0.02em;
+        line-height: 1.3;
+        color: var(--text);
+      }
+      .corner.tl {
+        top: 16px;
+        left: 16px;
+      }
+      .corner.tr {
+        top: 16px;
+        right: 16px;
+      }
+      .corner.bl {
+        bottom: 16px;
+        left: 16px;
+        color: var(--text-dim);
+      }
+      .corner.br {
+        bottom: 16px;
+        right: 16px;
+        color: var(--text-dim);
+        font-size: 14px;
+      }
+
+      #app-name {
+        font-weight: 600;
+        letter-spacing: 0.06em;
+      }
+      #workspace-name {
+        color: var(--text-dim);
+        margin-left: 10px;
+        font-weight: 400;
+        letter-spacing: 0.02em;
+      }
+      #workspace-name:empty::before {
+        content: "no workspace";
+        color: var(--text-faint);
+      }
+
+      /* ── Pick pane (first run) ──────────────────────────── */
+      #pick-pane {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 22px;
+        z-index: 20;
+        pointer-events: none;
+      }
+      #pick-pane .tagline {
+        font-size: 13px;
+        color: var(--text-dim);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        max-width: 420px;
+        text-align: center;
+      }
+      #pick-pane.hidden {
+        display: none;
+      }
+
+      button.primary {
+        pointer-events: auto;
+        background: transparent;
+        border: 1px solid var(--accent);
+        color: var(--accent);
+        padding: 11px 20px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 13px;
+        letter-spacing: 0.04em;
+        font-family: inherit;
+        transition:
+          background 140ms ease,
+          box-shadow 140ms ease;
+      }
+      button.primary:hover {
+        background: rgba(138, 180, 255, 0.08);
+        box-shadow: 0 0 24px -4px rgba(138, 180, 255, 0.35);
+      }
+      button.primary:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(138, 180, 255, 0.35);
+      }
+
+      /* ── Settings pane ──────────────────────────────────── */
+      #settings {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 420px;
+        background: var(--glass-strong);
+        backdrop-filter: blur(22px) saturate(140%);
+        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        border-left: 1px solid var(--glass-border);
+        transform: translateX(100%);
+        transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+        padding: 28px;
+        overflow-y: auto;
+        z-index: 30;
+      }
+      #settings.open {
+        transform: translateX(0);
+      }
+      #settings h2 {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        margin: 0 0 18px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+      }
+      #settings pre {
+        font-size: 11px;
+        line-height: 1.7;
+        color: var(--text);
+        margin: 0;
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      #settings .hint {
+        margin-top: 24px;
+        font-size: 10px;
+        color: var(--text-faint);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      /* ── Toast (errors) ─────────────────────────────────── */
+      #toast {
+        position: fixed;
+        bottom: 60px;
+        left: 50%;
+        transform: translateX(-50%) translateY(12px);
+        opacity: 0;
+        background: var(--glass-strong);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-size: 12px;
+        color: var(--text);
+        pointer-events: none;
+        transition:
+          opacity 160ms ease,
+          transform 160ms ease;
+        z-index: 40;
+        max-width: 480px;
+      }
+      #toast.show {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+
+    <div id="hud">
+      <div class="corner tl">
+        <span id="app-name">Boltzsidian</span><span id="workspace-name"></span>
+      </div>
+      <div class="corner bl" id="stats-hud">—</div>
+      <div class="corner br" id="sleep-hud" title="Sleep depth">◐</div>
+    </div>
+
+    <div id="pick-pane">
+      <div class="tagline">point at a folder — it becomes a universe</div>
+      <button class="primary" id="pick-button">Choose workspace folder</button>
+    </div>
+
+    <div id="settings" aria-hidden="true">
+      <h2>Settings</h2>
+      <pre id="settings-json"></pre>
+      <div class="hint">press \ to close · phase 0 read-only preview</div>
+    </div>
+
+    <div id="toast" role="status"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
