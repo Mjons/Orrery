@@ -225,7 +225,7 @@ Measure in Phase 3 polish. Re-measure at every phase gate.
 
 ## 5. Phases
 
-Seven phases plus scaffolding and beta. Each phase has a goal, concrete
+Eight phases plus scaffolding and beta. Each phase has a goal, concrete
 deliverables (Dn), testable acceptance criteria, and an exit gate — the
 condition under which we stop before proceeding.
 
@@ -435,6 +435,66 @@ _teaches itself_.
 **Exit gate.** Test with 3 people (not Michael). If any of them is
 confused about what the app does in the first two minutes, the welcome +
 demo are wrong. Iterate before moving on.
+
+---
+
+### Phase 3.7 — Formations (1 week)
+
+**Goal.** Folders become visible as regions without becoming the
+navigation model; named filter modes (formations) let the user look at
+the universe through one question at a time. Full design in
+[FORMATIONS.md](FORMATIONS.md).
+
+**Deliverables.**
+
+- D3.7.1 — Folder-aura palette: 8-tone low-saturation band, curated to
+  coexist with the accent. Stored in settings; user-reassignable per
+  folder.
+- D3.7.2 — Per-body `uFolderTint` uniform in the bodies shader rendering
+  a soft outer halo. Core body color (from kind) untouched.
+- D3.7.3 — Top-level folder flattening: nested folders inherit their
+  top-level ancestor's tint. No visual hierarchy.
+- D3.7.4 — **Folder influence** slider (0–1) in settings, driving
+  gravitational basin strength in the GPGPU engine. Default 0 (dissolve).
+  Lives as a real force in dream mode once Phase 3 is in place.
+- D3.7.5 — Formations rail: `Shift+F` summons a top-docked pill rail of
+  labeled filters. Keyboard shortcuts `1`–`9`. `Esc` or `1` clears.
+- D3.7.6 — Five load-bearing formations shipped:
+  `All`, `Halo` (zero-link notes), `Protostars` (last 14 days),
+  `Solo folder` (pick one, fade the rest), `Galactic core` (densest
+  cluster auto-detected).
+- D3.7.7 — Formations are orthogonal — active pills stack. Composes with
+  search: search filters by text, formations filter by structure, they
+  intersect rather than fight.
+
+**Deferred (for later phases or cut):**
+
+- Nebula formation — requires a separate tag-overlap fog pass.
+- Supernovae / Main sequence / Binaries / Globular — flavor formations;
+  ship two, see if they earn their keep, cut the rest.
+- Folder pulse (synchronized twinkle) — very subtle, probably cut from 1.0.
+- Saved formation presets — add once users have lived with the defaults.
+
+**Acceptance.**
+
+- Open a vault with 3+ top-level folders. Aura palette auto-assigns and
+  each folder reads distinctly under bloom without the UI drifting off
+  the accent palette.
+- Slide Folder influence from 0 to 1: wake mode re-settles into a
+  basin-dominated layout; dream mode shows basins as live forces with
+  links stretching across them as bridges.
+- `Shift+F` → `2`: only bodies touched in the last 14 days glow.
+  `Shift+F` → `5`: halo notes glow. Both active simultaneously: the
+  intersection lights up (often empty — which is the insight).
+- A new "Solo folder" formation is applicable even when the folder-aura
+  setting is off. Folders exist structurally either way.
+
+**Exit gate.** Live with it for a week on Michael's real vault. If you
+never press `Shift+F`, cut formations. If you leave Folder influence at
+0 permanently and never set tints, remove the setting from the pane. The
+defaults-off posture has to feel right — formations are a power-user
+affordance, not the main interaction surface. Don't let them become a
+secondary sidebar by stealth.
 
 ---
 
