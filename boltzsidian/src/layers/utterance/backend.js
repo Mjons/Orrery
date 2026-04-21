@@ -141,6 +141,15 @@ export const VOICE_POLICY = {
   // fallback is "use the existing salience-score top-K," which the
   // salience layer handles synchronously before firing the model call.
   "idea-judge": ["template"],
+  // Tend Level 1 — rewrite a rule-generated "reason" as a short
+  // conversational nudge. FACTS stay deterministic (the proposal
+  // itself is unchanged); only the English changes. Template fallback
+  // = original reason unchanged. MODEL_SURFACES.md §2.2.
+  "tend-reason-polish": ["template"],
+  // Tend Level 2 — rank a list of proposals by usefulness. Returns
+  // indices in priority order. Template fallback = confidence-sorted
+  // order already produced by the rules.
+  "tend-rank": ["template"],
 };
 
 // Pick the chain for a job kind, honouring the user's settings override.

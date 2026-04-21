@@ -1019,6 +1019,25 @@
         color: var(--text-dim);
         margin: 0;
       }
+      /* Subtle marker when the reason has been rewritten by the model —
+       * border-left tint the colour of the tend accent. The user can
+       * see at a glance which reasons are rule-derived and which were
+       * polished by the backend. Trust UI per MODEL_SURFACES §1.2. */
+      #tend-drawer .tend-item-reason[data-polished] {
+        padding-left: 8px;
+        border-left: 2px solid rgba(230, 184, 92, 0.45);
+        color: var(--text);
+      }
+      #tend-drawer .tend-item-reason[data-polished]::after {
+        content: "";
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: rgba(230, 184, 92, 0.55);
+        margin-left: 6px;
+        vertical-align: middle;
+      }
       #tend-drawer .tend-item-actions {
         display: flex;
         gap: 8px;
@@ -2514,6 +2533,151 @@
       /* ── Overlay modals (tag-prompt, about, morning) ────── */
       .tag-prompt-modal,
       .about-modal,
+      /* ── Hotkey overlay (Settings → Help → Show hotkeys) ─── */
+      /* Modal that lists every keyboard shortcut + mouse gesture,
+       * grouped by concern. The overlay's visual language matches the
+       * morning-report modal so the app has one "information card"
+       * treatment. */
+      .hotkey-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 55;
+        opacity: 0;
+        transition: opacity 180ms ease;
+      }
+      .hotkey-modal.show {
+        opacity: 1;
+      }
+      .hk-card {
+        width: min(640px, 94vw);
+        max-height: 86vh;
+        display: flex;
+        flex-direction: column;
+        background: var(--glass-strong);
+        border: 1px solid var(--glass-border);
+        backdrop-filter: blur(22px) saturate(140%);
+        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        border-radius: 14px;
+        color: var(--text);
+        box-shadow: 0 14px 44px -14px rgba(0, 0, 0, 0.55);
+      }
+      .hk-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 22px 26px 12px;
+        border-bottom: 1px solid var(--glass-border);
+      }
+      .hk-head h2 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      .hk-sub {
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin: 4px 0 0;
+      }
+      .hk-close {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 2px 6px;
+        border-radius: 6px;
+        font-family: inherit;
+      }
+      .hk-close:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .hk-body {
+        overflow-y: auto;
+        padding: 12px 26px 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .hk-section h3 {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin: 0 0 8px;
+        color: var(--text-faint);
+      }
+      .hk-rows {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .hk-row {
+        display: grid;
+        grid-template-columns: 168px 1fr;
+        gap: 14px;
+        align-items: center;
+        font-size: 13px;
+        color: var(--text);
+      }
+      .hk-keys {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        align-items: center;
+      }
+      .hk-key {
+        display: inline-block;
+        padding: 2px 8px;
+        min-width: 22px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 5px;
+        font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
+        font-size: 11px;
+        color: var(--text);
+        line-height: 1.5;
+      }
+      .hk-key-word {
+        background: transparent;
+        border-style: dashed;
+        color: var(--text-dim);
+        font-style: italic;
+      }
+      .hk-key-sep {
+        color: var(--text-faint);
+        margin: 0 2px;
+        font-size: 10px;
+      }
+      .hk-desc {
+        color: var(--text-dim);
+        line-height: 1.5;
+      }
+      .hk-foot {
+        padding: 12px 26px 18px;
+        border-top: 1px solid var(--glass-border);
+      }
+      .hk-note {
+        font-size: 11px;
+        color: var(--text-faint);
+        letter-spacing: 0.02em;
+      }
+
       .morning-report-modal {
         position: fixed;
         inset: 0;

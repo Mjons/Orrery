@@ -278,6 +278,76 @@ Rules:
 The goal: name what the night was about.`,
     user: (snap) => buildMorningSynthesisUserPrompt(snap),
   },
+
+  // ── tend-reason-polish: Tend Level 1 ──────────────────────
+  //
+  // Takes a rule-generated reason ("note X has no tags. Its body uses
+  // #decision (used on 8 notes) — worth adopting one of the vault's
+  // existing tags.") and rewrites it as a short conversational nudge.
+  // The FACTS must not change — the same numbers, titles, and tag
+  // names appear in the output. Only the English shifts.
+  //
+  // MODEL_SURFACES.md §2.2: rules propose, local enriches, Claude
+  // stays out. Deterministic floor = template backend returns the
+  // original reason untouched.
+  "tend-reason-polish": {
+    system: `You rewrite robotic housekeeping suggestions for a note-taking app. The suggestion itself — the underlying proposal (add this tag, link these notes, etc.) — stays exactly the same. Your job is ONLY to rewrite the "why" sentence as something a friend would actually say, not a database readout.
+
+HARD RULES:
+- Never invent vault content. Every title, tag, folder name, number, or date in your output must appear in the input. If the input says "#decision (used on 8 notes)", you can say "#decision, which you've used on 8 notes already" — NOT "#decision" alone, and NOT "used on many notes" (the number matters).
+- Output exactly ONE sentence. ≤ 22 words.
+- Tone: dry, conversational, slightly direct. Think "sharp friend reading over your shoulder," not "IT admin."
+- Present tense preferred.
+- Never prescribe — no "you should add this tag." Observe the situation ("X mentions Y, but doesn't link it") and let the Accept/Reject button do the prescribing.
+- No preamble, no quotes around the whole sentence.
+
+Examples (input → output):
+
+  Input (tag-infer): "anti-mysticism has no tags. Its body uses #decision (used on 8 notes) — worth adopting one of the vault's existing tags."
+  Output: Your anti-mysticism note keeps using the word "decision" but isn't tagged #decision like the other 8.
+
+  Input (obvious-link): "\"Three things before coffee\" mentions \"Michael\" in its body but doesn't link to it."
+  Output: Three things before coffee name-drops Michael without linking — probably an accident.
+
+  Input (title-collision): "\"notes\" (boltzsidian/notes.md) shares a title with \"notes\" (panel-haus/notes.md)."
+  Output: Two notes both titled "notes" — one in boltzsidian, one in panel-haus.
+
+  Input (stub): "\"draft\" is 4 words under a generic title. Flesh out, retitle, or delete — the universe can't do much with it."
+  Output: "draft" is four words long with a placeholder title — promote, rename, or bin it.
+
+  Input (fm-normalise): "\"2026-01-21\" is missing id, created in its frontmatter. The app needs these to maintain stable links across renames."
+  Output: 2026-01-21 is missing its id and created-at — fill them in so renames don't break links.
+
+The goal: turn a report into a nudge. Same facts, warmer phrasing.`,
+    user: (snap) => buildTendPolishUserPrompt(snap),
+  },
+
+  // ── tend-rank: Tend Level 2 ───────────────────────────────
+  //
+  // Takes all proposals from the current Tend run and returns them in
+  // priority order (index list). Used when the list is long enough
+  // that some proposals would get lost at the bottom. Template
+  // fallback = confidence-sorted order already applied by the rules.
+  "tend-rank": {
+    system: `You rank housekeeping proposals for a note-taking app by usefulness. The proposal set is fixed — you're not filtering or inventing anything, only ordering.
+
+Output STRICTLY this JSON and nothing else:
+
+{"order": [3, 1, 5, 2, 4], "reasoning": "one complete sentence naming the pattern of what rose to the top"}
+
+Rules:
+- "order" must contain every input index exactly once. Number of elements = number of proposals given.
+- Weight factors, in order of importance:
+  1. **High effort saved** — duplicate titles and stub notes waste attention on every vault scan. Rank these up.
+  2. **Genuine new structure** — obvious-link proposals where the linked note would actually be useful context. Rank up.
+  3. **Vocabulary alignment** — tag-infer when the suggested tag is already heavily used in the vault. Rank up.
+  4. **Frontmatter housekeeping** — useful but low-stakes. Rank neutrally.
+- "reasoning" must be ONE sentence, ≤ 25 words, naming WHY you chose the top few.
+- No preamble, no markdown fences, no text outside the JSON.
+
+The goal: surface the proposals that actually matter first.`,
+    user: (snap) => buildTendRankUserPrompt(snap),
+  },
 };
 
 // Legacy export name retained for anything that imported SYSTEM_PROMPT
@@ -648,6 +718,40 @@ function buildIdeaSeedUserPrompt(snapshot) {
   if (snapshot.age_gap) parts.push(`age gap: ${snapshot.age_gap}`);
   const slots = parts.length > 0 ? parts.join(" · ") : "no grounded slots";
   return `Two notes drifted near each other tonight. Each is amplifying ONE of its own attributes more than usual. Name the idea that falls out of that specific collision.\nSlots: ${slots}`;
+}
+
+// tend-reason-polish user prompt — hands over the exact original
+// reason plus minimal context so the model can preserve facts. The
+// pass kind is included so the model can pick appropriate register
+// (stub detection vs frontmatter-normalisation read differently).
+function buildTendPolishUserPrompt(snapshot) {
+  const { pass = "", noteTitle = "", originalReason = "" } = snapshot;
+  return [
+    `Pass kind: ${pass}`,
+    `Note title: "${noteTitle}"`,
+    `Original reason: ${originalReason}`,
+    "",
+    "Rewrite the reason as one short conversational sentence. Keep every specific fact (title, tag, number, date) from the original.",
+  ].join("\n");
+}
+
+// tend-rank user prompt — numbered list of proposals with pass kind
+// and the (possibly already polished) reason. Model returns ordered
+// index list + rationale.
+function buildTendRankUserPrompt(snapshot) {
+  const { proposals = [] } = snapshot;
+  const lines = [
+    `Rank these ${proposals.length} housekeeping proposals by usefulness (highest first):`,
+    "",
+  ];
+  for (const p of proposals) {
+    lines.push(`${p.index}: [${p.pass}] "${p.noteTitle}" — ${p.reason}`);
+  }
+  lines.push("");
+  lines.push(
+    `Return JSON: {"order":[${proposals.length} distinct indices],"reasoning":"one sentence"}`,
+  );
+  return lines.join("\n");
 }
 
 // morning-synthesis user prompt — feeds the model the night's artifact

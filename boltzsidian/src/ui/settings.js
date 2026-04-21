@@ -10,6 +10,7 @@ import { DEMO_THEMES } from "../vault/opfs.js";
 import { AMBIENCE_PRESETS, AMBIENCE_ORDER } from "../sim/ambience.js";
 import { PASSES as TEND_PASSES } from "../layers/tend.js";
 import { BACKEND_META } from "../layers/utterance/backend.js";
+import { showHotkeyOverlay } from "./hotkey-overlay.js";
 
 const TEND_PASS_LABELS = {
   [TEND_PASSES.TAG_INFER]: "Tag inference",
@@ -369,6 +370,9 @@ export function initSettings({
     <section class="settings-group">
       <h3>Help</h3>
       <div class="settings-row">
+        <button type="button" id="s-show-hotkeys" class="ghost">
+          Show hotkeys
+        </button>
         <button type="button" id="s-reset-coachmarks" class="ghost">
           Reset coachmarks
         </button>
@@ -492,6 +496,12 @@ export function initSettings({
   }
   if (aboutBtn && onShowAbout) {
     aboutBtn.addEventListener("click", () => onShowAbout());
+  }
+  const showHotkeysBtn = pane.querySelector("#s-show-hotkeys");
+  if (showHotkeysBtn) {
+    showHotkeysBtn.addEventListener("click", () => {
+      showHotkeyOverlay();
+    });
   }
 
   accentInput.addEventListener("input", () => {

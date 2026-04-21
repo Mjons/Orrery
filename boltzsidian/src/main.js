@@ -69,7 +69,8 @@ import { DEFAULT_PARAMS as SALIENCE_DEFAULTS } from "./layers/salience.js";
 import { promoteIdea, discardIdea, ignoreIdea } from "./layers/promote.js";
 import { createIdeasDrawer } from "./ui/ideas-drawer.js";
 import { createSalienceDebug } from "./ui/salience-debug.js";
-import { runTendPasses } from "./layers/tend.js";
+import { runTendPasses, PASSES as TEND_PASSES } from "./layers/tend.js";
+import { polishProposalsSerial, rankProposals } from "./layers/tend-enrich.js";
 import { applyProposal, rejectProposal } from "./layers/tend-apply.js";
 import { createTendDrawer } from "./ui/tend-drawer.js";
 import {
@@ -293,25 +294,71 @@ const settingsUI = initSettings({
       }
     }
   },
-  onRunTend: async (enabled) => {
-    if (!vault) {
-      toast("Open a workspace first.");
-      return 0;
-    }
-    const { proposals } = runTendPasses(vault, { enabled });
-    tendDrawer.setProposals(proposals);
-    if (proposals.length > 0) {
-      // Close the other left-side drawers — only one at a time so they
-      // don't fight for the same viewport slice.
-      if (ideasDrawer?.isOpen?.()) ideasDrawer.close?.();
-      if (weedDrawer?.isOpen?.()) weedDrawer.close?.();
-      tendDrawer.open();
-    } else {
-      toast("Nothing obvious to tend right now.");
-    }
-    return proposals.length;
-  },
+  onRunTend: async (enabled) => runTendAndOpen({ enabled }),
 });
+
+// Extracted so the T hotkey can also fire a fresh Tend run — the
+// settings button uses `enabled` from the checkboxes; the hotkey
+// derives it from settings.tend_passes. Same pipeline either way:
+// run passes → rank → open drawer → polish reasons in background.
+async function runTendAndOpen({ enabled } = {}) {
+  if (!vault) {
+    toast("Open a workspace first.");
+    return 0;
+  }
+  // If the caller didn't supply an enabled list, derive it from the
+  // current settings. All passes default to on.
+  if (!enabled) {
+    const state = settings.tend_passes || {};
+    enabled = Object.values(TEND_PASSES).filter((id) => state[id] !== false);
+  }
+  if (enabled.length === 0) {
+    toast("All Tend passes are disabled in Settings.");
+    return 0;
+  }
+
+  const { proposals } = runTendPasses(vault, { enabled });
+  if (proposals.length === 0) {
+    tendDrawer.setProposals([]);
+    toast("Nothing obvious to tend right now.");
+    return 0;
+  }
+
+  // Rank first — usually fast (one model call over all proposals).
+  // Template fallback keeps the confidence-sorted order.
+  let ranked = proposals;
+  if (proposals.length > 1) {
+    try {
+      const result = await rankProposals(proposals, utterance);
+      if (result.proposals && result.backend !== "template") {
+        ranked = result.proposals;
+        if (result.reasoning) {
+          console.info(`[bz] tend-rank reasoning: ${result.reasoning}`);
+        }
+      }
+    } catch (err) {
+      console.warn("[bz] tend-rank threw", err);
+    }
+  }
+
+  tendDrawer.setProposals(ranked);
+  if (ideasDrawer?.isOpen?.()) ideasDrawer.close?.();
+  if (weedDrawer?.isOpen?.()) weedDrawer.close?.();
+  tendDrawer.open();
+
+  // Polish reasons in the background. Each successful polish mutates
+  // the proposal and refreshes the drawer so the user sees the
+  // polished reason land in real time.
+  polishProposalsSerial(ranked, utterance, {
+    onUpdate: () => {
+      tendDrawer.refresh?.();
+    },
+  }).catch((err) => {
+    console.warn("[bz] tend-polish harvester threw", err);
+  });
+
+  return ranked.length;
+}
 
 // ── Note panel ──────────────────────────────────────────────
 const notePanel = createNotePanel({
@@ -386,10 +433,25 @@ ideasDrawer = createIdeasDrawer({
 const tendDrawer = createTendDrawer({
   onAccept: async (proposal) => {
     if (!vault || !saver) return;
-    await applyProposal({ proposal, vault, saver });
+    const result = await applyProposal({ proposal, vault, saver });
+    // An obvious-link accept adds a wikilink to the note body — the
+    // vault's forward/backward maps update via reparseNote, but the
+    // physics edge list and tether geometry don't auto-sync. Rebuild
+    // both so the new tether actually appears in the canvas. Cheap
+    // enough to run on every accept; the other pass kinds (tag-infer,
+    // fm-normalise, stub, title-collision) get a harmless no-op on
+    // the rebuild side since their edge set didn't change. Kinds can
+    // shift on tag-infer too (tag→kind mapping) so refresh those.
+    if (result?.applied) {
+      if (physics) physics.rebuildEdges();
+      if (tethers) tethers.rebuild();
+      if (bodies) bodies.refreshAllKinds?.();
+    }
   },
   onReject: async (proposal) => {
     if (!vault || !saver) return;
+    // Reject only stamps tended_on frontmatter — no body change, no
+    // new links — so no rebuild needed.
     await rejectProposal({ proposal, vault, saver });
   },
   onOpenNote: (noteId) => openNote(noteId),
@@ -1719,14 +1781,25 @@ window.addEventListener("keydown", (e) => {
     updateNoticedPill();
   }
 
-  // T toggles the tend drawer — but only if there's something in it.
-  // Otherwise a stray T would open an empty drawer which reads as broken.
+  // T — symmetric with W. Open drawer with fresh Tend scan if closed
+  // and empty; close if open; toggle if closed-with-content. Runs a
+  // real scan (rank + polish) when opening from empty so the user
+  // doesn't have to go through Settings for the common case.
   if (e.key === "t" || e.key === "T") {
-    if (tendDrawer.isOpen() || tendDrawer.count() > 0) {
-      e.preventDefault();
-      tendDrawer.toggle();
-      if (tendDrawer.isOpen() && ideasDrawer?.isOpen?.()) ideasDrawer.close?.();
-      if (tendDrawer.isOpen() && weedDrawer?.isOpen?.()) weedDrawer.close?.();
+    e.preventDefault();
+    if (tendDrawer.isOpen()) {
+      tendDrawer.close();
+    } else if (tendDrawer.count() > 0) {
+      // Content already loaded from a prior run — just reveal it.
+      tendDrawer.open();
+      if (ideasDrawer?.isOpen?.()) ideasDrawer.close?.();
+      if (weedDrawer?.isOpen?.()) weedDrawer.close?.();
+    } else {
+      // Empty drawer — kick a fresh Tend run. The function closes
+      // the other drawers itself when it opens ours.
+      runTendAndOpen().catch((err) => {
+        console.warn("[bz] tend hotkey run failed", err);
+      });
     }
   }
 

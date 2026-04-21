@@ -88,6 +88,15 @@ export function createTendDrawer({
     return proposals.length;
   }
 
+  // Re-render without resetting review state. Used by the enrichment
+  // pipeline when a proposal's reason has been polished by the model
+  // mid-review — we want the drawer to show the new text without
+  // re-locking the bulk-accept button behind another round of
+  // individual reviews.
+  function refresh() {
+    render();
+  }
+
   function render() {
     drawer.classList.toggle("has-items", proposals.length > 0);
     groupsEl.innerHTML = "";
@@ -172,6 +181,14 @@ export function createTendDrawer({
 
     const reason = document.createElement("p");
     reason.className = "tend-item-reason";
+    // Data attribute drives the optional "polished" tint — CSS adds a
+    // soft accent border-left so the user can see which reasons the
+    // model has rephrased and which are still rule-derived. The fact
+    // content is unchanged either way; the marker is trust UI per
+    // MODEL_SURFACES.md §1.2.
+    if (proposal.reasonBackend && proposal.reasonBackend !== "template") {
+      reason.dataset.polished = proposal.reasonBackend;
+    }
     reason.textContent = proposal.reason || "";
 
     const actions = document.createElement("div");
@@ -249,6 +266,7 @@ export function createTendDrawer({
     toggle,
     isOpen,
     setProposals,
+    refresh,
     clear,
     count,
   };
