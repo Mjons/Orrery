@@ -225,7 +225,11 @@ export function createKeywordLinkPicker({ getVault, onApply } = {}) {
     targetRow.input.value = preTarget?.title || "";
     target = preTarget;
     skipSet.clear();
-    renderAutocomplete("");
+    // Don't auto-open the autocomplete — that made the whole vault
+    // list pop up on modal open, and clicking into the Keyword
+    // field hid it (looked like the modal itself was closing).
+    // The dropdown surfaces when the user focuses the Link-to field.
+    autocomplete.style.display = "none";
     scheduleScan();
     requestAnimationFrame(() => keywordRow.input.focus());
   }
@@ -487,11 +491,13 @@ export function createKeywordLinkPicker({ getVault, onApply } = {}) {
     positionAutocompleteBelow(targetRow.input);
     autocomplete.style.display = "flex";
     // Auto-pick the top result as a tentative target so Apply can
-    // light up immediately. The user can still click / arrow to a
-    // different row — pickTarget will overwrite. Skip if the user
-    // has already explicitly picked a target whose title matches
-    // the current input (don't clobber an explicit choice).
+    // light up immediately. Only when the user has actually typed a
+    // non-empty query — picking an arbitrary first-note on empty
+    // query would be wrong. The user can still click / arrow to a
+    // different row; pickTarget will overwrite.
+    const typed = (q || "").trim();
     if (
+      typed &&
       autocompleteMatches[0] &&
       (!target || target.title !== targetRow.input.value)
     ) {
