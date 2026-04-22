@@ -2,7 +2,11 @@
 tags: [welcome]
 pinned: true
 position: [0, 0, 0]
+tended_on: [tag-infer]
+id: 01KPTB0T915H1QZMHA8BAN46XE
+created: "2026-04-22T00:23:52.446Z"
 ---
+
 
 # Start here
 
@@ -15,3 +19,6 @@ Press **?** any time for the full hotkey list.
 **Try it:** hover any star near me, then click one.
 
 _Keep me around, or delete me — I'm just a note._
+
+
+#star

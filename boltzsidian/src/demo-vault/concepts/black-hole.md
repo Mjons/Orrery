@@ -1,3 +1,8 @@
+---
+tended_on: ["obvious-link:01KPTBBZ7HEDAQ8H88N6SMRND5"]
+id: 01KPTBBZ1053K4B4N2F9YNTPNY
+created: "2026-04-21T12:39:22.599Z"
+---
 # Black hole
 
 A region of spacetime where gravity is strong enough that nothing — not
@@ -20,3 +25,5 @@ ripples they make when they merge (LIGO).
 Related: [[Redshift]].
 
 #concept #anchor
+
+[[Telescope]]

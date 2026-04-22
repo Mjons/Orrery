@@ -1,3 +1,8 @@
+---
+tended_on: ["obvious-link:01KPTBBZ1053K4B4N2F9YNTPNY"]
+id: 01KPTC19AE86FSXH16CX2N9TBG
+created: "2026-04-21T12:36:50.694Z"
+---
 # Aquila
 
 The eagle of the summer sky. [[Altair]] at its heart, flanked on
