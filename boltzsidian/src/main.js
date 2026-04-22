@@ -3357,14 +3357,15 @@ if (import.meta.env && import.meta.env.DEV) {
       if (!hub) return console.warn("[bz] weave: no note matches", idOrTitle);
       weavePicker?.open?.(hub);
     },
-    __weaveScan: (idOrTitle) => {
+    __weaveScan: (idOrTitle, opts) => {
       if (!vault) return console.warn("[bz] no vault loaded");
       const hub =
         vault.byId?.get(idOrTitle) ||
         vault.resolveTitle?.(String(idOrTitle)) ||
         null;
       if (!hub) return console.warn("[bz] weaveScan: no note matches");
-      const result = scanWeave(vault, hub.id);
+      // Second arg: { sameRootOnly: true|false }. Defaults on.
+      const result = scanWeave(vault, hub.id, opts || {});
       console.log(
         `[bz] weave ${hub.title}: ${result.satellites.length} satellites, ${result.proposals.length} proposals`,
         result,
