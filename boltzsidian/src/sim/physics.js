@@ -87,6 +87,12 @@ export function createPhysics({
   // active or the theme is too small to be viable; otherwise
   // { centroid: [x,y,z], extent, size }.
   getThemeAnchor,
+  // STAR_CHARTS.md first cut — project-hub shapes. Returns an
+  // array of `{ hubId, shape, satIds, rotation, radius }`. Each
+  // shape pulls its satellites toward an ideal position on a ring
+  // centered on the hub. Called once on init; refreshEdges reruns
+  // it on vault reload.
+  getProjectShapes,
 }) {
   const positions = bodies.buffers.position;
   const velocities = bodies.buffers.velocity;
@@ -256,6 +262,22 @@ export function createPhysics({
         force[ai] += dx * basinStrength * 0.01;
         force[ai + 1] += dy * basinStrength * 0.01;
         force[ai + 2] += dz * basinStrength * 0.01;
+      }
+    }
+
+    // STAR_CHARTS.md — project shape force. For each note whose
+    // frontmatter has `project: true`, pull its satellites toward
+    // ideal positions on a ring centered on the hub. Stiffness is
+    // low so the figure is a target, not a cage; local spring
+    // forces still perturb the arrangement into a hand-drawn feel.
+    const shapes = getProjectShapes ? getProjectShapes() : null;
+    if (shapes && shapes.length > 0) {
+      // Fade the shape force as dream depth rises so the dream
+      // universe has no figures — same principle as constellation
+      // labels fading in deep sleep.
+      const shapeMix = depth > 0 ? Math.max(0, 1 - depth * 2.2) : 1;
+      if (shapeMix > 0.01) {
+        applyShapeForces(shapes, live, shapeMix);
       }
     }
 
@@ -455,6 +477,42 @@ export function createPhysics({
       centroids[si + 2] /= c;
     }
     centroidFolderCount = used;
+  }
+
+  // STAR_CHARTS.md — pull each satellite of a project hub toward
+  // its ideal position on a ring around the hub. Stiffness is low;
+  // the figure is a suggestion, not a constraint. `mix` is a dream-
+  // depth fade so the shape dissolves into drift during sleep.
+  const SHAPE_K = 0.06;
+  function applyShapeForces(shapes, live, mix) {
+    for (const shape of shapes) {
+      const hubIdx = bodies.indexOfId(shape.hubId);
+      if (hubIdx < 0 || hubIdx >= live) continue;
+      const hx = positions[hubIdx * 3];
+      const hy = positions[hubIdx * 3 + 1];
+      const hz = positions[hubIdx * 3 + 2];
+      const n = shape.satIds.length;
+      if (n === 0) continue;
+      for (let i = 0; i < n; i++) {
+        const idx = bodies.indexOfId(shape.satIds[i]);
+        if (idx < 0 || idx >= live) continue;
+        if (pinnedBuf[idx]) continue;
+        const theta = shape.rotation + (i / n) * Math.PI * 2;
+        // Ring target in the XZ plane with a tiny deterministic
+        // Y-jitter so the figure reads as hand-drawn.
+        const ix = hx + Math.cos(theta) * shape.radius;
+        const iy = hy + Math.sin(i * 2.7 + shape.rotation * 3.1) * 8;
+        const iz = hz + Math.sin(theta) * shape.radius;
+        const ai = idx * 3;
+        const dx = ix - positions[ai];
+        const dy = iy - positions[ai + 1];
+        const dz = iz - positions[ai + 2];
+        const k = SHAPE_K * mix;
+        force[ai] += dx * k;
+        force[ai + 1] += dy * k;
+        force[ai + 2] += dz * k;
+      }
+    }
   }
 
   function repel(a, b, strength, rRad2) {

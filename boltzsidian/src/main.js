@@ -28,6 +28,7 @@ import { createTethers } from "./sim/tethers.js";
 import { createSparks, SIZE_CONNECTION, SIZE_IDEA } from "./sim/sparks.js";
 import { createKMatrix } from "./sim/kmatrix.js";
 import { createHoverOrbit } from "./sim/hover-orbit.js";
+import { collectProjectShapes } from "./sim/star-charts.js";
 import { createLabels } from "./ui/labels.js";
 import { createConstellations, saveClusterName } from "./ui/constellations.js";
 import { createBatchLinkPicker } from "./ui/batch-link-picker.js";
@@ -183,6 +184,10 @@ let isBulkInProgress = false;
 // recomputed alongside the live cluster centroids every ~30 frames.
 // Null when no theme is set OR the theme is too small (< MIN_THEME_SIZE).
 let themeAnchorCache = null;
+// STAR_CHARTS.md first cut — cache of project-hub shapes read by
+// physics. Rebuilt on vault reload and refreshed on the same tick
+// that recomputes cluster centroids.
+let projectShapesCache = [];
 // DREAM_THEMES.md Phase D — cached theme Set<noteId> used by the
 // salience layer for pair-sampling bias. Refreshed on the same tick
 // as the anchor. Null when no theme is set.
@@ -1739,7 +1744,14 @@ async function setWorkspace(ws) {
       // in the same tick that updates cluster centroids. Physics
       // reads the cached value so every step is O(1).
       getThemeAnchor: () => themeAnchorCache,
+      // STAR_CHARTS.md — project-hub shapes cached on vault load
+      // and refreshed every ~30 frames alongside centroids. Physics
+      // reads it per-step.
+      getProjectShapes: () => projectShapesCache,
     });
+    // Seed the shape cache so the first physics frame already sees
+    // any project hubs in the vault.
+    projectShapesCache = collectProjectShapes(vault);
 
     tethers = createTethers({
       scene,
@@ -2186,6 +2198,10 @@ async function setWorkspace(ws) {
         // the same tick. Both null when no theme, or the theme is
         // under MIN_THEME_SIZE (fall back to random everywhere).
         refreshThemeCaches();
+        // STAR_CHARTS.md — rebuild project-hub shape cache so new
+        // `project: true` frontmatter (or link graph changes) take
+        // effect within a second.
+        projectShapesCache = collectProjectShapes(vault);
       }
       constellations.update();
     });
