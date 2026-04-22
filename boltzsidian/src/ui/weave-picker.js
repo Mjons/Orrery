@@ -150,10 +150,14 @@ export function createWeavePicker({ getVault, runScan, onApply } = {}) {
   }
 
   // ── Public API ────────────────────────────────────────
-  function open(hub) {
+  // scanOpts are forwarded to runScan — e.g. { titlePrefix: "X",
+  // sameRootOnly: false } for cross-root discovery.
+  let lastScanOpts = null;
+  function open(hub, scanOpts = null) {
     if (!hub) return;
     overlay.style.display = "flex";
     skipSet = new Set();
+    lastScanOpts = scanOpts;
     render(hub);
   }
   function close() {
@@ -181,7 +185,7 @@ export function createWeavePicker({ getVault, runScan, onApply } = {}) {
       updateFooter();
       return;
     }
-    scanResult = runScan(vault, hub.id);
+    scanResult = runScan(vault, hub.id, lastScanOpts);
     title.textContent = `→ [[${hub.title || "untitled"}]]`;
     const { satellites, proposals, skipped } = scanResult;
     sub.textContent = `${satellites.length} satellite${satellites.length === 1 ? "" : "s"} · ${proposals.length} proposal${proposals.length === 1 ? "" : "s"} (${skipped.alreadyLinked} already linked, ${skipped.noMention} no prose mention)`;

@@ -2124,7 +2124,7 @@ async function setWorkspace(ws) {
     if (weavePicker) weavePicker.dispose();
     weavePicker = createWeavePicker({
       getVault: () => vault,
-      runScan: (v, hubId) => scanWeave(v, hubId),
+      runScan: (v, hubId, opts) => scanWeave(v, hubId, opts || {}),
       onApply: async (proposals) => {
         if (!saver) return;
         // Group proposals by source note so each note is parsed and
@@ -3364,14 +3364,14 @@ if (import.meta.env && import.meta.env.DEV) {
     //   __boltzsidian.__weave("Delphica")        // resolve by title
     //   __boltzsidian.__weave(note.id)           // resolve by id
     //   __boltzsidian.__weaveScan("Delphica")    // scan-only, logs proposals
-    __weave: (idOrTitle) => {
+    __weave: (idOrTitle, opts) => {
       if (!vault) return console.warn("[bz] no vault loaded");
       const hub =
         vault.byId?.get(idOrTitle) ||
         vault.resolveTitle?.(String(idOrTitle)) ||
         null;
       if (!hub) return console.warn("[bz] weave: no note matches", idOrTitle);
-      weavePicker?.open?.(hub);
+      weavePicker?.open?.(hub, opts || null);
     },
     __weaveScan: (idOrTitle, opts) => {
       if (!vault) return console.warn("[bz] no vault loaded");
