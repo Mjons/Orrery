@@ -101,19 +101,41 @@ function applyTagInfer(note, proposal) {
 
 export function applyObviousLink(note, proposal, vault) {
   const target = vault?.byId?.get(proposal.linkTargetId);
-  if (!target) return note.rawText;
-  // Reuse Phase 3's planLinkCreate behaviour: append `[[Target Title]]`
-  // at the end of the body if not already present. We inline the logic
-  // here instead of importing to avoid a circular tend ↔ links coupling.
+  if (!target || !target.title) return note.rawText;
   const body = note.body || "";
-  const already = new RegExp(
+  // Skip if this target is already linked anywhere in the body —
+  // exact `[[Title]]` or aliased `[[Title|whatever]]`.
+  const alreadyLinked = new RegExp(
     `\\[\\[\\s*${escapeRegex(target.title)}\\s*(?:\\|[^\\]]*)?\\]\\]`,
     "i",
   ).test(body);
-  if (already) return note.rawText;
-  const trimmed = body.replace(/\s+$/, "");
-  const sep = trimmed ? "\n\n" : "";
-  const newBody = `${trimmed}${sep}[[${target.title}]]\n`;
+  if (alreadyLinked) return note.rawText;
+  // Per DOCS_AGENT.md Pass 3 and TENDING_FIX_PLAN.md §Phase 2:
+  // wikilinks go IN-PROSE as first-mention replacements, never as
+  // EOF appends. Find the first unbounded prose occurrence of the
+  // target's title; replace in place. If no prose mention exists,
+  // this applier is a no-op — we never invent a link.
+  //
+  // Scrub code fences, inline code, existing wikilinks, and
+  // markdown links to spaces of equal length so character offsets
+  // stay valid against `body` while the search only considers prose.
+  const scrubbed = body
+    .replace(/```[\s\S]*?```/g, (m) => " ".repeat(m.length))
+    .replace(/`[^`\n]*`/g, (m) => " ".repeat(m.length))
+    .replace(/\[\[[^\]]*\]\]/g, (m) => " ".repeat(m.length))
+    .replace(/\[[^\]]*\]\([^)]*\)/g, (m) => " ".repeat(m.length));
+  const phraseRe = new RegExp(`\\b${escapeRegex(target.title)}\\b`, "i");
+  const m = phraseRe.exec(scrubbed);
+  if (!m) return note.rawText;
+  const matched = body.slice(m.index, m.index + m[0].length);
+  // Preserve author casing via an alias when it diverges from the
+  // canonical stem — reads naturally, resolves the same target.
+  const replacement =
+    matched === target.title
+      ? `[[${target.title}]]`
+      : `[[${target.title}|${matched}]]`;
+  const newBody =
+    body.slice(0, m.index) + replacement + body.slice(m.index + m[0].length);
   return replaceBody(note.rawText, body, newBody);
 }
 
