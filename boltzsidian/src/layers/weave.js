@@ -39,6 +39,13 @@ const MIN_VARIANT_LENGTH = 3;
  *   because cross-project neighborhoods are usually tending-agent
  *   noise, not honest project structure. Disable to consider the
  *   whole graph.
+ * @param {string} [opts.titlePrefix]
+ *   Discovery scope: instead of the hub's one-hop neighborhood, use
+ *   every note whose title starts with this prefix (case-insensitive).
+ *   Useful when the project notes share a title convention but
+ *   haven't been cross-linked yet — weaving gives them their first
+ *   set of tethers. When set, sameRootOnly is also honored so the
+ *   prefix scope can still be trimmed to one project root.
  * @returns {{
  *   hub: object,
  *   satellites: object[],
@@ -47,7 +54,7 @@ const MIN_VARIANT_LENGTH = 3;
  * }}
  */
 export function scanWeave(vault, hubId, opts = {}) {
-  const { sameRootOnly = true } = opts;
+  const { sameRootOnly = true, titlePrefix = null } = opts;
   const empty = {
     hub: null,
     satellites: [],
@@ -58,12 +65,21 @@ export function scanWeave(vault, hubId, opts = {}) {
   const hub = vault.byId.get(hubId);
   if (!hub) return empty;
 
-  // One-hop neighborhood: any note that either links to the hub or
-  // that the hub links to. Dedupe; drop the hub itself.
+  // Build the candidate set. Two modes:
+  //   - default: one-hop neighborhood (forward + backward links)
+  //   - titlePrefix: every note whose title starts with the prefix
   const satIds = new Set();
-  for (const x of vault.forward?.get(hubId) || []) satIds.add(x);
-  for (const x of vault.backward?.get(hubId) || []) satIds.add(x);
-  satIds.delete(hubId);
+  if (titlePrefix) {
+    const prefix = String(titlePrefix).toLowerCase();
+    for (const n of vault.notes || []) {
+      if (n.id === hubId) continue;
+      if ((n.title || "").toLowerCase().startsWith(prefix)) satIds.add(n.id);
+    }
+  } else {
+    for (const x of vault.forward?.get(hubId) || []) satIds.add(x);
+    for (const x of vault.backward?.get(hubId) || []) satIds.add(x);
+    satIds.delete(hubId);
+  }
 
   const satellites = [];
   const skipped = { self: 0, alreadyLinked: 0, noMention: 0, crossRoot: 0 };
