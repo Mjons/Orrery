@@ -67,6 +67,13 @@ export const DEFAULT_SETTINGS = {
   // Brief — 90-second "where you are" panel on workspace open.
   // STATES.md §4, BUILD_PLAN Phase 6.7.
   brief_on_open: true,
+  // Multi-project manifest — MULTI_PROJECT_PLAN.md Phase 1. Null
+  // means "legacy single-root mode" and the app boots exactly as
+  // before. A truthy value is a normalised manifest object (see
+  // src/vault/manifest.js parseManifest). Phase 2 onward reads this;
+  // Phase 5 writes it through the pick flow. Dormant in Phase 1 —
+  // present so later phases can read without migrating settings.
+  workspace_manifest: null,
 };
 
 export function loadSettings() {

@@ -325,6 +325,36 @@
         line-height: 1.6;
         margin: 0 0 10px;
       }
+      #settings .settings-roots {
+        margin-top: 12px;
+      }
+      #settings .settings-root-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 6px 0;
+        font-size: 12px;
+        border-top: 1px solid var(--glass-border);
+      }
+      #settings .settings-root-name {
+        flex: 1;
+        color: var(--text-dim);
+      }
+      #settings .settings-root-status {
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      #settings .settings-root-dropped .settings-root-status {
+        color: var(--accent);
+      }
+      #settings .settings-root-add {
+        justify-content: flex-start;
+        border-top: 1px dashed var(--glass-border);
+        padding-top: 10px;
+        margin-top: 4px;
+      }
       #settings .settings-footer {
         margin-top: 10px;
         letter-spacing: 0.06em;
@@ -866,6 +896,99 @@
       #ideas-drawer .idea-parents a:hover {
         color: var(--accent);
         border-bottom-color: rgba(138, 180, 255, 0.4);
+      }
+      #ideas-drawer .idea-parents .idea-parent-root {
+        font-size: 9px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        border: 1px solid var(--glass-border);
+        border-radius: 3px;
+        padding: 0 4px;
+        margin-left: 2px;
+        vertical-align: middle;
+        border-bottom: 1px solid var(--glass-border);
+      }
+      /* Evidence block — two literal quotes pulled from the parent
+       * bodies. Small, muted, italic so the eye reads it as citation
+       * rather than part of the claim. */
+      #ideas-drawer .idea-evidence {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      #ideas-drawer .idea-evidence-row {
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--text-dim);
+        padding-left: 10px;
+        border-left: 2px solid rgba(138, 180, 255, 0.25);
+      }
+      #ideas-drawer .idea-evidence-source {
+        color: var(--text-faint);
+        font-weight: 600;
+        margin-right: 4px;
+      }
+      #ideas-drawer .idea-evidence-quote {
+        font-style: italic;
+      }
+      /* Next-action — single-line suggestion at the bottom of each
+       * card. "Next" label is accented so the actionable thing reads
+       * immediately. */
+      #ideas-drawer .idea-next {
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--text-dim);
+        margin: 0;
+      }
+      #ideas-drawer .idea-next-label {
+        display: inline-block;
+        padding: 1px 6px;
+        margin-right: 6px;
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: rgba(138, 180, 255, 0.1);
+        border-radius: 3px;
+        vertical-align: middle;
+      }
+      /* Adversary badge — shows whether the adversarial pass survived
+       * (green-ish) or replaced (amber-ish) the idea. Both colour
+       * variants stay muted so the badge reads as provenance, not
+       * alert. */
+      #ideas-drawer .idea-adversary {
+        font-size: 11px;
+        line-height: 1.5;
+        color: var(--text-dim);
+        margin: 0;
+      }
+      #ideas-drawer .idea-adversary-badge {
+        display: inline-block;
+        padding: 1px 6px;
+        margin-right: 6px;
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        border-radius: 3px;
+        vertical-align: middle;
+      }
+      #ideas-drawer .idea-adversary-survived .idea-adversary-badge {
+        color: #8affb0;
+        background: rgba(138, 255, 176, 0.1);
+      }
+      #ideas-drawer .idea-adversary-counter .idea-adversary-badge {
+        color: #e6b85c;
+        background: rgba(230, 184, 92, 0.1);
+      }
+      #ideas-drawer .idea-adversary-reason {
+        font-style: italic;
+        color: var(--text-faint);
       }
       #ideas-drawer .idea-score {
         font-size: 10px;
@@ -2135,6 +2258,26 @@
         color: var(--text-faint);
         border-bottom-color: rgba(215, 219, 228, 0.2);
       }
+      #note-panel .panel-body .wikilink-cross {
+        font-size: 9px;
+        letter-spacing: 0.04em;
+        color: var(--text-faint);
+        margin-left: 1px;
+        vertical-align: super;
+        opacity: 0.75;
+      }
+      #note-panel .panel-title .panel-root-pill {
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        border: 1px solid var(--glass-border);
+        border-radius: 4px;
+        padding: 1px 6px;
+        margin-left: 8px;
+        vertical-align: middle;
+      }
       #note-panel .panel-meta {
         border-top: 1px solid var(--glass-border);
         padding: 14px 24px;
@@ -2184,6 +2327,19 @@
       }
       #search-strip input::placeholder {
         color: var(--text-faint);
+      }
+      #search-strip .search-summary {
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        padding: 0 16px;
+        color: var(--text-faint);
+      }
+      #search-strip .search-summary:empty {
+        display: none;
+      }
+      #search-strip .search-summary .root-tag {
+        color: var(--text-dim);
+        margin-right: 6px;
       }
       #search-strip .search-hint {
         font-size: 10px;
@@ -3104,6 +3260,7 @@
         spellcheck="false"
         autocomplete="off"
       />
+      <div class="search-summary" aria-live="polite"></div>
       <div class="search-hint">
         <b>↑ ↓</b> navigate · <b>enter</b> open · <b>esc</b> close
       </div>

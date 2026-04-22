@@ -11,10 +11,10 @@ GPU-accelerated particle universe. Forked from the sim on branch
 
 Canonical planning docs live at branch root:
 
-- [WORKSPACE.md](../WORKSPACE.md) — product spec
-- [BUILD_PLAN.md](../BUILD_PLAN.md) — operational phases 0-7
-- [BRAIN.md](../BRAIN.md), [BOLTZMANN.md](../BOLTZMANN.md),
-  [OBSIDIAN.md](../OBSIDIAN.md), [DREAM.md](../DREAM.md) — speculative
+- [WORKSPACE.md](../docs/WORKSPACE.md) — product spec
+- [BUILD_PLAN.md](../docs/BUILD_PLAN.md) — operational phases 0-7
+- [BRAIN.md](../docs/BRAIN.md), [BOLTZMANN.md](../docs/BOLTZMANN.md),
+  [OBSIDIAN.md](../docs/OBSIDIAN.md), [DREAM.md](../docs/DREAM.md) — speculative
   layers that become features
 
 ## Invariants (these deliberately differ from the sim's root CLAUDE.md)
@@ -58,7 +58,7 @@ boltzsidian/
 
 ## Common tasks
 
-See [../BUILD_PLAN.md](../BUILD_PLAN.md) for phase-by-phase deliverables
+See [../docs/BUILD_PLAN.md](../docs/BUILD_PLAN.md) for phase-by-phase deliverables
 with acceptance criteria and exit gates. Every phase has a kill condition.
 Do not skip gates.
 
@@ -72,7 +72,7 @@ small; don't fork the whole sim into `boltzsidian/`.
 
 ## Performance budgets
 
-See [../BUILD_PLAN.md](../BUILD_PLAN.md) §4.7. Re-measure at every phase
+See [../docs/BUILD_PLAN.md](../docs/BUILD_PLAN.md) §4.7. Re-measure at every phase
 gate.
 
 ## User preferences (author: Michael)

@@ -43,6 +43,12 @@ export function initSettings({
   onSetClaudeApiKey, // async (string | null) => void
   onTestLocalBackend, // async () => { ok, detail }
   getDreamStatus, // () => { state, phase, depth } — live dream probe
+  // Phase 5: surface the workspace roots list + dropped entries so
+  // the user can see which projects connected and re-grant any that
+  // lapsed.
+  getWorkspaceRoots, // () => { roots, writeRootId, dropped }
+  onReconnectRoot, // async (droppedEntry) => boolean
+  onAddRoot, // async () => boolean — pick a folder, append to manifest, reload
   // surfaces the ON/OFF indicator so the user can verify at a glance
   // whether the dream loop is actually running.
 }) {
@@ -229,6 +235,7 @@ export function initSettings({
       <h3>Workspace</h3>
       <p class="settings-hint" id="s-workspace-desc"></p>
       <div class="settings-row" id="s-workspace-actions"></div>
+      <div id="s-workspace-roots" class="settings-roots"></div>
     </section>
 
     <section class="settings-group" id="s-voice-section">
@@ -482,6 +489,7 @@ export function initSettings({
   const aboutBtn = pane.querySelector("#s-about");
   const workspaceDesc = pane.querySelector("#s-workspace-desc");
   const workspaceActions = pane.querySelector("#s-workspace-actions");
+  const workspaceRoots = pane.querySelector("#s-workspace-roots");
 
   if (reshowTagBtn && onReshowTagPrompt) {
     reshowTagBtn.addEventListener("click", () => {
@@ -1092,6 +1100,98 @@ export function initSettings({
         "A real folder on your disk. Nothing in this app touches anything outside that folder.";
     } else {
       workspaceDesc.textContent = "No workspace open yet.";
+    }
+    renderWorkspaceRoots();
+  }
+
+  function renderWorkspaceRoots() {
+    if (!workspaceRoots) return;
+    workspaceRoots.innerHTML = "";
+    if (!getWorkspaceRoots) return;
+    const kind = getWorkspaceKind ? getWorkspaceKind() : null;
+    const {
+      roots = [],
+      writeRootId = null,
+      dropped = [],
+    } = getWorkspaceRoots() || {};
+    // Demo workspaces don't support multi-root — no list, no button.
+    if (kind !== "user") return;
+
+    const header = document.createElement("p");
+    header.className = "settings-hint";
+    header.textContent = "Project roots";
+    workspaceRoots.appendChild(header);
+
+    for (const r of roots) {
+      const row = document.createElement("div");
+      row.className = "settings-root-row";
+      const name = document.createElement("span");
+      name.className = "settings-root-name";
+      name.textContent = r.name || r.id;
+      const status = document.createElement("span");
+      status.className = "settings-root-status";
+      const tags = [];
+      if (r.id === writeRootId) tags.push("writeRoot");
+      if (r.readOnly) tags.push("read-only");
+      tags.push("connected");
+      status.textContent = tags.join(" · ");
+      row.append(name, status);
+      workspaceRoots.appendChild(row);
+    }
+
+    for (const d of dropped) {
+      const row = document.createElement("div");
+      row.className = "settings-root-row settings-root-dropped";
+      const name = document.createElement("span");
+      name.className = "settings-root-name";
+      name.textContent = d.name || d.id;
+      const status = document.createElement("span");
+      status.className = "settings-root-status";
+      status.textContent =
+        d.reason === "permission"
+          ? "re-grant needed"
+          : d.reason === "not-picked"
+            ? "not connected"
+            : "unavailable";
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "ghost";
+      btn.textContent = "Connect";
+      btn.addEventListener("click", async () => {
+        if (!onReconnectRoot) return;
+        btn.disabled = true;
+        try {
+          await onReconnectRoot(d);
+        } finally {
+          btn.disabled = false;
+          renderWorkspaceRoots();
+        }
+      });
+      row.append(name, status, btn);
+      workspaceRoots.appendChild(row);
+    }
+
+    // Add-root button is always available for user workspaces. Runs
+    // inside a direct user-click handler so showDirectoryPicker gets
+    // the transient activation it requires.
+    if (onAddRoot) {
+      const addRow = document.createElement("div");
+      addRow.className = "settings-root-row settings-root-add";
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "ghost";
+      addBtn.textContent = "Add project root";
+      addBtn.addEventListener("click", async () => {
+        addBtn.disabled = true;
+        try {
+          await onAddRoot();
+        } finally {
+          addBtn.disabled = false;
+          renderWorkspaceRoots();
+        }
+      });
+      addRow.appendChild(addBtn);
+      workspaceRoots.appendChild(addRow);
     }
   }
 

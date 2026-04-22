@@ -184,13 +184,22 @@ export function createNotePanel({
   function resolveTarget(raw) {
     const vault = getVault();
     if (!vault) return null;
+    // Phase 2: defer to vault.resolveTitle so prefer-same-root kicks
+    // in when the title collides across roots. `current` is the
+    // note the user is reading — its root wins the tie-break.
+    if (vault.resolveTitle) {
+      return vault.resolveTitle(raw, current);
+    }
+    // Fallback for pre-Phase-2 vaults (safety net).
     const lower = raw.trim().toLowerCase();
     if (vault.byId.has(raw)) return vault.byId.get(raw);
-    if (vault.byTitle.has(lower)) return vault.byTitle.get(lower);
-    return null;
+    const bucket = vault.byTitle?.get(lower);
+    return bucket && bucket.length > 0 ? bucket[0] : null;
   }
 
   function renderBody(note) {
+    const vault = getVault();
+    const multiRoot = vault?.roots && vault.roots.length > 1;
     const preprocessed = note.body.replace(
       /\[\[([^\]\|\n]+?)(?:\|([^\]\n]+))?\]\]/g,
       (_, target, alias) => {
@@ -199,7 +208,21 @@ export function createNotePanel({
         const label = (alias || t).trim();
         const cls = resolved ? "wikilink" : "wikilink broken";
         const dataTarget = resolved ? resolved.id : t;
-        return `<span class="${cls}" data-target="${escapeAttr(dataTarget)}">${escapeHtml(label)}</span>`;
+        // Cross-root marker — only meaningful in multi-root workspaces.
+        // A bullet with the target's root id as a tooltip; surfaces the
+        // fact that following this link will navigate across projects.
+        let crossMarker = "";
+        if (
+          multiRoot &&
+          resolved &&
+          note.rootId &&
+          resolved.rootId &&
+          resolved.rootId !== note.rootId
+        ) {
+          const rootLabel = escapeAttr(resolved.rootId);
+          crossMarker = `<sup class="wikilink-cross" title="links to ${rootLabel}">·${escapeHtml(resolved.rootId)}</sup>`;
+        }
+        return `<span class="${cls}" data-target="${escapeAttr(dataTarget)}">${escapeHtml(label)}</span>${crossMarker}`;
       },
     );
     return marked.parse(preprocessed);
@@ -224,8 +247,18 @@ export function createNotePanel({
     return parts.join(" · ");
   }
 
+  function paintTitle(note, title) {
+    const vault = getVault();
+    const multiRoot = vault?.roots && vault.roots.length > 1;
+    if (multiRoot && note.rootId) {
+      titleEl.innerHTML = `${escapeHtml(title)} <span class="panel-root-pill" title="root: ${escapeAttr(note.rootId)}">${escapeHtml(note.rootId)}</span>`;
+    } else {
+      titleEl.textContent = title;
+    }
+  }
+
   function refreshHeader(note) {
-    titleEl.textContent = note.title || "Untitled";
+    paintTitle(note, note.title || "Untitled");
     metaEl.innerHTML = buildMeta(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
   }
@@ -532,7 +565,7 @@ export function createNotePanel({
     const body = m ? text.slice(m[0].length) : text;
     const h1 = body.match(H1_RE);
     const nextTitle = (h1 && h1[1].trim()) || current.title;
-    if (nextTitle !== titleEl.textContent) titleEl.textContent = nextTitle;
+    paintTitle(current, nextTitle);
   }
 
   function extractBody(text) {
@@ -565,8 +598,11 @@ export function createNotePanel({
         linkIds.push(byId.id);
         continue;
       }
-      const byTitle = vault.byTitle?.get(target.toLowerCase());
-      if (byTitle) linkIds.push(byTitle.id);
+      // Phase 2: prefer-same-root policy applied through vault helper.
+      const resolved = vault.resolveTitle
+        ? vault.resolveTitle(target, current)
+        : null;
+      if (resolved) linkIds.push(resolved.id);
     }
     return { currentTags: tags, currentLinks: linkIds };
   }

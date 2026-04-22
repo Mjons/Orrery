@@ -116,26 +116,31 @@ function suggestLinks({ vault, body, linked, note, dismissed }) {
   const out = [];
   const seen = new Set();
 
-  // Single pass — for each existing note title, check whether its text
-  // appears in the body, not already linked, not the note itself.
-  for (const [lowered, other] of byTitle) {
+  // Phase 2: byTitle is Map<title, Note[]>. Iterate every candidate
+  // in every bucket — colliding titles across roots each get a
+  // chance to be suggested. The `seen` set keeps us from surfacing
+  // the same target twice even when multiple lookups find it.
+  for (const [lowered, bucket] of byTitle) {
     if (!lowered || lowered.length < MIN_TITLE_LENGTH) continue;
-    if (other === note) continue;
-    if (linked.has(other.id)) continue;
-    if (seen.has(other.id)) continue;
-    if (dismissed.has(`link:${other.id}`)) continue;
-    // Already wikilinked in the body? Skip.
-    if (alreadyWikilinkedTo(body, other)) continue;
-    // Word-boundary case-insensitive match.
-    const escaped = escapeRegExp(lowered);
-    const re = new RegExp(`(^|[^\\w])${escaped}([^\\w]|$)`, "i");
-    if (!re.test(clean)) continue;
-    seen.add(other.id);
-    out.push({
-      id: other.id,
-      title: other.title,
-    });
-    if (out.length >= MAX_LINKS * 2) break; // over-pull, we'll trim
+    for (const other of bucket) {
+      if (other === note) continue;
+      if (linked.has(other.id)) continue;
+      if (seen.has(other.id)) continue;
+      if (dismissed.has(`link:${other.id}`)) continue;
+      // Already wikilinked in the body? Skip.
+      if (alreadyWikilinkedTo(body, other)) continue;
+      // Word-boundary case-insensitive match.
+      const escaped = escapeRegExp(lowered);
+      const re = new RegExp(`(^|[^\\w])${escaped}([^\\w]|$)`, "i");
+      if (!re.test(clean)) continue;
+      seen.add(other.id);
+      out.push({
+        id: other.id,
+        title: other.title,
+      });
+      if (out.length >= MAX_LINKS * 2) break; // over-pull, we'll trim
+    }
+    if (out.length >= MAX_LINKS * 2) break;
   }
 
   // If we have more than MAX_LINKS, prefer longer titles (more specific

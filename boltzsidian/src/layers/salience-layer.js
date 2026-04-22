@@ -292,6 +292,13 @@ export function createSalienceLayer({
         resonance,
         seedText: seedTextTemplate,
         seedBackend: "template",
+        // Phase B structured fields. Template-only candidates have
+        // claim === seedText, no evidence, no next. Model-produced
+        // candidates fill these in via parseIdeaSeedJson + verification.
+        claim: seedTextTemplate,
+        evidenceA: null,
+        evidenceB: null,
+        nextAction: null,
         snap,
         playState: "untouched",
         playedAt: 0,
@@ -314,14 +321,36 @@ export function createSalienceLayer({
       }
 
       // Serial model call — this is the whole point of the harvester.
-      // Wait on it. If it throws, skip (Q5 decision).
+      // Parse JSON + verify evidence quotes against actual note bodies.
+      // If the model invented a quote, DROP the candidate entirely per
+      // the plan — defensible output is the point.
+      let dropped = false;
       if (utterance) {
         try {
           const result = await utterance.generate("idea-seed", snap);
           if (result && result.text && result.backend !== "template") {
-            candidate.seedText = result.text;
-            candidate.seedBackend = result.backend;
-            candidate.originalSeedText = result.text;
+            const parsed = parseIdeaSeedJson(result.text);
+            if (parsed) {
+              const verified = verifyEvidence(parsed, a, b);
+              if (verified.ok) {
+                candidate.claim = verified.claim;
+                candidate.evidenceA = verified.evidence_a;
+                candidate.evidenceB = verified.evidence_b;
+                candidate.nextAction = verified.next;
+                candidate.seedText = verified.claim; // compat for old consumers
+                candidate.seedBackend = result.backend;
+                candidate.originalSeedText = verified.claim;
+              } else {
+                // Invented quote — drop the candidate rather than
+                // ship something whose evidence doesn't exist.
+                console.warn(
+                  "[bz] salience: idea-seed dropped — unverified evidence",
+                  { pair: key, reason: verified.reason },
+                );
+                dropped = true;
+              }
+            }
+            // Unparseable JSON = just stay on the template seed. No drop.
           }
         } catch (err) {
           console.warn("[bz] salience: idea-seed serial fail", err);
@@ -331,6 +360,7 @@ export function createSalienceLayer({
       // Re-check cycle state after the await — the cycle may have
       // ended while this call was in flight.
       if (!pool) return;
+      if (dropped) return; // never reaches the pool
 
       const neighbourKinds = findNeighbourKinds(midpoint, bodies, vault);
       const breakdown = scoreChild(
@@ -526,6 +556,79 @@ export function createSalienceLayer({
     lastJudgeReasoning = String(parsed.reasoning || "").trim();
     lastJudgeAt = Date.now();
     if (onChange) onChange();
+
+    // Phase C — adversary pass. Every survivor gets one attack call.
+    // If the adversary produces a sharper counter, replace in-place.
+    // If it "survives," stamp survivedCritique for the frontmatter.
+    // Fires after surfaced is populated so the user sees something
+    // immediately; adversary replacements come in async.
+    for (const w of winners) {
+      runAdversary(w).catch((err) => {
+        console.warn("[bz] salience: adversary failed", err);
+      });
+    }
+  }
+
+  // Hit the model with one adversarial pass against a surfaced idea.
+  // Mutates in place + fires onChange so the drawer re-renders.
+  async function runAdversary(candidate) {
+    if (!utterance || !candidate) return;
+    const snap = {
+      claim: candidate.claim || candidate.seedText || "",
+      evidenceA: candidate.evidenceA || "",
+      evidenceB: candidate.evidenceB || "",
+      nextAction: candidate.nextAction || "",
+      a_title: candidate.parentA?.title || "",
+      b_title: candidate.parentB?.title || "",
+    };
+    const result = await utterance.generate("idea-adversary", snap);
+    if (!result || !result.text || result.backend === "template") return;
+    const parsed = parseAdversaryOutput(result.text);
+    if (!parsed) return;
+
+    if (parsed.verdict === "survives") {
+      candidate.survivedCritique = true;
+      candidate.adversaryReason = parsed.reason || "";
+      candidate.adversaryBackend = result.backend;
+    } else if (parsed.verdict === "replaced" && parsed.counter_claim) {
+      // Counter becomes the new claim. Evidence carries over (same
+      // passages, sharper reading). "next" can be replaced too if the
+      // counter provided one.
+      candidate.originalSeedText = candidate.claim || candidate.seedText;
+      candidate.claim = parsed.counter_claim;
+      candidate.seedText = parsed.counter_claim;
+      if (parsed.counter_next) candidate.nextAction = parsed.counter_next;
+      candidate.survivedCritique = false; // wasn't the survivor; is the counter
+      candidate.adversaryReason = parsed.reason || "";
+      candidate.adversaryBackend = result.backend;
+      candidate.seedBackend = result.backend;
+    } else {
+      return;
+    }
+    if (onChange) onChange();
+  }
+
+  // Forgiving JSON parser for the adversary's output. Matches the
+  // judge / idea-seed parsers in shape.
+  function parseAdversaryOutput(text) {
+    const stripped = String(text || "").trim();
+    const m = stripped.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try {
+      const obj = JSON.parse(m[0]);
+      const verdict = String(obj.verdict || "")
+        .toLowerCase()
+        .trim();
+      if (verdict !== "survives" && verdict !== "replaced") return null;
+      return {
+        verdict,
+        reason: String(obj.reason || "").trim(),
+        counter_claim: String(obj.counter_claim || "").trim(),
+        counter_next: String(obj.counter_next || "").trim(),
+      };
+    } catch {
+      return null;
+    }
   }
 
   // Forgiving parser for the judge's JSON output. Handles:
@@ -657,8 +760,10 @@ export function createSalienceLayer({
         result.backend !== "template" &&
         !isSameText(result.text, target.seedText)
       ) {
-        // Replace seedText in place; keep originalSeedText for audit.
+        // Replace claim + seedText in place; evidence carries over
+        // since reword is a phrasing change, not a content change.
         target.seedText = result.text;
+        target.claim = result.text;
         target.seedBackend = result.backend;
         target.playState = "played";
       } else {
@@ -796,6 +901,74 @@ export function createSalienceLayer({
 // Stable key for a pair regardless of order.
 function pairKey(idA, idB) {
   return idA < idB ? `${idA}|${idB}` : `${idB}|${idA}`;
+}
+
+// ── Phase B helpers ─────────────────────────────────────────
+// The idea-seed model returns strict JSON; parseIdeaSeedJson handles
+// the common "preamble + fence + trailing noise" cases and returns
+// either a normalised object or null.
+function parseIdeaSeedJson(text) {
+  const stripped = String(text || "").trim();
+  const m = stripped.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try {
+    const obj = JSON.parse(m[0]);
+    const claim = String(obj.claim || "").trim();
+    if (!claim) return null;
+    return {
+      claim,
+      evidence_a: String(obj.evidence_a || "").trim(),
+      evidence_b: String(obj.evidence_b || "").trim(),
+      next: String(obj.next || "").trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Verify each evidence quote is a literal substring of its source
+// note's body. Case-insensitive, whitespace-normalised — the model is
+// allowed minor whitespace drift since it's copying from an already-
+// collapsed excerpt, but not paraphrasing. Returns { ok, claim,
+// evidence_a, evidence_b, next, reason } where ok is false if the
+// parsed object failed verification.
+//
+// Both evidence fields are OPTIONAL — the prompt allows "" when the
+// model can't find a grounding phrase. Empty evidence is acceptable;
+// FALSIFIED evidence (non-empty but not a substring) is grounds for
+// dropping the whole candidate.
+function verifyEvidence(parsed, noteA, noteB) {
+  const bodyA = normaliseBody(noteA?.body || "");
+  const bodyB = normaliseBody(noteB?.body || "");
+  if (parsed.evidence_a) {
+    const norm = normaliseBody(parsed.evidence_a);
+    if (!bodyA.includes(norm)) {
+      return {
+        ok: false,
+        reason: `evidence_a not in A body: "${parsed.evidence_a.slice(0, 40)}…"`,
+      };
+    }
+  }
+  if (parsed.evidence_b) {
+    const norm = normaliseBody(parsed.evidence_b);
+    if (!bodyB.includes(norm)) {
+      return {
+        ok: false,
+        reason: `evidence_b not in B body: "${parsed.evidence_b.slice(0, 40)}…"`,
+      };
+    }
+  }
+  return {
+    ok: true,
+    claim: parsed.claim,
+    evidence_a: parsed.evidence_a || null,
+    evidence_b: parsed.evidence_b || null,
+    next: parsed.next || null,
+  };
+}
+
+function normaliseBody(s) {
+  return String(s).toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 // Today's local-date key as `YYYY-MM-DD`. Used by buildPairSnap's warp

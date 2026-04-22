@@ -57,18 +57,47 @@ export async function promoteIdea({
     // otherwise would learn from it. "template" = deterministic floor,
     // everything else is generated text the user accepted.
     generated_by: candidate.seedBackend || "template",
+    // Phase C resilience stamp — an idea that survived the adversarial
+    // pass wears it. Absent when the candidate never had an adversary
+    // run (template floor) or was itself a counter-replacement (in
+    // which case survivedCritique is false by design).
+    ...(candidate.survivedCritique === true ? { survived_critique: true } : {}),
   };
 
-  // The body: the seed text as a sentence, plus clickable parent links.
-  // Wikilinks use parent TITLES (not paths) so they render naturally in
-  // read mode alongside the user's own writing.
+  // The body: structured content so the promoted file reads as a real
+  // document rather than a one-sentence scribble. Sections only appear
+  // when the corresponding field is populated — template-floor
+  // candidates fall back to seedText as the sole "Claim" body.
+  const aLink = candidate.parentA ? `[[${candidate.parentA.title}]]` : null;
+  const bLink = candidate.parentB ? `[[${candidate.parentB.title}]]` : null;
   const lines = [];
   lines.push(`# ${title}`);
   lines.push("");
-  lines.push(candidate.seedText);
+  lines.push("## Claim");
+  lines.push(candidate.claim || candidate.seedText || "(empty)");
   lines.push("");
-  const aLink = candidate.parentA ? `[[${candidate.parentA.title}]]` : null;
-  const bLink = candidate.parentB ? `[[${candidate.parentB.title}]]` : null;
+  const evidenceA = candidate.evidenceA;
+  const evidenceB = candidate.evidenceB;
+  if (evidenceA || evidenceB) {
+    lines.push("## Evidence");
+    if (evidenceA && candidate.parentA) {
+      lines.push(`- From [[${candidate.parentA.title}]]: *"${evidenceA}"*`);
+    }
+    if (evidenceB && candidate.parentB) {
+      lines.push(`- From [[${candidate.parentB.title}]]: *"${evidenceB}"*`);
+    }
+    lines.push("");
+  }
+  if (candidate.nextAction) {
+    lines.push("## Next");
+    lines.push(candidate.nextAction);
+    lines.push("");
+  }
+  if (candidate.adversaryReason) {
+    lines.push("## Adversary's read");
+    lines.push(candidate.adversaryReason);
+    lines.push("");
+  }
   if (aLink && bLink) {
     lines.push(`Parents: ${aLink} · ${bLink}`);
   } else if (aLink) {

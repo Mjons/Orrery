@@ -11,7 +11,12 @@ const WIKI_ALL_RE = /\[\[([^\]\|\n]+?)(\|[^\]\n]+)?\]\]/g;
 
 // Create an empty in-memory note. The file is NOT created here — the first
 // autosave writes it out (so cancelled Cmd+N never leaves an empty file).
-export function makeEmptyNote({ path, title = "Untitled", settings }) {
+export function makeEmptyNote({
+  path,
+  title = "Untitled",
+  settings,
+  rootId = null,
+}) {
   const id = ulid();
   const now = Date.now();
   const note = {
@@ -28,6 +33,7 @@ export function makeEmptyNote({ path, title = "Untitled", settings }) {
     mtime: now,
     size: 0,
     kind: 0,
+    rootId,
     _isPhantom: true,
   };
   note.kind = computeKind(note, settings);
@@ -37,10 +43,39 @@ export function makeEmptyNote({ path, title = "Untitled", settings }) {
 export function addNoteToVault(vault, note) {
   vault.notes.push(note);
   vault.byId.set(note.id, note);
-  vault.byTitle.set(note.title.toLowerCase(), note);
+  // Phase 2: byTitle is Map<title, Note[]>. Append to the bucket for
+  // this title — create a new bucket if none exists yet.
+  addToTitleBucket(vault.byTitle, note);
   vault.forward.set(note.id, new Set());
   vault.backward.set(note.id, new Set());
   vault.stats.notes = vault.notes.length;
+}
+
+function addToTitleBucket(byTitle, note) {
+  const key = String(note.title || "")
+    .toLowerCase()
+    .trim();
+  if (!key) return;
+  let bucket = byTitle.get(key);
+  if (!bucket) {
+    bucket = [];
+    byTitle.set(key, bucket);
+  }
+  if (!bucket.includes(note)) bucket.push(note);
+}
+
+function removeFromTitleBucket(byTitle, note, titleKeyOverride = null) {
+  const key =
+    titleKeyOverride ??
+    String(note.title || "")
+      .toLowerCase()
+      .trim();
+  if (!key) return;
+  const bucket = byTitle.get(key);
+  if (!bucket) return;
+  const i = bucket.indexOf(note);
+  if (i !== -1) bucket.splice(i, 1);
+  if (bucket.length === 0) byTitle.delete(key);
 }
 
 // Detach a note from the vault's indices. Used by the Weed drawer after
@@ -52,8 +87,10 @@ export function removeNoteFromVault(vault, noteId) {
   const note = vault.byId.get(noteId);
   if (!note) return false;
   vault.byId.delete(note.id);
-  const titleKey = (note.title || "").toLowerCase();
-  if (vault.byTitle.get(titleKey) === note) vault.byTitle.delete(titleKey);
+  // Phase 2: byTitle is Map<title, Note[]>. Drop this note from its
+  // bucket; delete the key entirely when the bucket becomes empty
+  // (keeps the map compact, keeps `has()` checks honest).
+  removeFromTitleBucket(vault.byTitle, note);
   const outgoing = vault.forward.get(note.id);
   if (outgoing) {
     for (const targetId of outgoing) {
@@ -100,12 +137,13 @@ export function reparseNote(vault, note, newText, settings) {
   note.kind = newKind;
 
   if (prevTitle !== note.title) {
-    const prev = prevTitle.toLowerCase();
-    if (vault.byTitle.get(prev) === note) vault.byTitle.delete(prev);
-    vault.byTitle.set(note.title.toLowerCase(), note);
+    // Phase 2: shift this note from its old title bucket to its new
+    // one. Other notes that shared either title remain in place.
+    removeFromTitleBucket(vault.byTitle, note, prevTitle.toLowerCase().trim());
+    addToTitleBucket(vault.byTitle, note);
   }
 
-  const nextForward = resolveLinkSet(note.links, note.id, vault);
+  const nextForward = resolveLinkSet(note.links, note, vault);
   vault.forward.set(note.id, nextForward);
   syncBackward(vault, note.id, prevForward, nextForward);
 
@@ -186,25 +224,32 @@ export function canonicalizeForSave(text, note) {
   return { text: canon, body: parsed.body, frontmatter: fm };
 }
 
-function resolveLinkSet(links, selfId, vault) {
+// Resolve a note's wikilinks into a Set of target note ids. Uses
+// vault.resolveTitle so cross-root tie-breaking obeys prefer-same-
+// root. Falls back to a local lookup if the vault predates the
+// helper (shouldn't happen now, but defensive).
+function resolveLinkSet(links, selfNote, vault) {
   const out = new Set();
+  const selfId = selfNote?.id || null;
   for (const raw of links) {
-    const target = resolveLink(raw, vault);
+    const target = vault.resolveTitle
+      ? vault.resolveTitle(raw, selfNote)
+      : legacyResolveLink(raw, vault);
     if (!target || target.id === selfId) continue;
     out.add(target.id);
   }
   return out;
 }
 
-function resolveLink(raw, vault) {
-  const t = raw.trim();
+function legacyResolveLink(raw, vault) {
+  const t = String(raw || "").trim();
   if (!t) return null;
   if (vault.byId.has(t)) return vault.byId.get(t);
   const lower = t.toLowerCase();
-  if (vault.byTitle.has(lower)) return vault.byTitle.get(lower);
   const stripped = lower.replace(/\.md$/i, "");
-  if (vault.byTitle.has(stripped)) return vault.byTitle.get(stripped);
-  return null;
+  const bucket = vault.byTitle.get(lower) || vault.byTitle.get(stripped);
+  if (!bucket || bucket.length === 0) return null;
+  return bucket[0];
 }
 
 function syncBackward(vault, selfId, prev, next) {

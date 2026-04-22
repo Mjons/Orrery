@@ -106,14 +106,30 @@ export function growthSinceLastSeen(candidates, keepState) {
 
 // Move a file to `.universe/archive/YYYY/<basename>`. If something is
 // already at the destination, suffix with a timestamp so we never
-// silently clobber. FileSystemFileHandle.move() is required (Chromium
-// 122+, which Boltzsidian already requires elsewhere).
-export async function archiveNote(rootHandle, path) {
+// silently clobber.
+//
+// MULTI_PROJECT_PLAN.md Phase 3C: archive destination is the
+// writeRoot (Boltzsidian's own space), NOT the source's root. That
+// way a read-only project can still have notes archived OUT of it
+// into a place Boltzsidian controls — dream-log-style sidecars stay
+// in one place regardless of which project the note came from.
+//
+// Same-root case (single-root vaults, or writeHandle not supplied)
+// uses the fast FileSystemFileHandle.move() path. Cross-root falls
+// back to copy-then-delete since move() doesn't necessarily work
+// across unrelated directory handles.
+export async function archiveNote(
+  rootHandle,
+  path,
+  { writeHandle = null } = {},
+) {
   if (!rootHandle || !path) return { ok: false, reason: "bad-args" };
   const name = basename(path);
   const year = new Date().getFullYear();
+  const destHandle = writeHandle || rootHandle;
+  const sameRoot = destHandle === rootHandle;
   try {
-    const universe = await rootHandle.getDirectoryHandle(UNIVERSE_DIR, {
+    const universe = await destHandle.getDirectoryHandle(UNIVERSE_DIR, {
       create: true,
     });
     const archive = await universe.getDirectoryHandle(ARCHIVE_DIR, {
@@ -130,10 +146,23 @@ export async function archiveNote(rootHandle, path) {
       const stamp = Date.now();
       targetName = name.replace(/(\.md)?$/i, `-${stamp}.md`);
     }
-    if (typeof sourceFile.move !== "function") {
-      throw new Error("FileSystemFileHandle.move unavailable");
+
+    if (sameRoot && typeof sourceFile.move === "function") {
+      // Fast same-root path — atomic, preserves mtime.
+      await sourceFile.move(yearDir, targetName);
+    } else {
+      // Cross-root path: copy the bytes over, then remove the source.
+      // If the read succeeds but the remove fails, we end up with a
+      // duplicate — less bad than losing data silently.
+      const text = await (await sourceFile.getFile()).text();
+      const destFile = await yearDir.getFileHandle(targetName, {
+        create: true,
+      });
+      const w = await destFile.createWritable();
+      await w.write(text);
+      await w.close();
+      await sourceDir.removeEntry(name);
     }
-    await sourceFile.move(yearDir, targetName);
     return {
       ok: true,
       archivedAs: `${UNIVERSE_DIR}/${ARCHIVE_DIR}/${year}/${targetName}`,

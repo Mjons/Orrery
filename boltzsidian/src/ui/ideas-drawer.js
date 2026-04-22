@@ -11,6 +11,8 @@
 
 export function createIdeasDrawer({
   getSurfaced, // () => [candidate, …]
+  getVault, // () => vault — used to resolve parent roots for cross-
+  // root pills. Optional; pre-Phase-4 callers can omit.
   onPromote, // (candidate) => Promise
   onDiscard, // (candidate) => void
   onIgnore, // (candidate) => void
@@ -136,25 +138,77 @@ export function createIdeasDrawer({
     li.dataset.unread = c.readAt ? "false" : "true";
     li.style.position = "relative";
 
-    const text = document.createElement("p");
-    text.className = "idea-text";
-    text.textContent = c.seedText;
+    // Claim — the idea itself, rendered prominently. Uses `claim`
+    // when the structured path populated it; falls back to `seedText`
+    // for template-floor candidates that never ran through the model.
+    const claim = document.createElement("p");
+    claim.className = "idea-text";
+    claim.textContent = c.claim || c.seedText || "";
 
+    // Parent pair (clickable to open either note).
     const parents = document.createElement("p");
     parents.className = "idea-parents";
-    if (c.parentA) {
-      parents.appendChild(parentLink(c.parentA));
-    }
+    const rootA = rootIdFor(c.parentA);
+    const rootB = rootIdFor(c.parentB);
+    // Show root pills only when the two parents span different roots —
+    // dream ideas that connect across projects are the interesting
+    // case; same-root pairs don't need the extra chrome.
+    const showRootPills = rootA && rootB && rootA !== rootB;
+    if (c.parentA) parents.appendChild(parentLink(c.parentA, showRootPills));
     if (c.parentA && c.parentB) {
       parents.appendChild(document.createTextNode(" · "));
     }
-    if (c.parentB) {
-      parents.appendChild(parentLink(c.parentB));
+    if (c.parentB) parents.appendChild(parentLink(c.parentB, showRootPills));
+
+    // Evidence block — two quoted phrases, each labelled with the
+    // source note title. Hidden when the structured path didn't
+    // populate them (template floor / unverified quotes).
+    let evidenceEl = null;
+    if (c.evidenceA || c.evidenceB) {
+      evidenceEl = document.createElement("ul");
+      evidenceEl.className = "idea-evidence";
+      if (c.evidenceA) {
+        evidenceEl.appendChild(
+          renderEvidenceRow(c.parentA?.title || "A", c.evidenceA),
+        );
+      }
+      if (c.evidenceB) {
+        evidenceEl.appendChild(
+          renderEvidenceRow(c.parentB?.title || "B", c.evidenceB),
+        );
+      }
+    }
+
+    // Next-action row — the "what to do with this." Single line,
+    // rendered as a quiet suggestion.
+    let nextEl = null;
+    if (c.nextAction) {
+      nextEl = document.createElement("p");
+      nextEl.className = "idea-next";
+      nextEl.innerHTML = `<span class="idea-next-label">Next</span> ${escapeHtml(c.nextAction)}`;
     }
 
     const score = document.createElement("p");
     score.className = "idea-score";
     score.textContent = scoreLabel(c);
+
+    // Adversary badge — small status pill:
+    //   - survivedCritique === true → "survived critique"
+    //   - survivedCritique === false && adversaryReason present → "counter"
+    //     (meaning the idea was REPLACED by a sharper reading; the current
+    //      claim is that counter)
+    //   - neither → nothing (template-floor candidate, or adversary hasn't
+    //     run yet / fell back to template)
+    let adversaryEl = null;
+    if (c.survivedCritique === true) {
+      adversaryEl = document.createElement("p");
+      adversaryEl.className = "idea-adversary idea-adversary-survived";
+      adversaryEl.innerHTML = `<span class="idea-adversary-badge">survived critique</span>${c.adversaryReason ? ` <span class="idea-adversary-reason">${escapeHtml(c.adversaryReason)}</span>` : ""}`;
+    } else if (c.adversaryReason) {
+      adversaryEl = document.createElement("p");
+      adversaryEl.className = "idea-adversary idea-adversary-counter";
+      adversaryEl.innerHTML = `<span class="idea-adversary-badge">counter</span> <span class="idea-adversary-reason">${escapeHtml(c.adversaryReason)}</span>`;
+    }
 
     const actions = document.createElement("div");
     actions.className = "idea-actions";
@@ -162,17 +216,59 @@ export function createIdeasDrawer({
     actions.appendChild(actionButton("Ignore", "ignore"));
     actions.appendChild(actionButton("Discard", "discard"));
 
-    li.append(text, parents, score, actions);
+    li.append(claim, parents);
+    if (evidenceEl) li.append(evidenceEl);
+    if (nextEl) li.append(nextEl);
+    if (adversaryEl) li.append(adversaryEl);
+    li.append(score, actions);
     return li;
   }
 
-  function parentLink(parent) {
+  function renderEvidenceRow(sourceTitle, quote) {
+    const row = document.createElement("li");
+    row.className = "idea-evidence-row";
+    const source = document.createElement("span");
+    source.className = "idea-evidence-source";
+    source.textContent = sourceTitle + ":";
+    const q = document.createElement("span");
+    q.className = "idea-evidence-quote";
+    q.textContent = `"${quote}"`;
+    row.append(source, q);
+    return row;
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function parentLink(parent, showRootPill = false) {
     const a = document.createElement("a");
     a.textContent = parent.title;
     a.dataset.parentId = parent.id;
     a.href = "#";
     a.addEventListener("click", (e) => e.preventDefault(), { once: false });
+    if (showRootPill) {
+      const rootId = rootIdFor(parent);
+      if (rootId) {
+        const pill = document.createElement("span");
+        pill.className = "idea-parent-root";
+        pill.textContent = rootId;
+        a.appendChild(document.createTextNode(" "));
+        a.appendChild(pill);
+      }
+    }
     return a;
+  }
+
+  function rootIdFor(parent) {
+    if (!parent) return null;
+    if (parent.rootId) return parent.rootId;
+    const vault = getVault ? getVault() : null;
+    const note = vault?.byId?.get(parent.id);
+    return note?.rootId || null;
   }
 
   function actionButton(label, action, extra = "") {

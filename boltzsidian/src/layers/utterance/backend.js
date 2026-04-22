@@ -150,6 +150,12 @@ export const VOICE_POLICY = {
   // indices in priority order. Template fallback = confidence-sorted
   // order already produced by the rules.
   "tend-rank": ["template"],
+  // Phase C — adversary pass. Runs once per survivor after the judge
+  // lands, asks the model for the strongest counter to a proposed
+  // idea. Survivors that hold up carry a resilience flag; survivors
+  // that fall get replaced by the counter itself. Template fallback
+  // = no change (idea survives by default).
+  "idea-adversary": ["template"],
 };
 
 // Pick the chain for a job kind, honouring the user's settings override.

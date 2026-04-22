@@ -6,6 +6,7 @@ import MiniSearch from "minisearch";
 export function createSearch({ getVault, getBodies, onArc, onOpen }) {
   const strip = document.getElementById("search-strip");
   const input = strip.querySelector("input");
+  const summaryEl = strip.querySelector(".search-summary");
 
   let index = null;
   let indexedCount = 0;
@@ -53,6 +54,7 @@ export function createSearch({ getVault, getBodies, onArc, onOpen }) {
     strip.classList.remove("open");
     strip.setAttribute("aria-hidden", "true");
     getBodies()?.setGlowFilter(null);
+    if (summaryEl) summaryEl.innerHTML = "";
     input.blur();
   }
 
@@ -70,6 +72,7 @@ export function createSearch({ getVault, getBodies, onArc, onOpen }) {
     if (!trimmed) {
       matches = [];
       getBodies()?.setGlowFilter(null);
+      renderSummary();
       return;
     }
     if (!index) return;
@@ -78,11 +81,56 @@ export function createSearch({ getVault, getBodies, onArc, onOpen }) {
     const bodies = getBodies();
     if (matches.length === 0) {
       bodies?.setGlowFilter(new Set());
+      renderSummary();
       return;
     }
     bodies?.setGlowFilter(new Set(matches.map((r) => r.id)));
     cursor = 0;
     arcToMatch(0);
+    renderSummary();
+  }
+
+  // Subtle root breakdown — shown only when multi-root AND matches
+  // span more than one root. Single-root searches get no summary
+  // (the input + glow is enough).
+  function renderSummary() {
+    if (!summaryEl) return;
+    const vault = getVault();
+    if (!vault || !matches.length || !(vault.roots?.length > 1)) {
+      summaryEl.innerHTML = "";
+      return;
+    }
+    const byRoot = new Map();
+    for (const m of matches) {
+      const note = vault.byId.get(m.id);
+      const root = note?.rootId || "unknown";
+      byRoot.set(root, (byRoot.get(root) || 0) + 1);
+    }
+    if (byRoot.size <= 1) {
+      summaryEl.innerHTML = "";
+      return;
+    }
+    const tags = [...byRoot.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(
+        ([root, n]) => `<span class="root-tag">${escapeHtml(root)} ${n}</span>`,
+      )
+      .join("");
+    summaryEl.innerHTML = `${matches.length} hits · ${tags}`;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[c],
+    );
   }
 
   function arcToMatch(i) {

@@ -153,12 +153,35 @@ export function buildPairSnap(a, b, { topLevelFolder, pairSeed, dayKey } = {}) {
     b_title: b.title,
     a_warped: aWarped,
     b_warped: bWarped,
+    a_excerpt: excerptFor(a),
+    b_excerpt: excerptFor(b),
     shared_tag: sharedTag,
     shared_folder: sharedFolder,
     a_folder: aFolder,
     b_folder: bFolder,
     age_gap: ageGap,
   };
+}
+
+// Pull the first ~200 words of a note's body, stripped of code fences
+// and frontmatter. This is the CONTENT the idea-seed model reasons
+// over — previously we only fed titles/metadata and the model had to
+// guess what each note actually said. With excerpts in play it can
+// cite specific phrases and the claim+evidence structure becomes
+// meaningfully grounded. DREAM_ENGINE Phase A.
+const EXCERPT_MAX_WORDS = 200;
+function excerptFor(note) {
+  const body = note?.body || "";
+  if (!body) return "";
+  // Strip triple-backtick code blocks — they're rarely signal-rich
+  // and they blow token budgets fast.
+  let text = body.replace(/```[\s\S]*?```/g, "");
+  // Collapse whitespace so word-count is meaningful.
+  text = text.replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const words = text.split(/\s+/);
+  if (words.length <= EXCERPT_MAX_WORDS) return text;
+  return words.slice(0, EXCERPT_MAX_WORDS).join(" ") + "…";
 }
 
 // Enumerate the slots of a note that are legal warp candidates. Warp

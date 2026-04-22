@@ -155,34 +155,42 @@ export function inferTags(vault) {
 // it. This skips mentions that ALREADY appear inside `[[…]]`.
 export function detectObviousLinks(vault) {
   const proposals = [];
+  // Phase 2: byTitle is Map<title, Note[]>. Iterate every candidate
+  // in every bucket — collisions across roots produce multiple
+  // candidates for the same lowercased title and we want to consider
+  // each. `mentioned` dedup is now keyed by target.id so a source
+  // note can only generate one proposal per unique target, even if
+  // two notes share a title.
   const byTitle = vault.byTitle || new Map();
   for (const source of vault.notes) {
     if (!source.body) continue;
     const strippedBody = stripCodeAndWikilinks(source.body);
     const mentioned = new Set();
-    for (const [lower, target] of byTitle) {
-      if (target.id === source.id) continue;
-      const t = target.title || "";
-      if (t.length < 3) continue;
-      // Require title length ≥ 3 so common short words don't trigger.
-      const re = new RegExp(`\\b${escapeRegex(t)}\\b`, "i");
-      if (!re.test(strippedBody)) continue;
-      // Already linked? Skip.
-      const outgoing = vault.forward.get(source.id);
-      if (outgoing?.has(target.id)) continue;
-      if (mentioned.has(target.id)) continue;
-      mentioned.add(target.id);
-      proposals.push({
-        id: `${PASSES.OBVIOUS_LINK}:${source.id}:${target.id}`,
-        pass: PASSES.OBVIOUS_LINK,
-        noteId: source.id,
-        noteTitle: source.title,
-        notePath: source.path,
-        linkTargetId: target.id,
-        linkTargetTitle: target.title,
-        reason: `"${source.title}" mentions "${target.title}" in its body but doesn't link to it.`,
-        confidence: 0.85,
-      });
+    for (const bucket of byTitle.values()) {
+      for (const target of bucket) {
+        if (target.id === source.id) continue;
+        const t = target.title || "";
+        if (t.length < 3) continue;
+        // Require title length ≥ 3 so common short words don't trigger.
+        const re = new RegExp(`\\b${escapeRegex(t)}\\b`, "i");
+        if (!re.test(strippedBody)) continue;
+        // Already linked? Skip.
+        const outgoing = vault.forward.get(source.id);
+        if (outgoing?.has(target.id)) continue;
+        if (mentioned.has(target.id)) continue;
+        mentioned.add(target.id);
+        proposals.push({
+          id: `${PASSES.OBVIOUS_LINK}:${source.id}:${target.id}`,
+          pass: PASSES.OBVIOUS_LINK,
+          noteId: source.id,
+          noteTitle: source.title,
+          notePath: source.path,
+          linkTargetId: target.id,
+          linkTargetTitle: target.title,
+          reason: `"${source.title}" mentions "${target.title}" in its body but doesn't link to it.`,
+          confidence: 0.85,
+        });
+      }
     }
   }
   return proposals;

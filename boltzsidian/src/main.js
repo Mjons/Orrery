@@ -27,6 +27,19 @@ import { createPickDebug } from "./ui/pick-debug.js";
 import { createSearch } from "./ui/search.js";
 import { createLinkDrag } from "./ui/link-drag.js";
 import { openVault } from "./vault/vault.js";
+import {
+  parseManifest,
+  serializeManifest,
+  synthesizeSingleRootManifest,
+  loadManifestFromHandle,
+  saveManifestToHandle,
+  DEFAULT_EXCLUDES,
+} from "./vault/manifest.js";
+import {
+  saveRootHandle,
+  loadRootHandle,
+  deleteRootHandle,
+} from "./vault/handle-store.js";
 import { loadState, saveState } from "./vault/state-store.js";
 import {
   addNoteToVault,
@@ -100,7 +113,36 @@ const TAG_PROMPT_KEY = "boltzsidian.tag_prompt.seen.v1";
 // `applyAccent` reads `bodies`, so these bindings must exist before it runs.
 let workspaceHandle = null;
 let workspaceKind = null;
+// MULTI_PROJECT_PLAN.md Phase 5: roots that appeared in workspace.json
+// but couldn't be reconstituted at boot (permission denied, user
+// skipped the pick). Surfaced in the Settings pane as "re-grant
+// needed" entries. Cleared on successful re-grant.
+let droppedRoots = [];
 let vault = null;
+
+// MULTI_PROJECT_PLAN.md Phase 3 — resolution helpers used across
+// every writer call site in this file.
+//
+// getWriteHandle() — for Boltzsidian's own artifacts: ideas/, the
+// .universe/ sidecar family (state, prune candidates, dream logs,
+// weed keep-list). Always lands in the writeRoot. Single-root users
+// have writeRoot === sole root, so this is a clean alias of the old
+// workspaceHandle reference.
+//
+// getSourceRoot(noteId) — for writes back to an EXISTING note (tend
+// stamps, panel saves, weed archive/delete). Returns the RootSpec
+// the note was read from. Caller gates on root.readOnly.
+//
+// These helpers exist so Phase-5's manifest-driven pick flow can
+// swap the source-of-truth for the writeRoot without rippling through
+// every call site.
+function getWriteHandle() {
+  const fromVault = vault?.getWriteRoot?.()?.handle;
+  return fromVault || workspaceHandle;
+}
+function getSourceRoot(noteId) {
+  return vault?.getRootForNote?.(noteId) || null;
+}
 let bodies = null;
 let labels = null;
 let physics = null;
@@ -263,7 +305,8 @@ const settingsUI = initSettings({
   getWeedKeep: () => weedKeepState,
   onWeedUnkeep: async (noteId) => {
     weedKeepState.keptIds = weedKeepState.keptIds.filter((id) => id !== noteId);
-    if (workspaceHandle) await saveWeedKeep(workspaceHandle, weedKeepState);
+    const wh = getWriteHandle();
+    if (wh) await saveWeedKeep(wh, weedKeepState);
   },
   getUtteranceStatus: () => utterance.status(),
   getClaudeApiKey: () => utterance.backends.claude.getApiKey(),
@@ -295,6 +338,17 @@ const settingsUI = initSettings({
     }
   },
   onRunTend: async (enabled) => runTendAndOpen({ enabled }),
+  // Phase 5: workspace roots panel — show connected + dropped roots,
+  // wire the re-grant button to the same single-root prompt used at
+  // boot. A successful re-grant clears the dropped entry and reopens
+  // the vault so the root's notes join the scene immediately.
+  getWorkspaceRoots: () => ({
+    roots: vault?.roots || [],
+    writeRootId: vault?.writeRootId || null,
+    dropped: droppedRoots.slice(),
+  }),
+  onReconnectRoot: async (dropped) => regrantDroppedRoot(dropped),
+  onAddRoot: async () => addProjectRoot(),
 });
 
 // Extracted so the T hotkey can also fire a fresh Tend run — the
@@ -377,8 +431,23 @@ const notePanel = createNotePanel({
   // then removeNoteEverywhere scrubs vault indices + body pool + physics
   // edges + tethers and closes the panel if it was showing this note.
   onDelete: async (note) => {
-    if (!workspaceHandle || !note) return;
-    const result = await deleteNoteFile(workspaceHandle, note.path);
+    if (!note || !vault) return;
+    // Phase 3C: delete lands on the note's SOURCE root — not
+    // writeRoot — so the file actually disappears from its project.
+    // Read-only projects reject the delete with a toast.
+    const sourceRoot = getSourceRoot(note.id);
+    if (!sourceRoot) {
+      toast(`Can't delete: unknown root for this note.`);
+      return;
+    }
+    if (sourceRoot.readOnly) {
+      toast(
+        `Can't delete — "${sourceRoot.name || sourceRoot.id}" is read-only.`,
+        { duration: 3500 },
+      );
+      return;
+    }
+    const result = await deleteNoteFile(sourceRoot.handle, note.path);
     if (!result.ok) {
       toast(`Delete failed: ${note.path}`);
       return;
@@ -401,6 +470,7 @@ const search = createSearch({
 // lazily via closures — it only becomes non-null after a workspace loads.
 ideasDrawer = createIdeasDrawer({
   getSurfaced: () => (salienceLayer ? salienceLayer.getSurfaced() : []),
+  getVault: () => vault,
   getDreamState: () => {
     if (!dream) return null;
     const phase = dream.getPhase?.();
@@ -449,6 +519,17 @@ ideasDrawer = createIdeasDrawer({
 const tendDrawer = createTendDrawer({
   onAccept: async (proposal) => {
     if (!vault || !saver) return;
+    // MULTI_PROJECT_PLAN.md Phase 3D — preempt accepts that would land on
+    // a read-only root. Saver would decline anyway, but the proposal also
+    // stamps `tended_on` which we don't want to lose to a silent skip.
+    const sourceRoot = getSourceRoot(proposal.noteId);
+    if (sourceRoot?.readOnly) {
+      toast(
+        `Can't tend — "${sourceRoot.name || sourceRoot.id}" is read-only.`,
+        { duration: 3500 },
+      );
+      return;
+    }
     const result = await applyProposal({ proposal, vault, saver });
     // An obvious-link accept adds a wikilink to the note body — the
     // vault's forward/backward maps update via reparseNote, but the
@@ -466,8 +547,16 @@ const tendDrawer = createTendDrawer({
   },
   onReject: async (proposal) => {
     if (!vault || !saver) return;
-    // Reject only stamps tended_on frontmatter — no body change, no
-    // new links — so no rebuild needed.
+    // Reject stamps `rejected:` into tended_on — still a write, so
+    // read-only roots get the same preempt as accept.
+    const sourceRoot = getSourceRoot(proposal.noteId);
+    if (sourceRoot?.readOnly) {
+      toast(
+        `Can't tend — "${sourceRoot.name || sourceRoot.id}" is read-only.`,
+        { duration: 3500 },
+      );
+      return;
+    }
     await rejectProposal({ proposal, vault, saver });
   },
   onOpenNote: (noteId) => openNote(noteId),
@@ -483,15 +572,32 @@ let weedKeepState = {
 };
 const weedDrawer = createWeedDrawer({
   onKeep: async (candidate) => {
-    if (!workspaceHandle) return;
+    const wh = getWriteHandle();
+    if (!wh) return;
     if (!weedKeepState.keptIds.includes(candidate.id)) {
       weedKeepState.keptIds.push(candidate.id);
     }
-    await saveWeedKeep(workspaceHandle, weedKeepState);
+    await saveWeedKeep(wh, weedKeepState);
   },
   onArchive: async (candidate) => {
-    if (!workspaceHandle || !vault) return;
-    const result = await archiveNote(workspaceHandle, candidate.path);
+    if (!vault) return;
+    // Source root = where the note actually lives. Archive destination
+    // = writeRoot (Boltzsidian-owned sidecar). In single-root vaults
+    // these are the same handle — fast move() path. In multi-root,
+    // copy-then-delete crosses the boundary safely.
+    const sourceRoot = getSourceRoot(candidate.id);
+    const writeHandle = getWriteHandle();
+    if (!sourceRoot || !writeHandle) return;
+    if (sourceRoot.readOnly) {
+      toast(
+        `Can't archive — "${sourceRoot.name || sourceRoot.id}" is read-only.`,
+        { duration: 3500 },
+      );
+      throw new Error("read-only");
+    }
+    const result = await archiveNote(sourceRoot.handle, candidate.path, {
+      writeHandle,
+    });
     if (!result.ok) {
       toast(`Archive failed: ${candidate.path}`);
       throw new Error(result.reason);
@@ -499,8 +605,17 @@ const weedDrawer = createWeedDrawer({
     removeNoteEverywhere(candidate.id);
   },
   onDelete: async (candidate) => {
-    if (!workspaceHandle || !vault) return;
-    const result = await deleteNoteFile(workspaceHandle, candidate.path);
+    if (!vault) return;
+    const sourceRoot = getSourceRoot(candidate.id);
+    if (!sourceRoot) return;
+    if (sourceRoot.readOnly) {
+      toast(
+        `Can't delete — "${sourceRoot.name || sourceRoot.id}" is read-only.`,
+        { duration: 3500 },
+      );
+      throw new Error("read-only");
+    }
+    const result = await deleteNoteFile(sourceRoot.handle, candidate.path);
     if (!result.ok) {
       toast(`Delete failed: ${candidate.path}`);
       throw new Error(result.reason);
@@ -510,25 +625,39 @@ const weedDrawer = createWeedDrawer({
   },
   onOpenNote: (noteId) => openNote(noteId),
   onBulkKeep: async (candidates) => {
-    if (!workspaceHandle) return;
+    const wh = getWriteHandle();
+    if (!wh) return;
     const set = new Set(weedKeepState.keptIds);
     for (const c of candidates) set.add(c.id);
     weedKeepState.keptIds = [...set];
-    await saveWeedKeep(workspaceHandle, weedKeepState);
+    await saveWeedKeep(wh, weedKeepState);
     weedDrawer.setCandidates([]);
     toast(
       `Kept ${candidates.length} note${candidates.length === 1 ? "" : "s"}.`,
     );
   },
   onBulkArchive: async (candidates) => {
-    if (!workspaceHandle) return;
+    if (!vault) return;
+    const writeHandle = getWriteHandle();
+    if (!writeHandle) return;
     let ok = 0;
+    let skipped = 0;
     for (const c of candidates) {
-      const r = await archiveNote(workspaceHandle, c.path);
+      const sourceRoot = getSourceRoot(c.id);
+      if (!sourceRoot || sourceRoot.readOnly) {
+        skipped++;
+        continue;
+      }
+      const r = await archiveNote(sourceRoot.handle, c.path, { writeHandle });
       if (r.ok) {
         removeNoteEverywhere(c.id);
         ok++;
       }
+    }
+    if (skipped > 0) {
+      console.warn(
+        `[bz] weed bulk-archive skipped ${skipped} read-only / unresolved candidates`,
+      );
     }
     weedDrawer.setCandidates([]);
     toast(`Archived ${ok} of ${candidates.length} — see .universe/archive/.`, {
@@ -568,7 +697,8 @@ function removeNoteEverywhere(noteId) {
 // the last-seen count so the growth toast doesn't re-fire on the same
 // list.
 async function openWeed() {
-  if (!workspaceHandle) {
+  const writeHandle = getWriteHandle();
+  if (!writeHandle) {
     toast("Open a workspace first.");
     return 0;
   }
@@ -576,14 +706,14 @@ async function openWeed() {
     toast("Weed is disabled in Settings.");
     return 0;
   }
-  const { candidates } = await loadPruneCandidates(workspaceHandle);
+  const { candidates } = await loadPruneCandidates(writeHandle);
   const live = filterKept(candidates, weedKeepState.keptIds);
   weedDrawer.setCandidates(live);
   // Mark the current count as seen so the soft-toast only fires when
   // the list actually grows past this baseline.
   weedKeepState.lastSeenCount = candidates.length;
   weedKeepState.lastSeenAt = new Date().toISOString();
-  saveWeedKeep(workspaceHandle, weedKeepState).catch(() => {});
+  saveWeedKeep(writeHandle, weedKeepState).catch(() => {});
   if (live.length === 0) {
     toast("Nothing to weed. The dream hasn't flagged any orphans.");
     return 0;
@@ -598,11 +728,12 @@ async function openWeed() {
 // On workspace load, re-check prune-candidates.json for growth since
 // the user last opened Weed. If growth crosses the threshold, soft-toast.
 async function checkWeedGrowth() {
-  if (!workspaceHandle) return;
+  const writeHandle = getWriteHandle();
+  if (!writeHandle) return;
   if (settings.weed_enabled === false) return;
   try {
-    weedKeepState = await loadWeedKeep(workspaceHandle);
-    const { candidates } = await loadPruneCandidates(workspaceHandle);
+    weedKeepState = await loadWeedKeep(writeHandle);
+    const { candidates } = await loadPruneCandidates(writeHandle);
     const live = filterKept(candidates, weedKeepState.keptIds);
     const growth = growthSinceLastSeen(live, weedKeepState);
     const threshold = Number(settings.weed_growth_threshold) || 5;
@@ -851,6 +982,340 @@ window.addEventListener("keydown", () => dream && dream.noteInput(), true);
 window.addEventListener("focus", () => dream && dream.noteIdleReset());
 
 // ── Workspace loading ───────────────────────────────────────
+
+// MULTI_PROJECT_PLAN.md Phase 5: resolve the on-disk manifest (if any)
+// before the vault walks. The returned shape drops straight into
+// openVault — either `{ handle, kind }` for legacy single-root or
+// `{ manifest }` for a multi-root workspace with every root's handle
+// hydrated.
+async function resolveWorkspaceManifest(ws) {
+  const singleRoot = () => ({
+    openVaultArg: { handle: ws.handle, kind: ws.kind },
+    manifest: null,
+    dropped: [],
+  });
+
+  // Demo (OPFS) workspaces are always single-root — don't even look
+  // for a manifest. They ship pre-authored.
+  if (ws.kind === "demo") return singleRoot();
+
+  let manifest;
+  try {
+    manifest = await loadManifestFromHandle(ws.handle);
+  } catch (err) {
+    console.warn("[bz] manifest read failed, using single-root fallback", err);
+    return singleRoot();
+  }
+  if (!manifest) return singleRoot();
+
+  const writeRoot = manifest.roots.find((r) => r.id === manifest.writeRootId);
+  if (!writeRoot) {
+    console.warn(
+      `[bz] manifest writeRootId "${manifest.writeRootId}" not in roots; falling back to single-root`,
+    );
+    return singleRoot();
+  }
+  // The folder the user just picked IS the writeRoot, regardless of
+  // which id the manifest assigns it. Pin the live handle + kind
+  // there; every other root reconstitutes via IDB or user pick.
+  writeRoot.handle = ws.handle;
+  writeRoot.kind = ws.kind;
+
+  const additional = manifest.roots.filter(
+    (r) => r.id !== manifest.writeRootId,
+  );
+  const pending = []; // handle in IDB, permission lapsed
+  const missing = []; // no handle in IDB yet
+  for (const root of additional) {
+    try {
+      const h = await loadRootHandle(root.id);
+      if (!h) {
+        missing.push(root);
+        continue;
+      }
+      const state = await h.queryPermission({ mode: "readwrite" });
+      if (state === "granted") {
+        root.handle = h;
+        root.kind = "project";
+      } else {
+        root.handle = h; // attach so requestPermission reuses it
+        pending.push(root);
+      }
+    } catch (err) {
+      console.warn(`[bz] root "${root.id}" IDB lookup failed`, err);
+      missing.push(root);
+    }
+  }
+
+  const dropped = [];
+  if (pending.length || missing.length) {
+    await resolveRootsInteractively({ pending, missing, dropped });
+  }
+
+  // Drop any root that never got a handle. writeRoot is always hydrated
+  // via ws.handle so it survives. A dropped root gets surfaced via the
+  // dropped[] return — callers (setWorkspace) toast about it.
+  manifest.roots = manifest.roots.filter((r) => r.handle);
+
+  return { openVaultArg: { manifest }, manifest, dropped };
+}
+
+// Walk the pending/missing lists one root at a time, asking the user
+// to grant access to each. Each step shows a toast with a Grant/Skip
+// button — single-step flow is important because each FS Access pick
+// consumes the page's transient user activation, so batching multiple
+// pickers into one click handler fails on the second pick.
+async function resolveRootsInteractively({ pending, missing, dropped }) {
+  for (const root of pending) {
+    const granted = await promptPermission(root);
+    if (!granted) {
+      root.handle = null;
+      dropped.push({ id: root.id, name: root.name, reason: "permission" });
+    }
+  }
+  for (const root of missing) {
+    const handle = await promptPickRoot(root);
+    if (handle) {
+      root.handle = handle;
+      root.kind = "project";
+      try {
+        await saveRootHandle(root.id, handle);
+      } catch (err) {
+        console.warn(`[bz] saveRootHandle("${root.id}") failed`, err);
+      }
+    } else {
+      dropped.push({ id: root.id, name: root.name, reason: "not-picked" });
+    }
+  }
+}
+
+function promptPermission(root) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (ok) => {
+      if (settled) return;
+      settled = true;
+      resolve(ok);
+    };
+    toast.actions(
+      `Reconnect to project "${root.name || root.id}"?`,
+      [
+        {
+          label: "Grant",
+          kind: "primary",
+          onClick: async () => {
+            try {
+              const state = await root.handle.requestPermission({
+                mode: "readwrite",
+              });
+              done(state === "granted");
+            } catch (err) {
+              console.warn(`[bz] requestPermission("${root.id}") failed`, err);
+              done(false);
+            }
+          },
+        },
+        { label: "Skip", onClick: () => done(false) },
+      ],
+      { duration: 60000 },
+    );
+    window.setTimeout(() => done(false), 65000);
+  });
+}
+
+function promptPickRoot(root) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (handle) => {
+      if (settled) return;
+      settled = true;
+      resolve(handle);
+    };
+    toast.actions(
+      `Workspace references project "${root.name || root.id}" — pick its folder?`,
+      [
+        {
+          label: "Pick folder",
+          kind: "primary",
+          onClick: async () => {
+            try {
+              const handle = await window.showDirectoryPicker({
+                mode: "readwrite",
+                id: `boltzsidian-root-${root.id}`,
+                startIn: "documents",
+              });
+              done(handle);
+            } catch (err) {
+              if (err?.name !== "AbortError") {
+                console.warn(`[bz] pick root "${root.id}" failed`, err);
+              }
+              done(null);
+            }
+          },
+        },
+        { label: "Skip", onClick: () => done(null) },
+      ],
+      { duration: 60000 },
+    );
+    window.setTimeout(() => done(null), 65000);
+  });
+}
+
+// Re-drive the grant flow for a root that got dropped at boot. Used
+// by the Settings pane's per-root "Re-grant" button. On success we
+// patch the live vault's manifest + walk the new root's notes in,
+// then rebuild physics/tethers/etc. A failed re-grant leaves the
+// entry in droppedRoots so the user can try again.
+async function regrantDroppedRoot(entry) {
+  if (!entry?.id) return false;
+  if (!vault || !vault.manifest) {
+    toast("Open a workspace first.");
+    return false;
+  }
+  // Look up the manifest entry by id. It may have been filtered out
+  // of vault.roots but should still be in vault.manifest.roots (which
+  // we trim too — so re-read workspace.json to recover the spec).
+  let root = vault.manifest.roots.find((r) => r.id === entry.id);
+  if (!root) {
+    let disk;
+    try {
+      disk = await loadManifestFromHandle(getWriteHandle());
+    } catch (err) {
+      console.warn("[bz] regrant: manifest reread failed", err);
+    }
+    root = disk?.roots?.find((r) => r.id === entry.id);
+  }
+  if (!root) {
+    toast(`Can't re-grant — "${entry.id}" is no longer in workspace.json.`);
+    droppedRoots = droppedRoots.filter((d) => d.id !== entry.id);
+    return false;
+  }
+
+  // Try IDB first — the handle may have survived even though its
+  // permission lapsed between sessions.
+  let handle = null;
+  try {
+    const stored = await loadRootHandle(entry.id);
+    if (stored) {
+      root.handle = stored;
+      handle = (await promptPermission(root)) ? stored : null;
+    }
+  } catch (err) {
+    console.warn("[bz] regrant: IDB lookup failed", err);
+  }
+  if (!handle) {
+    handle = await promptPickRoot(root);
+    if (handle) {
+      try {
+        await saveRootHandle(entry.id, handle);
+      } catch (err) {
+        console.warn("[bz] regrant: saveRootHandle failed", err);
+      }
+    }
+  }
+  if (!handle) return false;
+
+  droppedRoots = droppedRoots.filter((d) => d.id !== entry.id);
+  toast(`Connected "${root.name || root.id}". Reloading…`, { duration: 2000 });
+  // Reload rather than reopen in place — the full vault pipeline
+  // (bodies / physics / tethers / search / salience / dream) is
+  // wired at setWorkspace time and isn't designed for mid-session
+  // rebuilds. A reload is predictable and takes ~1s; a broken
+  // in-place rebuild loses work. Revisit when Phase 7 ships a
+  // proper workspace-swap flow.
+  window.setTimeout(() => window.location.reload(), 600);
+  return true;
+}
+
+// Settings → Workspace → "Add project root". Must run inside the
+// user-click handler: showDirectoryPicker consumes the page's
+// transient activation, so any async work before the picker call
+// risks "SecurityError: must be handling a user gesture".
+async function addProjectRoot() {
+  if (workspaceKind !== "user") {
+    toast("Project roots can only be added to a user workspace.");
+    return false;
+  }
+  if (!vault) {
+    toast("Open a workspace first.");
+    return false;
+  }
+  let handle;
+  try {
+    handle = await window.showDirectoryPicker({
+      mode: "readwrite",
+      id: "boltzsidian-root-add",
+      startIn: "documents",
+    });
+  } catch (err) {
+    if (err?.name === "AbortError") return false;
+    console.warn("[bz] addProjectRoot: pick failed", err);
+    toast(err.message ?? "Could not open folder.");
+    return false;
+  }
+
+  try {
+    // Load the current on-disk manifest. If the workspace has been
+    // single-root so far there's no file yet — synthesise one from
+    // the live writeRoot before appending.
+    const writeHandle = getWriteHandle();
+    if (!writeHandle) {
+      toast("No write root available.");
+      return false;
+    }
+    let manifest = await loadManifestFromHandle(writeHandle);
+    if (!manifest) {
+      manifest = synthesizeSingleRootManifest(writeHandle, {
+        kind: "user",
+        id: vault.writeRootId || undefined,
+        name: workspaceHandle?.name || undefined,
+      });
+    }
+    // Strip runtime-only fields the serializer would reject.
+    for (const r of manifest.roots) {
+      delete r.handle;
+      delete r.kind;
+    }
+
+    // Derive a stable kebab-case id from the folder name, collision-
+    // suffix if we already have one with that id.
+    const baseId = deriveRootId(handle.name);
+    const takenIds = new Set(manifest.roots.map((r) => r.id));
+    let id = baseId;
+    let n = 2;
+    while (takenIds.has(id)) id = `${baseId}-${n++}`;
+
+    manifest.roots.push({
+      id,
+      name: handle.name || id,
+      path: handle.name || id,
+      readOnly: false,
+      include: [],
+      exclude: manifest.defaultExcludes?.slice() || DEFAULT_EXCLUDES.slice(),
+    });
+
+    await saveManifestToHandle(writeHandle, manifest);
+    await saveRootHandle(id, handle);
+
+    toast(`Added "${handle.name}" · reloading…`, { duration: 2000 });
+    window.setTimeout(() => window.location.reload(), 600);
+    return true;
+  } catch (err) {
+    console.error("[bz] addProjectRoot failed", err);
+    toast(err.message ?? "Could not add project root.");
+    return false;
+  }
+}
+
+function deriveRootId(name) {
+  return (
+    String(name || "root")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "root"
+  );
+}
+
 async function setWorkspace(ws) {
   workspaceHandle = ws.handle;
   workspaceKind = ws.kind;
@@ -862,7 +1327,22 @@ async function setWorkspace(ws) {
 
   try {
     const t0 = performance.now();
-    vault = await openVault(ws.handle, {
+    // MULTI_PROJECT_PLAN.md Phase 5: resolve workspace.json (if any)
+    // before the walker runs. Single-root users hit the legacy
+    // `{ handle, kind }` path unchanged — nothing on disk references
+    // extra roots so resolveWorkspaceManifest returns singleRoot().
+    const resolved = await resolveWorkspaceManifest(ws);
+    if (resolved.dropped.length > 0) {
+      const list = resolved.dropped.map((d) => d.name || d.id).join(", ");
+      toast(
+        `Skipped ${resolved.dropped.length} project root${resolved.dropped.length === 1 ? "" : "s"}: ${list}. Re-grant from Settings.`,
+        { duration: 6000 },
+      );
+      console.warn("[bz] dropped roots:", resolved.dropped);
+    }
+    droppedRoots = resolved.dropped.slice();
+
+    vault = await openVault(resolved.openVaultArg, {
       settings,
       onProgress: ({ read, total }) => {
         statsHud.textContent = `reading ${read} / ${total} notes…`;
@@ -1079,12 +1559,10 @@ async function setWorkspace(ws) {
           }
         }
         try {
-          if (workspaceHandle && artifacts.pruneCandidates.length)
-            await writePruneCandidates(
-              workspaceHandle,
-              artifacts.pruneCandidates,
-            );
-          if (workspaceHandle) await writeDreamLog(workspaceHandle, artifacts);
+          const writeHandle = getWriteHandle();
+          if (writeHandle && artifacts.pruneCandidates.length)
+            await writePruneCandidates(writeHandle, artifacts.pruneCandidates);
+          if (writeHandle) await writeDreamLog(writeHandle, artifacts);
         } catch (err) {
           console.warn("[bz] dream artifact write failed", err);
         }
@@ -1303,6 +1781,18 @@ function frameOnContents() {
 async function handleSave(note, rawText) {
   if (!saver) throw new Error("no saver — workspace not open");
   const result = await saver(note, rawText);
+  // Phase 3: saver may decline on a read-only root. Surface the
+  // reason so the user knows why their edit didn't persist.
+  if (result && result.applied === false) {
+    if (result.reason === "read-only") {
+      toast("Can't save — this note lives in a read-only project root.", {
+        duration: 3500,
+      });
+    } else if (result.reason === "no-root") {
+      toast("Can't save — unknown root for this note.", { duration: 3500 });
+    }
+    return result;
+  }
   // Edits may have changed outgoing links. Rebuild physics + tethers.
   if (physics) physics.rebuildEdges();
   if (tethers) tethers.rebuild();
@@ -1339,7 +1829,7 @@ function handleNoteChanged(note, { renameResult }) {
 // the .universe/state.json file.
 let persistTimer = 0;
 function persistStateSoon() {
-  if (!workspaceHandle) return;
+  if (!getWriteHandle()) return;
   if (persistTimer) return;
   persistTimer = window.setTimeout(() => {
     persistTimer = 0;
@@ -1348,7 +1838,8 @@ function persistStateSoon() {
 }
 
 function persistState() {
-  if (!workspaceHandle || !vault || !bodies) return;
+  const writeHandle = getWriteHandle();
+  if (!writeHandle || !vault || !bodies) return;
   const positions = {};
   for (const n of vault.notes) {
     const p = bodies.positionOf(n.id);
@@ -1360,7 +1851,7 @@ function persistState() {
     kmatrix: kmatrix ? kmatrix.serialize() : null,
     savedAt: Date.now(),
   };
-  saveState(workspaceHandle, state).catch(() => {});
+  saveState(writeHandle, state).catch(() => {});
   stateDirty = false;
 }
 
@@ -1372,9 +1863,23 @@ function createNewNote() {
   }
   if (!bodies) return;
 
-  const taken = new Set(vault.notes.map((n) => n.path));
+  // MULTI_PROJECT_PLAN.md Phase 3E — new notes always land in writeRoot.
+  // Path uniqueness is scoped to the writeRoot's notes only so two
+  // projects can each have "Untitled.md" without clashing.
+  const writeRoot = vault.getWriteRoot?.();
+  const writeRootId = writeRoot?.id || null;
+  const taken = new Set(
+    vault.notes
+      .filter((n) => !n.rootId || n.rootId === writeRootId)
+      .map((n) => n.path),
+  );
   const path = uniquePath("", titleToStem("Untitled"), taken);
-  const note = makeEmptyNote({ path, title: "Untitled", settings });
+  const note = makeEmptyNote({
+    path,
+    title: "Untitled",
+    settings,
+    rootId: writeRootId,
+  });
   const seed = "# Untitled\n\n";
   note.body = seed;
   note.rawText = seed;
@@ -1937,6 +2442,9 @@ if (import.meta.env && import.meta.env.DEV) {
     get handle() {
       return workspaceHandle;
     },
+    get writeHandle() {
+      return getWriteHandle();
+    },
     get vault() {
       return vault;
     },
@@ -1992,6 +2500,53 @@ if (import.meta.env && import.meta.env.DEV) {
     modelFace,
     get sparks() {
       return sparks;
+    },
+    // MULTI_PROJECT_PLAN.md Phase 1 dev hooks. Smoke-test the parser
+    // / synthesiser from the console without touching the running
+    // vault. Will be removed or promoted to real API in later phases.
+    __parseManifest: (input) => parseManifest(input),
+    __serializeManifest: (manifest) => serializeManifest(manifest),
+    __synthesizeSingleRootManifest: synthesizeSingleRootManifest,
+    __defaultExcludes: () => DEFAULT_EXCLUDES.slice(),
+    // Phase 5 helpers for exercising the manifest-on-disk flow.
+    // Typical script: write a manifest, reload the tab, accept the
+    // pick prompts, verify vault spans all roots.
+    __loadManifestFromDisk: async () => {
+      const wh = getWriteHandle();
+      if (!wh) throw new Error("no write handle");
+      return loadManifestFromHandle(wh);
+    },
+    __saveManifestToDisk: async (manifest) => {
+      const wh = getWriteHandle();
+      if (!wh) throw new Error("no write handle");
+      await saveManifestToHandle(wh, manifest);
+    },
+    __loadRootHandle: (id) => loadRootHandle(id),
+    __deleteRootHandle: (id) => deleteRootHandle(id),
+    __droppedRoots: () => droppedRoots.slice(),
+    // Phase 2 smoke-test — reopen the current vault with an arbitrary
+    // manifest. Caller is responsible for attaching `handle` and
+    // `kind` to each root. Synthetic tests (point two root entries
+    // at the same handle) use this to exercise the merge path
+    // without picking a second directory.
+    __reopenWithManifest: async (manifest) => {
+      if (!manifest || !manifest.roots) {
+        throw new Error("__reopenWithManifest: expected a parsed manifest");
+      }
+      const next = await openVault(
+        { manifest },
+        { settings, onProgress: null },
+      );
+      vault = next;
+      if (search?.invalidate) search.invalidate();
+      return {
+        notes: next.notes.length,
+        roots: next.roots.map((r) => r.id),
+        titleBuckets: next.byTitle.size,
+        collisions: [...next.byTitle.entries()]
+          .filter(([, arr]) => arr.length > 1)
+          .map(([title, arr]) => ({ title, count: arr.length })),
+      };
     },
     dreamNow: () => dream && dream.dreamNow(),
     camera,

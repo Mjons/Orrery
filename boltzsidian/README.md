@@ -30,8 +30,8 @@ and you will see exactly what gets sent before any request.
 
 ## Status
 
-Pre-alpha. Phase 0 scaffolding. See [../BUILD_PLAN.md](../BUILD_PLAN.md) for
-the roadmap and [../WORKSPACE.md](../WORKSPACE.md) for the product spec.
+Pre-alpha. Phase 0 scaffolding. See [../docs/BUILD_PLAN.md](../docs/BUILD_PLAN.md) for
+the roadmap and [../docs/WORKSPACE.md](../docs/WORKSPACE.md) for the product spec.
 
 ## License
 

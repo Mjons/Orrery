@@ -119,43 +119,29 @@ Rules:
   // hallucinations" live: one speculative sentence naming the tension,
   // hypothesis, or question that joins two specific parent notes.
   "idea-seed": {
-    system: `You are the idea-hallucinator of a note universe. Tonight, two of the user's notes drifted near each other while EACH was AMPLIFYING one of its own real attributes more than it usually does. Your job: produce ONE speculative sentence or fragment that names the genuine tension, hypothesis, or claim that falls out of that specific collision — with each note's amplified attribute treated as its loudest aspect right now.
+    system: `You are the idea-hallucinator of a note universe. Tonight two of the user's notes drifted near each other. You have been given short EXCERPTS from each note's body — not just titles. Your job is to propose one defensible idea the collision implies, and back it up with a literal quote from each note.
 
-Both notes are still themselves. Never invent titles, tags, folders, or dates. But ONE attribute on each has gone loud — you will be told which in the user prompt as "A loud tonight:" and "B loud tonight:". Over-read them. The point isn't to balance the six slots; the point is to hear what these two specific warped attributes imply together.
+Both notes are still themselves. Never invent titles, tags, folders, dates, or any text that doesn't appear in the excerpts. ONE attribute on each has gone loud tonight ("A loud tonight:", "B loud tonight:") — over-read those when forming the claim.
 
-Think of yourself as a late-night collaborator blurting out "wait — when A is loud about its #decision tag and B is loud about its folder, these two are actually describing the same pressure from different sides."
+Output STRICTLY this JSON (nothing before, nothing after, no markdown fences):
 
-Examples of the voice. Study the shape: short, specific, mostly claims, fragments preferred. Claims outnumber questions roughly 2-to-1.
-
-  "anti-mysticism as a quiet constraint on which AI surfaces Panel Haus can ship."
-  "File System Access and first-run experience — same trust moment, different layer."
-  "Pro tier justifies itself only if the voice backends are visible to the user."
-  "#decision loud on anti-mysticism tonight: a way to ship without pretending to be sure."
-  "Does panel-haus's pricing strategy only work if observer chorus is cheap enough to run?"
-  "The #decision notes might be describing ONE slow decision, broken across four files."
-  "Panel Haus in folder-mode against first-run-experience in age-mode — same product, two deadlines."
-  "boltzsidian folder is a case study in its own anti-mysticism rule."
-  "Michael's staleness is doing the talking tonight; the decision tag is just the alibi."
-  "Export formats and Voice to panel — maybe the same UX gesture from opposite ends."
-  "observer chorus wearing its age, anti-mysticism wearing its folder — one missed deadline from both sides."
-  "first-run experience is doing the job anti-mysticism was supposed to do."
-  "Does Michael keep showing up near anti-mysticism because both resist the same thing?"
-  "#decision on A, age-gap on B — the lag between deciding and admitting it."
+{"claim":"…","evidence_a":"literal phrase copied from A's excerpt","evidence_b":"literal phrase copied from B's excerpt","next":"one concrete thing the user could do with this"}
 
 Rules:
-- Output exactly ONE sentence or fragment. Nothing else. No preamble, no bullets, no quotes around the whole thing.
-- ≤ 22 words. Short, pointed, specific.
-- Reference BOTH parent notes — by real title, shared tag, shared folder, or their amplified attributes.
-- Use the \`a_warped\` / \`b_warped\` slots as the loudest thing in the room. Write about what the collision of those TWO amplified attributes implies.
-- Never invent titles, tags, folders, or dates beyond the slot values provided.
-- Prefer CLAIMS. Fragments beat full sentences. "X as Y," "X — Y, from the other side," "A's W is louder than its V tonight" all beat "X is Y."
-- Questions are allowed but capped — no more than about 1 in 3 outputs should end in a question mark. When you do ask, it should be a genuine "does X only work if Y?" — not a lazy "what if X?"
-- Do NOT be mystical, cosmic, or aphoristic.
-- Do NOT prescribe action — no "you should merge these," "consider writing...". The idea itself is the action.
-- Do NOT summarise the pair — that's a readout.
-- Do NOT use essay-register words. Banned: "recurring," "personification," "manifestation," "suggests that," "serves to," "highlights the," "illustrates," "embodies," "speaks to." The voice is conversational, not academic.
+- claim: ONE sentence or fragment, ≤ 22 words. Names the tension, hypothesis, or lopsided connection the two warped attributes imply. Mentions at least one note by real title OR by a shared attribute (tag, folder). Claims outnumber questions ~2-to-1 across many generations — when you ask, it should be a genuine "does X only work if Y?"
+- evidence_a: a CONTIGUOUS substring of note A's excerpt, copied EXACTLY. 4–20 words. Pick the phrase that most directly supports the claim. If no phrase in the excerpt really supports the claim, output an empty string "" — do not paraphrase, do not stitch.
+- evidence_b: same rules against note B's excerpt. 4–20 words, literal, exact.
+- next: ONE sentence, ≤ 16 words. A concrete thing the user could do with this idea — write a new note, add a link, revise a decision, re-read something. Not fluffy ("think about this"). Actionable.
+- No essay register. Banned words: "recurring," "personification," "manifestation," "suggests that," "serves to," "highlights the," "illustrates," "embodies," "speaks to."
+- Never invent vault content beyond what's in the excerpts / slots.
+- Never prescribe outside the "next" field.
+- No mystical, cosmic, or aphoristic register.
 
-The goal: name a specific, chewable thought the two notes — with their amplified attributes — imply together.`,
+Example output:
+
+{"claim":"anti-mysticism as a quiet constraint on which AI surfaces Panel Haus can ship.","evidence_a":"the tools persist beyond their intent","evidence_b":"every new surface needs a grounding","next":"add a link from Panel Haus to anti-mysticism with a one-line gloss."}
+
+The goal: a defensible, quotable idea. The user should be able to verify the evidence by opening either note and finding the phrase verbatim.`,
     user: (snap) => buildIdeaSeedUserPrompt(snap),
   },
 
@@ -277,6 +263,39 @@ Rules:
 
 The goal: name what the night was about.`,
     user: (snap) => buildMorningSynthesisUserPrompt(snap),
+  },
+
+  // ── idea-adversary: Phase C ───────────────────────────────
+  //
+  // Each judge-selected survivor gets one adversarial pass. Model
+  // names the strongest reason the claim is wrong/trivial/lazy. If
+  // there's a real counter, the counter BECOMES the new surfaced
+  // idea; if the survivor holds up, it gets a resilience flag.
+  //
+  // Output is strict JSON so the salience layer can parse it. Two
+  // possible shapes: "survives" (the original claim holds) or
+  // "replaced" (the counter is sharper and should take its place).
+  "idea-adversary": {
+    system: `You are the adversary of a note-universe dream. You are handed one proposed idea with its supporting evidence from two notes. Your job: attack it. Name the strongest reason this claim is wrong, trivial, lazy, or a restatement of something obvious. If there is no strong counter, say so.
+
+Output STRICTLY this JSON and nothing else — no markdown, no preamble:
+
+If the claim survives attack:
+{"verdict":"survives","reason":"one complete sentence naming why the claim holds even under pressure"}
+
+If you can produce a sharper counter-claim that better reads the same evidence:
+{"verdict":"replaced","counter_claim":"one sentence, ≤22 words","counter_next":"one sentence ≤16 words","reason":"one sentence naming what the original got wrong"}
+
+Rules:
+- A counter must use the SAME evidence already in the original — the quotes from A and B don't change. You're reading the same two passages better, not finding new ones.
+- "survives" is not a lazy cop-out. Only use it when the original is genuinely strong. If you can even slightly sharpen it, use "replaced".
+- counter_claim must read as a real claim or question, not a negation ("X is wrong" doesn't count; "the real tension is Y, not X" does).
+- Never invent new vault content. Don't reference tags, titles, folders, or quotes that weren't already in the input.
+- Tone: direct, specific, dry. Banned: "could be," "perhaps," "maybe," "one might argue." Commit.
+- reason: ONE sentence, ≤ 25 words, naming what made the claim weak or why it held.
+
+The goal: every idea that reaches the drawer has either survived an argument or IS an argument.`,
+    user: (snap) => buildIdeaAdversaryUserPrompt(snap),
   },
 
   // ── tend-reason-polish: Tend Level 1 ──────────────────────
@@ -704,9 +723,9 @@ function buildChorusUserPrompt(snapshot) {
 // summary. Nothing is invented; warp just points at an existing slot.
 function buildIdeaSeedUserPrompt(snapshot) {
   const parts = [];
-  if (snapshot.a_title) parts.push(`note A: ${snapshot.a_title}`);
+  if (snapshot.a_title) parts.push(`note A title: ${snapshot.a_title}`);
   if (snapshot.a_warped) parts.push(`A loud tonight: ${snapshot.a_warped}`);
-  if (snapshot.b_title) parts.push(`note B: ${snapshot.b_title}`);
+  if (snapshot.b_title) parts.push(`note B title: ${snapshot.b_title}`);
   if (snapshot.b_warped) parts.push(`B loud tonight: ${snapshot.b_warped}`);
   if (snapshot.shared_tag) parts.push(`shared tag: ${snapshot.shared_tag}`);
   if (snapshot.shared_folder)
@@ -717,7 +736,55 @@ function buildIdeaSeedUserPrompt(snapshot) {
     parts.push(`B folder: ${snapshot.b_folder}`);
   if (snapshot.age_gap) parts.push(`age gap: ${snapshot.age_gap}`);
   const slots = parts.length > 0 ? parts.join(" · ") : "no grounded slots";
-  return `Two notes drifted near each other tonight. Each is amplifying ONE of its own attributes more than usual. Name the idea that falls out of that specific collision.\nSlots: ${slots}`;
+
+  const lines = [
+    "Two notes drifted near each other tonight. Each is amplifying ONE of its own attributes more than usual. Name the idea that falls out of that specific collision — and cite a phrase from each note's body to back it up.",
+    "",
+    `Slots: ${slots}`,
+    "",
+  ];
+  if (snapshot.a_excerpt) {
+    lines.push(`Excerpt from "${snapshot.a_title || "A"}":`);
+    lines.push(snapshot.a_excerpt);
+    lines.push("");
+  }
+  if (snapshot.b_excerpt) {
+    lines.push(`Excerpt from "${snapshot.b_title || "B"}":`);
+    lines.push(snapshot.b_excerpt);
+    lines.push("");
+  }
+  lines.push(
+    'Respond with JSON only: {"claim":"…","evidence_a":"…","evidence_b":"…","next":"…"}',
+  );
+  return lines.join("\n");
+}
+
+// idea-adversary user prompt — feeds the survivor's full structured
+// content and the pair's slot metadata so the model can form a real
+// counter-claim rather than a hand-wave.
+function buildIdeaAdversaryUserPrompt(snapshot) {
+  const {
+    claim = "",
+    evidenceA = "",
+    evidenceB = "",
+    nextAction = "",
+    a_title = "",
+    b_title = "",
+  } = snapshot;
+  const lines = [
+    "A dream just judged this idea a survivor. Your job: attack it.",
+    "",
+    `Claim: ${claim}`,
+    "",
+  ];
+  if (evidenceA) lines.push(`Evidence from "${a_title}": "${evidenceA}"`);
+  if (evidenceB) lines.push(`Evidence from "${b_title}": "${evidenceB}"`);
+  if (nextAction) lines.push(`Original next-step: ${nextAction}`);
+  lines.push("");
+  lines.push(
+    'Respond with JSON only: either {"verdict":"survives","reason":"…"} or {"verdict":"replaced","counter_claim":"…","counter_next":"…","reason":"…"}',
+  );
+  return lines.join("\n");
 }
 
 // tend-reason-polish user prompt — hands over the exact original
