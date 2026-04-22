@@ -727,6 +727,110 @@
       /* Suggestions row — heuristic tag + link chips beneath the
        * CodeMirror pane. Two labeled sections (tags / links). :empty
        * hides the container so there's no visual cost when idle. */
+      #note-panel .panel-connections {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 10px 22px 8px;
+        border-top: 1px solid var(--glass-border);
+        background: rgba(0, 0, 0, 0.18);
+        max-height: min(34vh, 320px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(138, 180, 255, 0.28) transparent;
+      }
+      #note-panel .panel-connections::-webkit-scrollbar {
+        width: 8px;
+      }
+      #note-panel .panel-connections::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      #note-panel .panel-connections::-webkit-scrollbar-thumb {
+        background: rgba(138, 180, 255, 0.22);
+        border: 2px solid transparent;
+        background-clip: content-box;
+        border-radius: 8px;
+      }
+      #note-panel .panel-connections::-webkit-scrollbar-thumb:hover {
+        background: rgba(138, 180, 255, 0.45);
+        background-clip: content-box;
+      }
+      #note-panel .panel-connections:empty {
+        display: none;
+      }
+      #note-panel .con-section {
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        column-gap: 10px;
+        align-items: start;
+      }
+      #note-panel .con-section + .con-section {
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.06);
+      }
+      #note-panel .con-label {
+        font-size: 9px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        text-align: right;
+        user-select: none;
+        padding-top: 4px;
+      }
+      #note-panel .con-label-count {
+        display: block;
+        font-size: 14px;
+        letter-spacing: 0;
+        color: var(--text-dim);
+        margin-top: 2px;
+      }
+      #note-panel .con-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+      #note-panel .con-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text-dim);
+        font: inherit;
+        font-size: 11px;
+        cursor: pointer;
+        transition:
+          color 120ms ease,
+          background 120ms ease,
+          border-color 120ms ease;
+      }
+      #note-panel .con-chip:hover {
+        color: var(--text);
+        background: rgba(138, 180, 255, 0.1);
+        border-color: rgba(138, 180, 255, 0.4);
+      }
+      #note-panel .con-chip.broken {
+        color: var(--text-faint);
+        font-style: italic;
+        cursor: default;
+      }
+      #note-panel .con-chip.broken:hover {
+        background: rgba(255, 255, 255, 0.03);
+        border-color: rgba(255, 255, 255, 0.12);
+      }
+      #note-panel .con-chip-text {
+        max-width: min(220px, 42vw);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       #note-panel .panel-suggestions {
         flex: 0 0 auto;
         display: flex;
@@ -2048,6 +2152,7 @@
         }
       }
       #model-face .mface-expr {
+        transform-box: fill-box;
         transform-origin: center;
         /* Eye tracking — JS pushes --mface-eye-dx / --mface-eye-dy
          * (SVG viewBox units, range ~±4.5) every frame so the whole
@@ -2059,6 +2164,12 @@
         );
       }
       #model-face .mface-expr .mface-scribble {
+        /* Critical: without transform-box: fill-box, SVG children
+         * resolve `transform-origin: center` against the outer
+         * viewBox (0,0) — so a blink scales toward the face center
+         * and the eye visibly "flies up" instead of closing in place.
+         * fill-box anchors each scribble to its own bounding box. */
+        transform-box: fill-box;
         transform-origin: center;
         animation: mface-slow-blink 11s ease-in-out infinite;
       }
@@ -3891,6 +4002,7 @@
         </div>
       </header>
       <article class="panel-body"></article>
+      <aside class="panel-connections" aria-label="Connections"></aside>
       <aside class="panel-suggestions" aria-label="Suggestions"></aside>
       <footer class="panel-meta"></footer>
     </aside>

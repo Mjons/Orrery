@@ -93,11 +93,18 @@ export function createLabels({
     el.addEventListener("mouseenter", () => {
       const id = noteIdBySlot[i];
       if (!id) return;
-      el.style.color = "rgba(255, 186, 122, 0.95)";
+      // Invert for readability: black text on white chip. The text
+      // shadow we use at rest (a dark glow for contrast against the
+      // starfield) would fight the white background, so drop it.
+      el.style.color = "rgba(0, 0, 0, 0.95)";
+      el.style.background = "rgba(255, 255, 255, 0.96)";
+      el.style.textShadow = "none";
       if (onLabelHover) onLabelHover(id);
     });
     el.addEventListener("mouseleave", () => {
       el.style.color = "rgba(215, 219, 228, 0.65)";
+      el.style.background = "transparent";
+      el.style.textShadow = "0 0 8px rgba(0, 0, 0, 0.8)";
       if (onLabelHover) onLabelHover(null);
     });
     el.addEventListener("click", (e) => {
@@ -226,6 +233,12 @@ export function createLabels({
       el0.style.fontSize = "13px";
       el0.style.fontWeight = "500";
       el0.style.opacity = "1";
+      // Hover-mode surfacing → black-on-white for legibility against
+      // any starfield colour. Reset by the "always"-mode branch below
+      // and by the mouseleave handler.
+      el0.style.color = "rgba(0, 0, 0, 0.95)";
+      el0.style.background = "rgba(255, 255, 255, 0.96)";
+      el0.style.textShadow = "none";
       el0.style.pointerEvents = modifierHeld ? "none" : "auto";
       noteIdBySlot[0] = targetId;
       // Fire the full hover experience (orange flare + orbit ring) the
