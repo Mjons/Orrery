@@ -647,6 +647,13 @@
       #note-panel[data-mode="edit"] .panel-body {
         padding: 0;
         overflow: hidden;
+        /* Must be a flex column in edit mode so .panel-editor's
+         * `flex: 1 1 auto` resolves to a real bounded height.
+         * Without this, the whole CodeMirror chain collapses to
+         * content height and the .cm-scroller never overflows —
+         * so mouse wheel does nothing. */
+        display: flex;
+        flex-direction: column;
       }
       #note-panel .cm-host {
         flex: 1 1 auto;
