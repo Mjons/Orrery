@@ -54,13 +54,23 @@ export function createBrief({
       hide();
     });
     panel.classList.add("show");
+    panel.removeAttribute("inert");
     panel.setAttribute("aria-hidden", "false");
     document.addEventListener("keydown", onKey, true);
   }
 
   function hide() {
     if (!isOpen()) return;
+    // Move focus OUT of the panel before hiding — otherwise the close
+    // button (which just received focus from the click) remains focused
+    // inside an aria-hidden ancestor, which browsers now block with
+    // the accessibility warning. `inert` enforces the hide on AT AND
+    // blocks focus; aria-hidden stays for legacy tools.
+    if (panel.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
     panel.classList.remove("show");
+    panel.setAttribute("inert", "");
     panel.setAttribute("aria-hidden", "true");
     document.removeEventListener("keydown", onKey, true);
     onDismissEarly?.();
