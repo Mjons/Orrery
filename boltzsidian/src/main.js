@@ -2968,6 +2968,24 @@ window.addEventListener("keydown", (e) => {
     coachmarks.markSeen("cmd-k");
   }
 
+  // Cmd/Ctrl+Shift+L → keyword-link picker (KEYWORD_LINK.md Phase E).
+  // Held before the isEditable / modifier early-returns so it works
+  // even when a note is open in edit mode — the picker is a separate
+  // modal and shouldn't be blocked by editor focus.
+  if (
+    (e.metaKey || e.ctrlKey) &&
+    e.shiftKey &&
+    (e.key === "l" || e.key === "L")
+  ) {
+    e.preventDefault();
+    if (!vault) {
+      toast("Open a workspace first.");
+      return;
+    }
+    keywordLinkPicker?.open?.({});
+    return;
+  }
+
   if (isEditable) return;
   // Ignore if any modifier is held — leaves browser shortcuts alone.
   if (e.metaKey || e.ctrlKey || e.altKey) return;

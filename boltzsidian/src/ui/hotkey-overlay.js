@@ -42,6 +42,19 @@ const GROUPS = [
     ],
   },
   {
+    title: "Bulk linking",
+    items: [
+      {
+        keys: ["Cmd", "Shift", "L"],
+        desc: "Link every mention of a keyword to a target note",
+      },
+      {
+        keys: ["right-click", "constellation"],
+        desc: "Batch-link every note in a cluster to a chosen hub",
+      },
+    ],
+  },
+  {
     title: "Drawers + panels",
     items: [
       { keys: ["I"], desc: "Toggle the Ideas drawer" },
