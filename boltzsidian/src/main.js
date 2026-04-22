@@ -2602,10 +2602,12 @@ async function undoUnlink(restore) {
 }
 
 // ── Pin toggle ──────────────────────────────────────────────
-// nextShape is one of: null (clear project status), "ring", "disc".
+// nextShape is one of: null (clear project status), "ring", "disc",
+// "spine", "fan". Unknown values are treated as "clear".
 async function handleToggleProject(note, nextShape) {
   if (!saver) return;
-  const valid = nextShape === "ring" || nextShape === "disc";
+  const KNOWN_SHAPES = ["ring", "disc", "spine", "fan"];
+  const valid = KNOWN_SHAPES.includes(nextShape);
   const fm = { ...(note.frontmatter || {}) };
   fm.id = fm.id || note.id;
   if (!fm.created)

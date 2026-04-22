@@ -18,7 +18,7 @@
 // its ideal position. Stiffness is low so spring forces still
 // wobble the arrangement — "hand-drawn atlas", not CAD.
 
-export const SHAPES = ["ring", "disc"];
+export const SHAPES = ["ring", "disc", "spine", "fan"];
 
 const RING_RADIUS_BASE = 180; // world units
 const RING_RADIUS_PER = 4; // extra radius per satellite beyond ~8
@@ -140,6 +140,43 @@ export function idealShapePosition(hubPos, shape, index) {
     const r = shape.radius * (isInner ? 0.58 : 1.0);
     const offset = isInner ? 0 : Math.PI / half; // stagger between rings
     const theta = shape.rotation + offset + (within / count) * Math.PI * 2;
+    const jitter = Math.sin(index * 2.7 + shape.rotation * 3.1) * 10;
+    return [
+      hubPos[0] + Math.cos(theta) * r,
+      hubPos[1] + jitter,
+      hubPos[2] + Math.sin(theta) * r,
+    ];
+  }
+
+  if (shape.shape === "spine") {
+    // Linear row through the hub — half the satellites to each side.
+    // Good for timelines and sequences. Oriented by shape.rotation
+    // so two spines in the same vault don't point the same way.
+    // Tiny Y-jitter + a gentle zig-zag around the center line so
+    // the row doesn't read as a ruler.
+    const spacing = Math.max(70, (shape.radius * 2) / Math.max(1, n - 1));
+    const offset = (index - (n - 1) / 2) * spacing;
+    const cosR = Math.cos(shape.rotation);
+    const sinR = Math.sin(shape.rotation);
+    const jitter = Math.sin(index * 2.7 + shape.rotation * 3.1) * 14;
+    // Side-offset perpendicular to the spine so alternating notes
+    // sit slightly above/below the line — reads as backbone, not
+    // ruler.
+    const side = (index % 2 === 0 ? 1 : -1) * 18;
+    return [
+      hubPos[0] + offset * cosR + -sinR * side,
+      hubPos[1] + jitter,
+      hubPos[2] + offset * sinR + cosR * side,
+    ];
+  }
+
+  if (shape.shape === "fan") {
+    // Arc of ~140° in one direction from the hub. Good for catalogs
+    // and "variations on a theme" where the hub points at everything.
+    const arcRad = (140 / 180) * Math.PI;
+    const t = n <= 1 ? 0.5 : index / (n - 1);
+    const theta = shape.rotation + (t - 0.5) * arcRad;
+    const r = shape.radius;
     const jitter = Math.sin(index * 2.7 + shape.rotation * 3.1) * 10;
     return [
       hubPos[0] + Math.cos(theta) * r,
