@@ -225,7 +225,6 @@ export function createWeavePicker({ getVault, runScan, onApply } = {}) {
   // ── Public API ────────────────────────────────────────
   // scanOpts are forwarded to runScan — e.g. { titlePrefix: "X",
   // sameRootOnly: false } for cross-root discovery.
-  let lastScanOpts = null;
   function open(hub, scanOpts = null) {
     if (!hub) return;
     overlay.style.display = "flex";
