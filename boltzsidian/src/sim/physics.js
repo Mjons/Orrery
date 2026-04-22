@@ -483,10 +483,15 @@ export function createPhysics({
 
   // STAR_CHARTS.md — pull each satellite of a project hub toward
   // its ideal position on the chosen shape around the hub.
-  // Stiffness is low; the figure is a suggestion, not a constraint.
-  // `mix` is a dream-depth fade so the shape dissolves into drift
-  // during sleep.
-  const SHAPE_K = 0.06;
+  // Stiffness is enough to visibly arrange within a few seconds
+  // but still lets spring forces wobble the figure into a
+  // hand-drawn look. `mix` is a dream-depth fade so the shape
+  // dissolves into drift during sleep.
+  //
+  // Raised from 0.06 (barely-visible drift over ~60s) to 0.6 after
+  // real-vault testing showed notes weren't settling fast enough
+  // to read as "it snapped into a ring".
+  const SHAPE_K = 0.6;
   const _hubTmp = [0, 0, 0];
   function applyShapeForces(shapes, live, mix) {
     for (const shape of shapes) {

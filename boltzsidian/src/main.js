@@ -3396,6 +3396,26 @@ if (import.meta.env && import.meta.env.DEV) {
     //   __boltzsidian.__weave("Delphica")        // resolve by title
     //   __boltzsidian.__weave(note.id)           // resolve by id
     //   __boltzsidian.__weaveScan("Delphica")    // scan-only, logs proposals
+    // STAR_CHARTS.md debug hook — show what the shape cache
+    // currently sees. Useful when the glyph lit up but nothing
+    // moved: this tells you whether collectProjectShapes found
+    // your hub at all, how many satellites it picked up, and via
+    // which path (link graph vs title-prefix fallback).
+    __projectShapes: () => {
+      console.log(
+        "[bz] project shapes cache:",
+        projectShapesCache.map((s) => ({
+          hub: vault?.byId?.get(s.hubId)?.title,
+          shape: s.shape,
+          sats: s.satIds.length,
+          radius: s.radius,
+          sampleSats: s.satIds
+            .slice(0, 5)
+            .map((id) => vault?.byId?.get(id)?.title),
+        })),
+      );
+      return projectShapesCache;
+    },
     __weave: (idOrTitle, opts) => {
       if (!vault) return console.warn("[bz] no vault loaded");
       const hub =

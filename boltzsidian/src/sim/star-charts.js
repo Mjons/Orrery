@@ -63,7 +63,9 @@ function normalizeShape(raw) {
 function resolveSatellites(vault, hub) {
   const sameRoot = (s) => !hub.rootId || !s.rootId || s.rootId === hub.rootId;
 
-  // 1. One-hop link graph.
+  // 1. One-hop link graph (same-root only — link-graph neighbourhoods
+  // are usually polluted with cross-project tending-agent noise, so
+  // we trust the graph only when both ends agree on root).
   const linkSet = new Set();
   for (const x of vault.forward?.get(hub.id) || []) linkSet.add(x);
   for (const x of vault.backward?.get(hub.id) || []) linkSet.add(x);
@@ -76,23 +78,21 @@ function resolveSatellites(vault, hub) {
 
   let satIds = linkSats;
 
-  // 2. Title-prefix fallback. Useful when the project's notes share
-  // a naming convention (e.g. "Delphica — X", "Delphica Landing
-  // Page") but haven't been cross-linked yet. The first "token"
-  // of the hub's title is the prefix — "Delphica Landing Page —
-  // Plan" → "Delphica".
+  // 2. Title-prefix fallback. When the project's notes share a
+  // naming convention (e.g. "Delphica — X", "Delphica Landing
+  // Page") but haven't been cross-linked yet. No same-root filter
+  // here — if the user picked a project hub and eight notes share
+  // its first title-token, they're almost certainly one project
+  // even if they live in different roots.
   if (linkSats.length < MIN_LINK_SATS) {
     const prefix = firstToken(hub.title).toLowerCase();
     if (prefix.length >= 3) {
       const prefixSats = [];
-      const linkSeen = new Set(linkSats);
       for (const s of vault.notes) {
         if (s.id === hub.id) continue;
-        if (!sameRoot(s)) continue;
         const firstTok = firstToken(s.title).toLowerCase();
         if (firstTok === prefix) prefixSats.push(s.id);
       }
-      // Merge with link sats so existing links aren't dropped.
       if (prefixSats.length > 0) {
         const merged = new Set([...linkSats, ...prefixSats]);
         satIds = [...merged];
