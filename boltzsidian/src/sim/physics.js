@@ -120,9 +120,15 @@ export function createPhysics({
   };
 
   function rebuildEdges() {
-    const seen = new Set();
+    const seen = new Map(); // undirected-key → edge record (for mutual detection)
     const out = [];
     if (!vault) return;
+    // TETHER_DIRECTION.md Phase A — preserve forward-graph direction
+    // on each edge so the renderer can tell source from target.
+    // `a` is always the forward-graph SOURCE (vault.forward[a].has(b)).
+    // When BOTH directions exist (A → B and B → A in forward), we
+    // draw once and flag `mutual: true`; the renderer uses this to
+    // suppress the directional gradient on symmetric links.
     for (const [srcId, targets] of vault.forward) {
       const i = bodies.indexOfId(srcId);
       if (i < 0) continue;
@@ -130,12 +136,23 @@ export function createPhysics({
         const j = bodies.indexOfId(dstId);
         if (j < 0) continue;
         const key = i < j ? `${i}:${j}` : `${j}:${i}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
+        const existing = seen.get(key);
+        if (existing) {
+          // We've already drawn this undirected edge from the other
+          // direction's pass. Mark both perspectives as mutual.
+          existing.mutual = true;
+          continue;
+        }
         const mi = Math.max(masses[i], 0.5);
         const mj = Math.max(masses[j], 0.5);
         const rest = 55 + Math.log(mi * mj + 1) * 34;
-        out.push({ a: i, b: j, rest });
+        // `a` is always the SOURCE, `b` always the TARGET. The
+        // spring physics doesn't care about direction (force is
+        // symmetric) but the tether renderer reads a → b for its
+        // luminance gradient.
+        const record = { a: i, b: j, rest, mutual: false };
+        out.push(record);
+        seen.set(key, record);
       }
     }
     edges = out;

@@ -295,6 +295,11 @@
         transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
         padding: 28px;
         overflow-y: auto;
+        /* Keep wheel events from chaining out to the 3D canvas —
+         * otherwise scrolling past the bottom of settings zooms the
+         * universe camera. */
+        overscroll-behavior: contain;
+        scroll-behavior: smooth;
         z-index: 30;
       }
       #settings.open {
@@ -658,6 +663,20 @@
       #note-panel .panel-body {
         scrollbar-width: thin;
         scrollbar-color: rgba(138, 180, 255, 0.28) transparent;
+        /* Edit-mode wheel events must stay inside the editor. Without
+         * overscroll-behavior: contain, scrolling past the last line
+         * chains out to the panel, and then the canvas, where wheel
+         * = zoom. Suddenly the user's universe jumps while they're
+         * typing. */
+        overscroll-behavior: contain;
+      }
+      /* `scroll-behavior: smooth` on the CM scroller makes cursor-
+       * follow feel sluggish when typing — CM uses scrollIntoView to
+       * keep the caret visible, and the smooth animation can lag a
+       * frame behind keystrokes. Only read-mode panel-body gets
+       * smooth; edit mode stays instant. */
+      #note-panel .panel-body {
+        scroll-behavior: smooth;
       }
       #note-panel .cm-scroller::-webkit-scrollbar,
       #note-panel .panel-body::-webkit-scrollbar {
@@ -697,6 +716,32 @@
         padding: 8px 22px 12px;
         border-top: 1px solid var(--glass-border);
         background: rgba(0, 0, 0, 0.22);
+        /* Cap so a dense batch of chips (say 12 links + 6 tags)
+         * can't push the editor off-screen. When chips exceed the
+         * cap, this container scrolls internally; editor keeps its
+         * space; overscroll stays contained so wheel events don't
+         * chain back to the canvas zoom. */
+        max-height: min(30vh, 260px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(138, 180, 255, 0.28) transparent;
+      }
+      #note-panel .panel-suggestions::-webkit-scrollbar {
+        width: 8px;
+      }
+      #note-panel .panel-suggestions::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      #note-panel .panel-suggestions::-webkit-scrollbar-thumb {
+        background: rgba(138, 180, 255, 0.22);
+        border: 2px solid transparent;
+        background-clip: content-box;
+        border-radius: 8px;
+      }
+      #note-panel .panel-suggestions::-webkit-scrollbar-thumb:hover {
+        background: rgba(138, 180, 255, 0.45);
+        background-clip: content-box;
       }
       #note-panel .panel-suggestions:empty {
         display: none;
@@ -747,6 +792,16 @@
         color: var(--text);
         background: rgba(138, 180, 255, 0.1);
         border-color: rgba(138, 180, 255, 0.4);
+      }
+      #note-panel .sug-chip-text {
+        /* Long note titles truncate inside the chip rather than
+         * wrapping or pushing the row to awkward widths. Full title
+         * is still visible via the native tooltip attribute set
+         * from the suggestions module. */
+        max-width: min(220px, 42vw);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       #note-panel .sug-chip-tag .sug-chip-text {
         font-family: ui-monospace, Menlo, Consolas, "Cascadia Mono", monospace;
@@ -1146,6 +1201,23 @@
       #tend-drawer .tend-groups {
         flex: 1 1 auto;
         overflow-y: auto;
+        overscroll-behavior: contain;
+        scroll-behavior: smooth;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(138, 180, 255, 0.28) transparent;
+      }
+      #tend-drawer .tend-groups::-webkit-scrollbar {
+        width: 10px;
+      }
+      #tend-drawer .tend-groups::-webkit-scrollbar-thumb {
+        background: rgba(138, 180, 255, 0.22);
+        border: 2px solid transparent;
+        background-clip: content-box;
+        border-radius: 8px;
+      }
+      #tend-drawer .tend-groups::-webkit-scrollbar-thumb:hover {
+        background: rgba(138, 180, 255, 0.45);
+        background-clip: content-box;
       }
       #tend-drawer .tend-group {
         border-bottom: 1px solid var(--glass-border);

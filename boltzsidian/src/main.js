@@ -31,6 +31,7 @@ import { createHoverOrbit } from "./sim/hover-orbit.js";
 import { createLabels } from "./ui/labels.js";
 import { createConstellations, saveClusterName } from "./ui/constellations.js";
 import { createBatchLinkPicker } from "./ui/batch-link-picker.js";
+import { createKeywordLinkPicker } from "./ui/keyword-link-picker.js";
 import { createPickDebug } from "./ui/pick-debug.js";
 import { createSearch } from "./ui/search.js";
 import { createLinkDrag } from "./ui/link-drag.js";
@@ -160,6 +161,7 @@ let bodies = null;
 let labels = null;
 let constellations = null;
 let batchLinkPicker = null;
+let keywordLinkPicker = null;
 // Hoisted so openNote() can promote the open note's body into its
 // orange "orrery" state (orbiting planets), not just label-hover.
 let hoverOrbit = null;
@@ -2005,6 +2007,25 @@ async function setWorkspace(ws) {
       onChoose: (cluster, target) => applyBatchLink(cluster, target),
     });
 
+    // KEYWORD_LINK.md Phase C — modal instance. Phase D wires the
+    // real apply loop; until then, log the selection so we can
+    // verify Phase B + C end-to-end from the console dev hook.
+    if (keywordLinkPicker) keywordLinkPicker.dispose();
+    keywordLinkPicker = createKeywordLinkPicker({
+      getVault: () => vault,
+      onApply: ({ target, selection }) => {
+        const total = selection.reduce((n, g) => n + g.occurrences.length, 0);
+        console.log(
+          `[bz] keyword-link apply (Phase D pending): ${total} matches across ${selection.length} notes → [[${target.title}]]`,
+          selection,
+        );
+        toast(
+          `Phase D not wired yet — ${total} matches queued (see console).`,
+          { duration: 4000 },
+        );
+      },
+    });
+
     // RENDER_QUALITY.md Phase A — by now every visual subsystem is
     // wired (tethers, sparks, labels, constellations). Re-dispatch
     // the current tier so each sees the right pool size + cadence
@@ -3123,6 +3144,13 @@ if (import.meta.env && import.meta.env.DEV) {
     // MULTI_PROJECT_PLAN.md Phase 1 dev hooks. Smoke-test the parser
     // / synthesiser from the console without touching the running
     // vault. Will be removed or promoted to real API in later phases.
+    // KEYWORD_LINK.md Phase C dev hook — open the keyword-linker
+    // modal before Phase E wires Cmd+Shift+L. Run:
+    //   __boltzsidian.__openKeywordLink({ keyword: "pipeline" })
+    // then pick a target and try Apply. Selection is handed to
+    // onApply which today just logs; Phase D replaces the log with
+    // the real write loop.
+    __openKeywordLink: (opts) => keywordLinkPicker?.open?.(opts || {}),
     __parseManifest: (input) => parseManifest(input),
     __serializeManifest: (manifest) => serializeManifest(manifest),
     __synthesizeSingleRootManifest: synthesizeSingleRootManifest,

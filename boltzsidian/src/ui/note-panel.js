@@ -410,7 +410,9 @@ export function createNotePanel({
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "sug-chip sug-chip-link";
-    chip.title = "Insert wikilink";
+    // Full title in the tooltip so long names that get ellipsised
+    // are still discoverable on hover.
+    chip.title = `Insert [[${title}]]`;
     const text = document.createElement("span");
     text.className = "sug-chip-text";
     text.textContent = title;

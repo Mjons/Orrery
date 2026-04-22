@@ -28,6 +28,13 @@ export function createTethers({
   const positions = new Float32Array(MAX_SEGMENTS * 2 * 3);
   const alphas = new Float32Array(MAX_SEGMENTS * 2);
   const distances = new Float32Array(MAX_SEGMENTS * 2);
+  // TETHER_DIRECTION.md Phase B — per-vertex direction t (0 at
+  // source, 1 at target) and per-segment mutual flag (same value
+  // at both vertices). Fragment shader mixes source/target
+  // brightness along `aDirT`; mutual edges short-circuit to a
+  // uniform brightness so A↔B reads as symmetry.
+  const dirT = new Float32Array(MAX_SEGMENTS * 2);
+  const mutualFlag = new Float32Array(MAX_SEGMENTS * 2);
 
   const geom = new THREE.BufferGeometry();
   geom.setAttribute(
@@ -42,6 +49,14 @@ export function createTethers({
     "aDist",
     new THREE.BufferAttribute(distances, 1).setUsage(THREE.DynamicDrawUsage),
   );
+  geom.setAttribute(
+    "aDirT",
+    new THREE.BufferAttribute(dirT, 1).setUsage(THREE.StaticDrawUsage),
+  );
+  geom.setAttribute(
+    "aMutual",
+    new THREE.BufferAttribute(mutualFlag, 1).setUsage(THREE.DynamicDrawUsage),
+  );
 
   const mat = new THREE.ShaderMaterial({
     uniforms: {
@@ -52,6 +67,16 @@ export function createTethers({
       // ~45% of wake. At the Phase 1 band (depth ~0.3) tethers sit at
       // ~83% — visibly slackened, still readable.
       uDepth: { value: 0 },
+      // TETHER_DIRECTION.md Phase B — brightness multipliers on the
+      // accent color. Same hue, different luminance, so direction
+      // is readable without introducing a second palette. uMutual
+      // is the middle value — A↔B looks uniformly bright.
+      uSourceScale: { value: 1.15 },
+      uTargetScale: { value: 0.5 },
+      uMutualScale: { value: 1.0 },
+      // Phase-D quality gate: Low tier sets this to 0 and the
+      // fragment collapses to a uniform uAccent. 1 = gradient on.
+      uDirectional: { value: 1 },
     },
     transparent: true,
     depthWrite: false,
@@ -59,11 +84,17 @@ export function createTethers({
     vertexShader: /* glsl */ `
       attribute float aAlpha;
       attribute float aDist;
+      attribute float aDirT;
+      attribute float aMutual;
       varying float vAlpha;
       varying float vDist;
+      varying float vT;
+      varying float vMutual;
       void main() {
         vAlpha = aAlpha;
         vDist = aDist;
+        vT = aDirT;
+        vMutual = aMutual;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
@@ -71,8 +102,14 @@ export function createTethers({
       uniform vec3 uAccent;
       uniform float uTime;
       uniform float uDepth;
+      uniform float uSourceScale;
+      uniform float uTargetScale;
+      uniform float uMutualScale;
+      uniform float uDirectional;
       varying float vAlpha;
       varying float vDist;
+      varying float vT;
+      varying float vMutual;
       void main() {
         // Taper at the ends so endpoints don't look like they sprout blobs.
         float taper = 1.0 - abs(vDist - 0.5) * 1.5;
@@ -81,12 +118,18 @@ export function createTethers({
         float pulse = 0.88 + 0.12 * sin(uTime * 0.5 + vDist * 3.14);
         // Dream fade — tethers should nearly vanish during deep dream
         // so the user sees the "leashless" state the design intends.
-        // sqrt() accelerates the fade early so Phase 1 "warming"
-        // already reads as substantially slacker than wake. At depth
-        // 0.3 ~30% opacity, 0.55 ~15%, 0.85+ ~6%. Tethers are ghostly
-        // outlines, not lit lines, once dreaming begins.
         float dreamFade = max(0.05, 1.0 - sqrt(uDepth) * 1.1);
-        gl_FragColor = vec4(uAccent, vAlpha * ${ALPHA_BASE.toFixed(2)} * taper * pulse * dreamFade);
+
+        // Directional brightness. One-way edges interpolate source →
+        // target luminance along vT. Mutual edges stay at a uniform
+        // mid-bright scale. Low quality tier (uDirectional == 0)
+        // collapses everything to uAccent × 1.0.
+        float directional = mix(uSourceScale, uTargetScale, vT);
+        float k = mix(directional, uMutualScale, vMutual);
+        k = mix(1.0, k, uDirectional);
+        vec3 col = uAccent * k;
+
+        gl_FragColor = vec4(col, vAlpha * ${ALPHA_BASE.toFixed(2)} * taper * pulse * dreamFade);
       }
     `,
   });
@@ -114,10 +157,11 @@ export function createTethers({
       const key = edgeKey(e.a, e.b);
       const existing = byKey.get(key);
       next.push({
-        a: e.a,
-        b: e.b,
+        a: e.a, // forward-graph source (physics Phase A metadata)
+        b: e.b, // forward-graph target
         alpha: existing ? existing.alpha : 0,
         target: 1,
+        mutual: !!e.mutual,
       });
       byKey.delete(key);
     }
@@ -165,6 +209,15 @@ export function createTethers({
       alphas[write * 2 + 1] = aOut;
       distances[write * 2] = 0;
       distances[write * 2 + 1] = 1;
+      // TETHER_DIRECTION.md Phase B — first vertex = source end
+      // (t = 0, brighter), second vertex = target end (t = 1,
+      // dimmer). Both vertices of a segment share aMutual so the
+      // shader can branch per-segment, not per-pixel.
+      dirT[write * 2] = 0;
+      dirT[write * 2 + 1] = 1;
+      const m = s.mutual ? 1 : 0;
+      mutualFlag[write * 2] = m;
+      mutualFlag[write * 2 + 1] = m;
       segments[write] = s;
       write++;
     }
@@ -173,6 +226,8 @@ export function createTethers({
     geom.getAttribute("position").needsUpdate = true;
     geom.getAttribute("aAlpha").needsUpdate = true;
     geom.getAttribute("aDist").needsUpdate = true;
+    geom.getAttribute("aDirT").needsUpdate = true;
+    geom.getAttribute("aMutual").needsUpdate = true;
   }
 
   // Screen-space pick. Returns the segment whose 2D projection is closest
@@ -231,12 +286,22 @@ export function createTethers({
     hoverKey = edgeKey(a, b);
   }
 
+  // RENDER_QUALITY.md + TETHER_DIRECTION.md §2.3 — Low tier drops
+  // the directional gradient in exchange for a single uniform
+  // color. Saves the mix + branch in the fragment shader on every
+  // tether pixel. All other tiers keep the gradient on.
+  function setQuality(tier) {
+    const directional = (tier?.tetherMaxScale ?? 1) >= 0.5 ? 1 : 0;
+    mat.uniforms.uDirectional.value = directional;
+  }
+
   return {
     rebuild,
     update,
     pickAt,
     setHover,
     updateAccent,
+    setQuality,
     material: mat,
     line,
   };
