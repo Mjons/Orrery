@@ -59,7 +59,7 @@ import {
 import { createSaver } from "./vault/save.js";
 import { titleToStem, uniquePath } from "./vault/writer.js";
 import { planLinkCreate, planLinkDelete } from "./vault/links.js";
-import { stringifyFrontmatter } from "./vault/frontmatter.js";
+import { parseFrontmatter, stringifyFrontmatter } from "./vault/frontmatter.js";
 import { initSettings } from "./ui/settings.js";
 import { createNotePanel } from "./ui/note-panel.js";
 import { toast } from "./ui/toast.js";
@@ -2029,15 +2029,62 @@ async function setWorkspace(ws) {
     if (keywordLinkPicker) keywordLinkPicker.dispose();
     keywordLinkPicker = createKeywordLinkPicker({
       getVault: () => vault,
-      onApply: ({ target, selection }) => {
-        const total = selection.reduce((n, g) => n + g.occurrences.length, 0);
-        console.log(
-          `[bz] keyword-link apply (Phase D pending): ${total} matches across ${selection.length} notes → [[${target.title}]]`,
-          selection,
-        );
+      onApply: async ({ target, selection }) => {
+        if (!saver || !target) return;
+        // Sanitise the title before wrapping. If the target note's own
+        // title literally contains `[[`, `]]`, or `|`, naive wrapping
+        // produces malformed output like `[[Title — [[Nested]]]]` —
+        // the inner `]]` closes the outer wikilink early and neither
+        // our parser nor Obsidian resolves it. Stripping these three
+        // tokens keeps the link valid and still resolves to the same
+        // note because resolution is title-based case-insensitive.
+        const cleanTitle = String(target.title || "")
+          .replace(/\[\[|\]\]|\|/g, "")
+          .trim();
+        if (!cleanTitle) {
+          toast("Target title is empty. Rename the target first.", {
+            duration: 4000,
+          });
+          return;
+        }
+        let writtenNotes = 0;
+        let writtenOccurrences = 0;
+        let errored = 0;
+        for (const group of selection) {
+          try {
+            const { note, occurrences } = group;
+            const { data, content } = parseFrontmatter(note.rawText);
+            let newBody = content;
+            // Apply end-to-start so earlier offsets stay valid after
+            // later slices are inserted. Each occurrence's charOffset
+            // is relative to the body (post-frontmatter).
+            const sorted = [...occurrences].sort(
+              (a, b) => b.charOffset - a.charOffset,
+            );
+            for (const o of sorted) {
+              const replacement =
+                o.matchedText === cleanTitle
+                  ? `[[${cleanTitle}]]`
+                  : `[[${cleanTitle}|${o.matchedText}]]`;
+              newBody =
+                newBody.slice(0, o.charOffset) +
+                replacement +
+                newBody.slice(o.charOffset + o.matchedText.length);
+            }
+            const newRawText = stringifyFrontmatter(data, newBody);
+            await saver(note, newRawText);
+            writtenNotes++;
+            writtenOccurrences += occurrences.length;
+          } catch (err) {
+            console.warn("[bz] keyword-link write failed:", err);
+            errored++;
+          }
+        }
         toast(
-          `Phase D not wired yet — ${total} matches queued (see console).`,
-          { duration: 4000 },
+          errored > 0
+            ? `Linked ${writtenOccurrences} mentions across ${writtenNotes} notes (${errored} failed — see console).`
+            : `Linked ${writtenOccurrences} mentions across ${writtenNotes} notes → [[${cleanTitle}]]`,
+          { duration: 4500 },
         );
       },
     });
