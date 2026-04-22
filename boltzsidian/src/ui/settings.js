@@ -49,6 +49,8 @@ export function initSettings({
   getWorkspaceRoots, // () => { roots, writeRootId, dropped }
   onReconnectRoot, // async (droppedEntry) => boolean
   onAddRoot, // async () => boolean — pick a folder, append to manifest, reload
+  onRemoveRoot, // async (rootId) => boolean — strip from manifest, drop IDB handle, reload
+  onRescan, // async () => void — flush pending edits + reload to pick up external file changes
   // surfaces the ON/OFF indicator so the user can verify at a glance
   // whether the dream loop is actually running.
 }) {
@@ -1115,6 +1117,22 @@ export function initSettings({
     } else if (kind === "user") {
       workspaceDesc.textContent =
         "A real folder on your disk. Nothing in this app touches anything outside that folder.";
+      if (onRescan) {
+        const rescanBtn = document.createElement("button");
+        rescanBtn.type = "button";
+        rescanBtn.className = "ghost";
+        rescanBtn.textContent = "Rescan workspace";
+        rescanBtn.title = "Reload to pick up files edited outside Boltzsidian.";
+        rescanBtn.addEventListener("click", async () => {
+          rescanBtn.disabled = true;
+          try {
+            await onRescan();
+          } finally {
+            rescanBtn.disabled = false;
+          }
+        });
+        workspaceActions.appendChild(rescanBtn);
+      }
     } else {
       workspaceDesc.textContent = "No workspace open yet.";
     }
@@ -1153,6 +1171,32 @@ export function initSettings({
       tags.push("connected");
       status.textContent = tags.join(" · ");
       row.append(name, status);
+      // Remove button — only for non-writeRoot entries. Can't yank the
+      // writeRoot out from under the running app; that would orphan
+      // every sidecar file in .universe/.
+      if (r.id !== writeRootId && onRemoveRoot) {
+        const rm = document.createElement("button");
+        rm.type = "button";
+        rm.className = "ghost settings-root-remove";
+        rm.textContent = "Remove";
+        rm.title = `Disconnect "${r.name || r.id}" from this workspace.`;
+        rm.addEventListener("click", async () => {
+          if (
+            !confirm(
+              `Disconnect "${r.name || r.id}" from this workspace?\n\nThe folder's files are NOT deleted — the root is just dropped from the manifest. You can re-add it later.`,
+            )
+          )
+            return;
+          rm.disabled = true;
+          try {
+            await onRemoveRoot(r.id);
+          } finally {
+            rm.disabled = false;
+            renderWorkspaceRoots();
+          }
+        });
+        row.append(rm);
+      }
       workspaceRoots.appendChild(row);
     }
 
@@ -1267,7 +1311,9 @@ export function initSettings({
     if (
       e.target instanceof HTMLInputElement ||
       e.target instanceof HTMLTextAreaElement ||
-      (e.target.closest && e.target.closest(".cm-editor"))
+      (e.target && e.target.isContentEditable) ||
+      (e.target.closest && e.target.closest(".cm-editor")) ||
+      (e.target.closest && e.target.closest("[contenteditable='true']"))
     )
       return;
     if (e.key === "\\") {

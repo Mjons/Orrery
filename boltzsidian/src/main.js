@@ -11,7 +11,7 @@ import * as THREE from "three";
 import { createRenderer } from "./sim/renderer.js";
 import { createBodies } from "./sim/bodies.js";
 import { layoutNotes } from "./sim/layout.js";
-import { computeLocalDensity } from "./sim/clusters.js";
+import { computeLocalDensity, recomputeCentroidsLive } from "./sim/clusters.js";
 import {
   AMBIENCE_PRESETS,
   getPreset as getAmbiencePreset,
@@ -23,7 +23,8 @@ import { createSparks, SIZE_CONNECTION, SIZE_IDEA } from "./sim/sparks.js";
 import { createKMatrix } from "./sim/kmatrix.js";
 import { createHoverOrbit } from "./sim/hover-orbit.js";
 import { createLabels } from "./ui/labels.js";
-import { createConstellations } from "./ui/constellations.js";
+import { createConstellations, saveClusterName } from "./ui/constellations.js";
+import { createBatchLinkPicker } from "./ui/batch-link-picker.js";
 import { createPickDebug } from "./ui/pick-debug.js";
 import { createSearch } from "./ui/search.js";
 import { createLinkDrag } from "./ui/link-drag.js";
@@ -147,6 +148,7 @@ function getSourceRoot(noteId) {
 let bodies = null;
 let labels = null;
 let constellations = null;
+let batchLinkPicker = null;
 let physics = null;
 let tethers = null;
 let sparks = null;
@@ -248,6 +250,11 @@ const demoButton = document.getElementById("demo-button");
 const aboutLink = document.getElementById("about-link");
 const progressEl = document.getElementById("welcome-progress");
 const statsHud = document.getElementById("stats-hud");
+// Sleep-depth HUD glyph at bottom-right. Declared up here (rather than
+// next to its updateSleepHud consumer lower in the file) because
+// setWorkspace / dream onDepthChange can fire before the latter block
+// evaluates on some restore paths, which triggers TDZ on the const.
+const sleepHud = document.getElementById("sleep-hud");
 
 // ── Settings pane ───────────────────────────────────────────
 const settingsUI = initSettings({
@@ -357,6 +364,12 @@ const settingsUI = initSettings({
   }),
   onReconnectRoot: async (dropped) => regrantDroppedRoot(dropped),
   onAddRoot: async () => addProjectRoot(),
+  onRemoveRoot: async (rootId) => removeProjectRoot(rootId),
+  onRescan: async () => {
+    // beforeunload handles flushing any pending edits + persisting state.
+    toast("Rescanning workspace — reloading…", { duration: 1500 });
+    window.setTimeout(() => window.location.reload(), 400);
+  },
 });
 
 // Extracted so the T hotkey can also fire a fresh Tend run — the
@@ -785,6 +798,10 @@ function updateNoticedPill() {
 }
 
 // ── Welcome wiring ──────────────────────────────────────────
+// Hoisted so the demoButton click handler and first-run default
+// check below can reference it without TDZ.
+const WELCOME_SEEN_KEY = "boltzsidian.welcome.seen.v1";
+
 if (aboutLink) {
   aboutLink.addEventListener("click", (e) => {
     e.preventDefault();
@@ -851,7 +868,7 @@ if (demoButton) {
   }
 }
 
-const WELCOME_SEEN_KEY = "boltzsidian.welcome.seen.v1";
+// WELCOME_SEEN_KEY moved up; see declaration near demoButton wiring.
 
 // Read whichever theme radio is currently selected on the welcome card.
 function pickedWelcomeTheme() {
@@ -1348,6 +1365,58 @@ function deriveRootId(name) {
   );
 }
 
+// Settings → Workspace → "Remove". Disconnects a project root from
+// the workspace WITHOUT touching files on disk — strips the entry
+// from workspace.json and drops the saved handle from IDB, then
+// reloads. writeRoot is never removable through this path; the
+// caller (settings UI) filters it out.
+async function removeProjectRoot(rootId) {
+  if (!rootId) return false;
+  if (!vault) {
+    toast("Open a workspace first.");
+    return false;
+  }
+  if (rootId === vault.writeRootId) {
+    toast("Can't remove the writeRoot — open a different workspace instead.");
+    return false;
+  }
+  try {
+    const writeHandle = getWriteHandle();
+    if (!writeHandle) {
+      toast("No write root available.");
+      return false;
+    }
+    const manifest = await loadManifestFromHandle(writeHandle);
+    if (!manifest) {
+      toast("No workspace.json on disk — nothing to remove.");
+      return false;
+    }
+    const before = manifest.roots.length;
+    manifest.roots = manifest.roots.filter((r) => r.id !== rootId);
+    if (manifest.roots.length === before) {
+      toast(`Root "${rootId}" not in workspace.json.`);
+      return false;
+    }
+    for (const r of manifest.roots) {
+      delete r.handle;
+      delete r.kind;
+    }
+    await saveManifestToHandle(writeHandle, manifest);
+    try {
+      await deleteRootHandle(rootId);
+    } catch (err) {
+      console.warn(`[bz] removeProjectRoot: deleteRootHandle failed`, err);
+    }
+    toast(`Removed "${rootId}" · reloading…`, { duration: 2000 });
+    window.setTimeout(() => window.location.reload(), 600);
+    return true;
+  } catch (err) {
+    console.error("[bz] removeProjectRoot failed", err);
+    toast(err.message ?? "Could not remove project root.");
+    return false;
+  }
+}
+
 async function setWorkspace(ws) {
   workspaceHandle = ws.handle;
   workspaceKind = ws.kind;
@@ -1686,12 +1755,44 @@ async function setWorkspace(ws) {
       vault,
       bodies,
       camera,
-      getMode: () => settings.show_constellations !== false,
+      getMode: () =>
+        settings.show_constellations !== false &&
+        settings.label_mode !== "never",
       getDreamDepth: () => (dream ? dream.getDepth() : 0),
       getSettings: () => settings,
       onConstellationClick: (cid) => focusCluster(cid),
+      onClusterRename: (cluster, newName) => {
+        saveClusterName(cluster, newName, settings);
+        saveSettings(settings);
+        toast(
+          newName ? `Renamed region to "${newName}"` : "Region name cleared",
+          { duration: 2000 },
+        );
+      },
+      onBatchLinkRequest: (cluster) => {
+        if (!batchLinkPicker) return;
+        batchLinkPicker.open(cluster);
+      },
     });
-    unsubscribeConstellations = onFrame(() => constellations.update());
+
+    // BATCH_LINK.md §3 — the floating picker that takes a cluster
+    // and a target note and writes the wikilink to every member.
+    // One shared instance per workspace; disposed + rebuilt on
+    // workspace change so it closes over the fresh vault.
+    if (batchLinkPicker) batchLinkPicker.dispose();
+    batchLinkPicker = createBatchLinkPicker({
+      getVault: () => vault,
+      onChoose: (cluster, target) => applyBatchLink(cluster, target),
+    });
+    // Centroid drift fix — physics moves bodies but cluster.centroid
+    // was baked at initial layout. Refresh every ~30 frames (~500ms
+    // @60fps) so constellation halos follow their actual clusters.
+    // Cheap: O(notes) per pass, no clustering re-run.
+    let _centroidTick = 0;
+    unsubscribeConstellations = onFrame(() => {
+      if (++_centroidTick % 30 === 0) recomputeCentroidsLive(vault, bodies);
+      constellations.update();
+    });
 
     if (unsubscribePhysics) unsubscribePhysics();
     unsubscribePhysics = onFrame((dt) => physics.step(dt));
@@ -2178,6 +2279,141 @@ function focusCluster(clusterId) {
   startTween(toPos, target, 0.9);
 }
 
+// BATCH_LINK.md §3 — apply the wikilink from the picker to every
+// member of the cluster. Reuses the Phase-3 root-aware saver so
+// read-only sources decline naturally, and applyObviousLink from
+// tend-apply.js so the body mutation matches how tend already adds
+// links (append to body end, skip if already present).
+async function applyBatchLink(cluster, target) {
+  if (!vault || !saver || !cluster || !target) return;
+  const memberIds = Array.isArray(cluster.noteIds)
+    ? cluster.noteIds.slice()
+    : [];
+  if (memberIds.length === 0) return;
+
+  // §3 confirmation threshold — large batches get a guard rail.
+  if (memberIds.length > 50) {
+    if (
+      !confirm(
+        `Add [[${target.title}]] to ${memberIds.length} notes? This writes to every member of the region.`,
+      )
+    )
+      return;
+  }
+
+  // Flush any in-progress edit on the panel so its dirty buffer
+  // doesn't clobber the batch writes on the next autosave tick.
+  if (notePanel.isDirty?.()) notePanel.flushSave();
+
+  let written = 0;
+  let alreadyLinked = 0;
+  let readOnlySkipped = 0;
+  let selfSkipped = 0;
+  let failed = 0;
+
+  for (const id of memberIds) {
+    if (id === target.id) {
+      selfSkipped++;
+      continue;
+    }
+    const note = vault.byId.get(id);
+    if (!note) continue;
+    if (note._isPhantom) continue;
+
+    // Already linked? The forward graph is authoritative.
+    const forward = vault.forward.get(id);
+    if (forward && forward.has(target.id)) {
+      alreadyLinked++;
+      continue;
+    }
+
+    // Use a collision-proof wikilink token. applyObviousLink writes
+    // `[[Title]]`, which on reparse resolves via prefer-same-root —
+    // fatal for batch links when the target's title exists in
+    // multiple roots (each source note would map `[[Title]]` to ITS
+    // OWN-root namesake instead of the picked target). Writing
+    // `[[id|Title]]` when the title collides keeps the visible text
+    // and forces resolution through byId.
+    const nextText = appendBatchLinkToBody(note, target, vault);
+    if (nextText === note.rawText) {
+      alreadyLinked++;
+      continue;
+    }
+    try {
+      const result = await saver(note, nextText);
+      if (result?.applied) {
+        written++;
+      } else if (result?.reason === "read-only") {
+        readOnlySkipped++;
+      } else {
+        failed++;
+      }
+    } catch (err) {
+      console.warn("[bz] batch-link write failed for", note.path, err);
+      failed++;
+    }
+  }
+
+  // Physics / tethers / search all need to see the new edges.
+  if (physics) physics.rebuildEdges();
+  if (tethers) tethers.rebuild();
+  if (search?.invalidate) search.invalidate();
+  updateStatsHud();
+
+  const summary = [
+    `Linked ${written} → [[${target.title}]]`,
+    alreadyLinked && `${alreadyLinked} already linked`,
+    readOnlySkipped && `${readOnlySkipped} read-only`,
+    selfSkipped && "1 self",
+    failed && `${failed} failed`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  toast(summary, { duration: 4500 });
+}
+
+// Compose a wikilink token for batch writes. If the target's title
+// is unique across the whole vault, use a readable `[[Title]]` —
+// cheap and the common case. If the title collides across roots
+// (e.g. every project has its own `INDEX.md`), write `[[id|Title]]`
+// so each source note resolves to the EXACT target the user picked,
+// not its own-root namesake via the prefer-same-root policy.
+function composeBatchLinkToken(target, vault) {
+  if (!target) return "";
+  const key = String(target.title || "")
+    .toLowerCase()
+    .trim();
+  if (!key) return `[[${target.id}]]`;
+  const bucket = vault?.byTitle?.get(key);
+  if (!bucket || bucket.length <= 1) return `[[${target.title}]]`;
+  return `[[${target.id}|${target.title}]]`;
+}
+
+// Append the batch-link token to a note's body. Mirrors
+// applyObviousLink's placement (end of body, preserved frontmatter),
+// but the "already contains" check matches on title OR id so a
+// re-run of the same batch after a collision-proof write doesn't
+// add a duplicate.
+function appendBatchLinkToBody(note, target, vault) {
+  const token = composeBatchLinkToken(target, vault);
+  const body = note.body || "";
+  const escTitle = escapeRegExp(target.title || "");
+  const escId = escapeRegExp(target.id || "");
+  const alt = [escTitle, escId].filter(Boolean).join("|");
+  const re = new RegExp(`\\[\\[\\s*(${alt})\\s*(?:\\|[^\\]]*)?\\s*\\]\\]`, "i");
+  if (re.test(body)) return note.rawText;
+  const trimmed = body.replace(/\s+$/, "");
+  const sep = trimmed ? "\n\n" : "";
+  const newBody = `${trimmed}${sep}${token}\n`;
+  const fmMatch = note.rawText.match(/^---[\s\S]*?\n---\s*\n/);
+  if (fmMatch) return fmMatch[0] + newBody;
+  return newBody;
+}
+
+function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function focusCamera(worldPos) {
   if (!worldPos) return;
   const target = new THREE.Vector3(worldPos[0], worldPos[1], worldPos[2]);
@@ -2335,7 +2571,11 @@ window.addEventListener("keydown", (e) => {
   const isEditable =
     e.target instanceof HTMLInputElement ||
     e.target instanceof HTMLTextAreaElement ||
-    (e.target && e.target.closest && e.target.closest(".cm-editor"));
+    (e.target && e.target.isContentEditable) ||
+    (e.target && e.target.closest && e.target.closest(".cm-editor")) ||
+    (e.target &&
+      e.target.closest &&
+      e.target.closest("[contenteditable='true']"));
 
   // Cmd/Ctrl+K stays — the browser doesn't claim it at the keydown layer.
   if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
@@ -2467,9 +2707,9 @@ function applyAccent(hex) {
 }
 
 // ── Sleep HUD ───────────────────────────────────────────────
-// The br-corner "◐" glyph advertises sleep depth. At depth 0 it's muted;
-// as depth rises it fills to a solid disc and tints toward the accent.
-const sleepHud = document.getElementById("sleep-hud");
+// `sleepHud` itself is declared up near the other HUD elements (see top
+// of file) so module-init callers that reach updateSleepHud before this
+// block evaluates don't hit a TDZ. This block just owns the renderer.
 function updateSleepHud(depth = 0) {
   // Feed depth to the face HUD so it can drift to "sleeping" at high
   // depth. Cheap even when sleepHud isn't wired yet.

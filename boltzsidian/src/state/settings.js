@@ -53,6 +53,12 @@ export const DEFAULT_SETTINGS = {
   // label instead of its individual star titles. Off = no named
   // regions; zoom behaviour on star labels is unchanged.
   show_constellations: true,
+  // User-renamed constellations. Keyed by an arbitrary slot id; each
+  // entry carries the memberIds snapshot from when the user named it
+  // so we can match the same region back even after cluster ids
+  // renumber. Resolution uses Jaccard overlap ≥ 0.6.
+  //   { [slotId]: { name: string, memberIds: [noteId, …] } }
+  cluster_names: {},
   // Interaction safeguards.
   confirm_unlink: true, // confirm before right-click deletes a tether
   // Tend passes — per-pass opt-outs. Absent key = enabled by default so

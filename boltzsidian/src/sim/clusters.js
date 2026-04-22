@@ -190,6 +190,50 @@ export function computeLocalDensity(
   return byNote;
 }
 
+// Refresh cluster.centroid + cluster.extent from the current live
+// body positions. Physics drifts bodies around continuously; the
+// initial values computed by computeLocalDensity go stale within a
+// few seconds of play. Cheap: O(notes) using positionOf().
+//
+// Does NOT recompute cluster MEMBERSHIP — just the geometric center
+// and bounding radius of the existing member set. Cluster membership
+// changes only happen on vault reload.
+export function recomputeCentroidsLive(vault, bodies) {
+  if (!vault?.clusters?.byId || !bodies?.positionOf) return;
+  for (const cluster of vault.clusters.byId.values()) {
+    const ids = cluster.noteIds;
+    if (!ids || ids.length === 0) continue;
+    let cx = 0,
+      cy = 0,
+      cz = 0,
+      count = 0;
+    for (const id of ids) {
+      const p = bodies.positionOf(id);
+      if (!p) continue;
+      cx += p[0];
+      cy += p[1];
+      cz += p[2];
+      count++;
+    }
+    if (count === 0) continue;
+    cx /= count;
+    cy /= count;
+    cz /= count;
+    let maxD2 = 0;
+    for (const id of ids) {
+      const p = bodies.positionOf(id);
+      if (!p) continue;
+      const dx = p[0] - cx;
+      const dy = p[1] - cy;
+      const dz = p[2] - cz;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > maxD2) maxD2 = d2;
+    }
+    cluster.centroid = [cx, cy, cz];
+    cluster.extent = Math.sqrt(maxD2);
+  }
+}
+
 function shuffle(a) {
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

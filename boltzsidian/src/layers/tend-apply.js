@@ -99,7 +99,7 @@ function applyTagInfer(note, proposal) {
   return replaceBody(note.rawText, body, newBody);
 }
 
-function applyObviousLink(note, proposal, vault) {
+export function applyObviousLink(note, proposal, vault) {
   const target = vault?.byId?.get(proposal.linkTargetId);
   if (!target) return note.rawText;
   // Reuse Phase 3's planLinkCreate behaviour: append `[[Target Title]]`

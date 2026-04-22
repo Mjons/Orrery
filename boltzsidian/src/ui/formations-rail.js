@@ -218,9 +218,11 @@ export function createFormationsRail({
       e.target instanceof HTMLInputElement ||
       e.target instanceof HTMLTextAreaElement ||
       e.target instanceof HTMLSelectElement ||
+      (e.target && e.target.isContentEditable) ||
       (e.target &&
         e.target.closest &&
         (e.target.closest(".cm-editor") ||
+          e.target.closest("[contenteditable='true']") ||
           e.target.closest(".tag-prompt-modal") ||
           e.target.closest(".about-modal") ||
           e.target.closest(".morning-report-modal")));
