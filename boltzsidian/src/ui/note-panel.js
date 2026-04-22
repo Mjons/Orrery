@@ -139,14 +139,18 @@ export function createNotePanel({
   closeBtn.addEventListener("click", () => close());
   modeBtn.addEventListener("click", () => toggleMode());
   if (projectBtn) {
+    // Cycle: off → ring → disc → off. Shape stored in frontmatter
+    // as `shape: "ring" | "disc"` when `project: true` is set.
+    const SHAPE_CYCLE = [null, "ring", "disc"];
     projectBtn.addEventListener("click", async () => {
       if (!current || !onToggleProject) return;
-      const next = !(
-        current.frontmatter && current.frontmatter.project === true
-      );
+      const fm = current.frontmatter || {};
+      const cur = fm.project === true ? fm.shape || "ring" : null;
+      const idx = SHAPE_CYCLE.indexOf(cur);
+      const nextShape = SHAPE_CYCLE[(idx + 1) % SHAPE_CYCLE.length];
       try {
-        await onToggleProject(current, next);
-        reflectProject(next);
+        await onToggleProject(current, nextShape);
+        reflectProject(nextShape);
       } catch (err) {
         console.error("[bz] toggle project failed", err);
       }
@@ -189,16 +193,34 @@ export function createNotePanel({
     }
   }
 
-  function reflectProject(on) {
+  // `shape` is null (not a project), "ring", or "disc". The button
+  // cycles through those three states on click; this function just
+  // paints the current state.
+  function reflectProject(shape) {
+    const on = shape === "ring" || shape === "disc";
     panel.dataset.project = on ? "true" : "false";
+    panel.dataset.projectShape = on ? shape : "";
     if (projectBtn) {
-      projectBtn.textContent = on ? "◉" : "◌";
-      const label = on
-        ? "Unmark as project hub"
-        : "Make this a project hub (arrange satellites in a ring)";
+      const glyph = shape === "disc" ? "◈" : shape === "ring" ? "◉" : "◌";
+      projectBtn.textContent = glyph;
+      const label =
+        shape === "ring"
+          ? "Project: Ring — click for Disc"
+          : shape === "disc"
+            ? "Project: Disc — click to clear"
+            : "Make this a project hub (click cycles Ring → Disc → off)";
       projectBtn.setAttribute("aria-label", label);
       projectBtn.title = label;
     }
+  }
+
+  // Read the current shape off a note's frontmatter. Returns null
+  // when the note isn't a project, the shape string otherwise.
+  function shapeOf(note) {
+    const fm = note?.frontmatter;
+    if (!fm || fm.project !== true) return null;
+    const s = String(fm.shape || "ring").toLowerCase();
+    return s === "disc" ? "disc" : "ring";
   }
 
   bodyEl.addEventListener("click", (e) => {
@@ -291,7 +313,7 @@ export function createNotePanel({
     paintTitle(note, note.title || "Untitled");
     metaEl.innerHTML = buildMeta(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
-    reflectProject(note.frontmatter && note.frontmatter.project === true);
+    reflectProject(shapeOf(note));
   }
 
   function open(note, { mode: openMode = "read" } = {}) {
@@ -304,7 +326,7 @@ export function createNotePanel({
     lastSavedText = note.rawText || "";
     refreshHeader(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
-    reflectProject(note.frontmatter && note.frontmatter.project === true);
+    reflectProject(shapeOf(note));
     setMode(openMode);
     panel.classList.add("open");
     panel.setAttribute("aria-hidden", "false");
@@ -706,7 +728,7 @@ export function createNotePanel({
     if (!current || current !== note) return;
     refreshHeader(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
-    reflectProject(note.frontmatter && note.frontmatter.project === true);
+    reflectProject(shapeOf(note));
     if (mode === "read") bodyEl.innerHTML = renderBody(note);
   }
 

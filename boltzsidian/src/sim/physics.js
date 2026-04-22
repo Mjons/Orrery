@@ -1,3 +1,5 @@
+import { idealShapePosition } from "./star-charts.js";
+
 // Spring physics between linked bodies.
 //
 // Runs on the CPU. Symplectic-Euler-ish: velocity is damped, then forces are
@@ -480,33 +482,30 @@ export function createPhysics({
   }
 
   // STAR_CHARTS.md — pull each satellite of a project hub toward
-  // its ideal position on a ring around the hub. Stiffness is low;
-  // the figure is a suggestion, not a constraint. `mix` is a dream-
-  // depth fade so the shape dissolves into drift during sleep.
+  // its ideal position on the chosen shape around the hub.
+  // Stiffness is low; the figure is a suggestion, not a constraint.
+  // `mix` is a dream-depth fade so the shape dissolves into drift
+  // during sleep.
   const SHAPE_K = 0.06;
+  const _hubTmp = [0, 0, 0];
   function applyShapeForces(shapes, live, mix) {
     for (const shape of shapes) {
       const hubIdx = bodies.indexOfId(shape.hubId);
       if (hubIdx < 0 || hubIdx >= live) continue;
-      const hx = positions[hubIdx * 3];
-      const hy = positions[hubIdx * 3 + 1];
-      const hz = positions[hubIdx * 3 + 2];
+      _hubTmp[0] = positions[hubIdx * 3];
+      _hubTmp[1] = positions[hubIdx * 3 + 1];
+      _hubTmp[2] = positions[hubIdx * 3 + 2];
       const n = shape.satIds.length;
       if (n === 0) continue;
       for (let i = 0; i < n; i++) {
         const idx = bodies.indexOfId(shape.satIds[i]);
         if (idx < 0 || idx >= live) continue;
         if (pinnedBuf[idx]) continue;
-        const theta = shape.rotation + (i / n) * Math.PI * 2;
-        // Ring target in the XZ plane with a tiny deterministic
-        // Y-jitter so the figure reads as hand-drawn.
-        const ix = hx + Math.cos(theta) * shape.radius;
-        const iy = hy + Math.sin(i * 2.7 + shape.rotation * 3.1) * 8;
-        const iz = hz + Math.sin(theta) * shape.radius;
+        const ideal = idealShapePosition(_hubTmp, shape, i);
         const ai = idx * 3;
-        const dx = ix - positions[ai];
-        const dy = iy - positions[ai + 1];
-        const dz = iz - positions[ai + 2];
+        const dx = ideal[0] - positions[ai];
+        const dy = ideal[1] - positions[ai + 1];
+        const dz = ideal[2] - positions[ai + 2];
         const k = SHAPE_K * mix;
         force[ai] += dx * k;
         force[ai + 1] += dy * k;

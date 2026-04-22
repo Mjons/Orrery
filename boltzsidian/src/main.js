@@ -2595,15 +2595,17 @@ async function undoUnlink(restore) {
 }
 
 // ── Pin toggle ──────────────────────────────────────────────
-async function handleToggleProject(note, nextProject) {
+// nextShape is one of: null (clear project status), "ring", "disc".
+async function handleToggleProject(note, nextShape) {
   if (!saver) return;
+  const valid = nextShape === "ring" || nextShape === "disc";
   const fm = { ...(note.frontmatter || {}) };
   fm.id = fm.id || note.id;
   if (!fm.created)
     fm.created = new Date(note.mtime || Date.now()).toISOString();
-  if (nextProject) {
+  if (valid) {
     fm.project = true;
-    if (!fm.shape) fm.shape = "ring"; // only supported shape in first cut
+    fm.shape = nextShape;
   } else {
     delete fm.project;
     delete fm.shape;
@@ -2614,12 +2616,10 @@ async function handleToggleProject(note, nextProject) {
     // Refresh the project-shape cache so physics sees the change on
     // the next frame instead of waiting for the ~500ms centroid tick.
     if (vault) projectShapesCache = collectProjectShapes(vault);
-    toast(
-      nextProject
-        ? "Marked as project hub — satellites will ring up"
-        : "Project hub cleared",
-      { duration: 1800 },
-    );
+    const msg = valid
+      ? `Project: ${nextShape} — satellites arranging`
+      : "Project hub cleared";
+    toast(msg, { duration: 1800 });
   } catch (err) {
     console.error("[bz] project toggle failed", err);
     toast("Could not update project flag.");
