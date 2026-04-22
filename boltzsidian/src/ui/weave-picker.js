@@ -72,7 +72,78 @@ export function createWeavePicker({ getVault, runScan, onApply } = {}) {
     fontSize: "12px",
     color: "var(--text-faint)",
   });
-  head.append(eyebrow, title, sub);
+
+  // ── Scope controls ─────────────────────────────────────
+  // Two knobs the user can flip without dropping to the console:
+  //   - Same root only (default on). Turn OFF when the project
+  //     spans multiple vault roots.
+  //   - Title prefix (optional text). When set, the candidate
+  //     set is every note whose title starts with this string.
+  //     Useful when the project's notes share a naming
+  //     convention but aren't cross-linked yet.
+  const scopeRow = document.createElement("div");
+  Object.assign(scopeRow.style, {
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    marginTop: "10px",
+    fontSize: "11px",
+    color: "var(--text-dim)",
+    letterSpacing: "0.02em",
+  });
+  const sameRootLabel = document.createElement("label");
+  Object.assign(sameRootLabel.style, {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  });
+  const sameRootBox = document.createElement("input");
+  sameRootBox.type = "checkbox";
+  sameRootBox.checked = true;
+  Object.assign(sameRootBox.style, { accentColor: "var(--accent)" });
+  sameRootBox.addEventListener("change", () => {
+    if (currentHub) render(currentHub);
+  });
+  sameRootLabel.append(sameRootBox, document.createTextNode("Same root only"));
+
+  const prefixLabel = document.createElement("label");
+  Object.assign(prefixLabel.style, {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    flex: "1 1 auto",
+    minWidth: 0,
+  });
+  prefixLabel.append(document.createTextNode("Title prefix:"));
+  const prefixInput = document.createElement("input");
+  prefixInput.type = "text";
+  prefixInput.placeholder = "e.g. Delphica — widens scope across roots";
+  Object.assign(prefixInput.style, {
+    flex: "1 1 auto",
+    minWidth: 0,
+    background: "rgba(255, 255, 255, 0.04)",
+    border: "1px solid var(--glass-border)",
+    borderRadius: "4px",
+    padding: "3px 8px",
+    color: "var(--text)",
+    fontFamily: "inherit",
+    fontSize: "11px",
+    outline: "none",
+  });
+  let prefixDebounce = 0;
+  prefixInput.addEventListener("input", () => {
+    if (prefixDebounce) clearTimeout(prefixDebounce);
+    prefixDebounce = setTimeout(() => {
+      if (currentHub) render(currentHub);
+    }, 220);
+  });
+  prefixInput.addEventListener("keydown", (e) => e.stopPropagation());
+  prefixLabel.append(prefixInput);
+  scopeRow.append(sameRootLabel, prefixLabel);
+
+  head.append(eyebrow, title, sub, scopeRow);
 
   const list = document.createElement("div");
   Object.assign(list.style, {
@@ -136,6 +207,8 @@ export function createWeavePicker({ getVault, runScan, onApply } = {}) {
   // ── State ──────────────────────────────────────────────
   let scanResult = null;
   let skipSet = new Set(); // `fromId:toId` that the user unchecked
+  let currentHub = null;
+  let lastScanOpts = null;
 
   document.addEventListener("keydown", onKey, true);
   function onKey(e) {
@@ -157,12 +230,25 @@ export function createWeavePicker({ getVault, runScan, onApply } = {}) {
     if (!hub) return;
     overlay.style.display = "flex";
     skipSet = new Set();
+    currentHub = hub;
     lastScanOpts = scanOpts;
+    // Seed the scope controls from the incoming opts so the UI
+    // matches what the caller asked for.
+    if (scanOpts) {
+      if (typeof scanOpts.sameRootOnly === "boolean") {
+        sameRootBox.checked = scanOpts.sameRootOnly;
+      }
+      prefixInput.value = scanOpts.titlePrefix || "";
+    } else {
+      sameRootBox.checked = true;
+      prefixInput.value = "";
+    }
     render(hub);
   }
   function close() {
     overlay.style.display = "none";
     scanResult = null;
+    currentHub = null;
     list.innerHTML = "";
   }
   function isOpen() {
@@ -185,7 +271,18 @@ export function createWeavePicker({ getVault, runScan, onApply } = {}) {
       updateFooter();
       return;
     }
-    scanResult = runScan(vault, hub.id, lastScanOpts);
+    // Build scan options from the live scope controls (these can
+    // have been adjusted by the user since open()).
+    const liveOpts = {
+      sameRootOnly: sameRootBox.checked,
+    };
+    const prefix = prefixInput.value.trim();
+    if (prefix) liveOpts.titlePrefix = prefix;
+    scanResult = runScan(vault, hub.id, liveOpts);
+    lastScanOpts = liveOpts;
+    // Fresh scan = fresh "unchecked" selections so the user isn't
+    // carrying decisions over into a different candidate set.
+    skipSet = new Set();
     title.textContent = `→ [[${hub.title || "untitled"}]]`;
     const { satellites, proposals, skipped } = scanResult;
     sub.textContent = `${satellites.length} satellite${satellites.length === 1 ? "" : "s"} · ${proposals.length} proposal${proposals.length === 1 ? "" : "s"} (${skipped.alreadyLinked} already linked, ${skipped.noMention} no prose mention)`;

@@ -563,7 +563,8 @@
         text-align: right;
       }
       #note-panel .panel-pin,
-      #note-panel .panel-project {
+      #note-panel .panel-project,
+      #note-panel .panel-weave {
         background: transparent;
         border: 1px solid var(--glass-border);
         color: var(--text-faint);
@@ -575,7 +576,8 @@
         font-family: inherit;
       }
       #note-panel .panel-pin:hover,
-      #note-panel .panel-project:hover {
+      #note-panel .panel-project:hover,
+      #note-panel .panel-weave:hover {
         color: var(--accent);
         border-color: rgba(138, 180, 255, 0.5);
       }
@@ -3850,6 +3852,14 @@
         <h1 class="panel-title"></h1>
         <div class="panel-actions">
           <span class="panel-status" aria-live="polite"></span>
+          <button
+            class="panel-weave"
+            type="button"
+            aria-label="Weave satellites"
+            title="Weave — propose cross-links between this note's satellites (Shift+O)"
+          >
+            ⋈
+          </button>
           <button
             class="panel-project"
             type="button"

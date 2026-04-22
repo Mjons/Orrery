@@ -19,6 +19,9 @@ export function createNotePanel({
   onToggleProject, // async (note, next: boolean) => void — flip
   // the note's `project: true` frontmatter flag. Caller writes the
   // change through the saver so the shape cache refreshes next tick.
+  onWeave, // (note) => void — open the weave picker for this note's
+  // neighborhood. Caller decides scan scope; the picker exposes
+  // same-root / title-prefix controls in its own header.
   onDelete, // async (note) => void — delete the note from disk + vault.
   // Caller is responsible for the native confirm() and for closing
   // the panel; we just call this when the user clicks the button.
@@ -31,6 +34,7 @@ export function createNotePanel({
   const modeBtn = panel.querySelector(".panel-mode");
   const pinBtn = panel.querySelector(".panel-pin");
   const projectBtn = panel.querySelector(".panel-project");
+  const weaveBtn = panel.querySelector(".panel-weave");
   const deleteBtn = panel.querySelector(".panel-delete");
   const statusEl = panel.querySelector(".panel-status");
   const resizeHandle = panel.querySelector(".panel-resize-handle");
@@ -138,6 +142,12 @@ export function createNotePanel({
 
   closeBtn.addEventListener("click", () => close());
   modeBtn.addEventListener("click", () => toggleMode());
+  if (weaveBtn) {
+    weaveBtn.addEventListener("click", () => {
+      if (!current || !onWeave) return;
+      onWeave(current);
+    });
+  }
   if (projectBtn) {
     // Cycle: off → ring → disc → off. Shape stored in frontmatter
     // as `shape: "ring" | "disc"` when `project: true` is set.

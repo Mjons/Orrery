@@ -600,6 +600,13 @@ const notePanel = createNotePanel({
   onSave: handleSave,
   onTogglePin: handleTogglePin,
   onToggleProject: handleToggleProject,
+  // WEAVE.md — open the picker on the current note. Starts with
+  // the defaults (same-root on, no prefix); the user can toggle
+  // scope from inside the modal.
+  onWeave: (note) => {
+    if (!weavePicker) return;
+    weavePicker.open(note, null);
+  },
   // Manual note deletion from the panel header. The panel's click
   // handler fires the native confirm(); by the time we're called the
   // user has already said yes. We reuse Weed's two-stage path:
