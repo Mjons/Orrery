@@ -27,15 +27,19 @@ const PASS_META = [
 // one item so the bulk action isn't a one-click footgun.
 const BULK_UNLOCK_MIN = 1;
 
-// TEND_BULK_CRASH.md §5D — yield between accepts so rAF-gated
-// rebuilds fire, layout can update, and GC has time to reclaim.
-// On the 1280-proposal batch, even Low render quality wasn't
-// enough — the write + reparse + side-effect cascade saturates
-// the main thread. Yield every accept, plus a small setTimeout to
-// give the event loop's idle phase a guaranteed turn. Slower wall-
-// clock (+~15 ms per accept) but stable on big vaults.
+// TEND_BULK_CRASH.md §5D + TEND_STAMP_MISMATCH.md §7.5 — yield
+// between accepts so rAF-gated rebuilds fire, layout can update,
+// and GC has time to reclaim. Chill tempo matches LLM cadence;
+// fast is the legacy sprint for small batches on beefy machines.
 const BATCH_CHUNK = 1;
-const BATCH_PAUSE_MS = 12;
+const PACE_PAUSE_MS = {
+  fast: 12, // ~80 items/s, old default, risky on 1000+
+  chill: 250, // ~4 items/s, matches polish turnaround, safe at any scale
+  manual: 0, // not used — Accept-all hidden; items done one at a time
+};
+function pauseForPace(pace) {
+  return PACE_PAUSE_MS[pace] ?? PACE_PAUSE_MS.chill;
+}
 
 // TEND_BULK_CRASH.md §5E — only render this many proposals as DOM
 // at any given time. On a 1000+ proposal batch, keeping the full
@@ -56,6 +60,12 @@ export function createTendDrawer({
   // long batch.
   onBulkStart,
   onBulkEnd,
+  // TEND_STAMP_MISMATCH.md §7.5 — "fast" | "chill" | "manual".
+  // Drives the per-accept pause in the bulk loop. `manual` hides
+  // the Accept-all button entirely so the user clicks each item.
+  // Returns the live setting so a mid-session change takes effect
+  // on the next bulk click without a restart.
+  getBulkPace = () => "chill",
 }) {
   const drawer = document.getElementById("tend-drawer");
   if (!drawer) {
@@ -334,6 +344,11 @@ export function createTendDrawer({
     bulk.title = bulk.disabled
       ? `Review at least ${BULK_UNLOCK_MIN} item${BULK_UNLOCK_MIN === 1 ? "" : "s"} individually first.`
       : "Accept every remaining suggestion in this group.";
+    // TEND_STAMP_MISMATCH.md §7.5 — Manual pace hides the button
+    // outright. The user opted into clicking each Accept individually.
+    if (getBulkPace() === "manual") {
+      bulk.style.display = "none";
+    }
     bulk.addEventListener("click", async () => {
       // TEND_BULK_CONCURRENCY.md §3.1 — single-flight lock. A second
       // bulk (same group OR different group) while one is running
@@ -356,6 +371,10 @@ export function createTendDrawer({
         // Accept-all to process EVERY proposal of this pass in the
         // batch, including pending ones that topUp hasn't shown yet.
         const snapshot = proposals.filter((p) => p.pass === passId);
+        // Read pace ONCE at click time — mid-batch pace changes
+        // would surprise the user. Chill is the default (250 ms);
+        // fast is the old sprint.
+        const pauseMs = pauseForPace(getBulkPace());
         for (let i = 0; i < snapshot.length; i++) {
           // Abort check: Clear / setProposals / a newer bulk-click
           // all bump activeBulkId. If that happened, stop cleanly
@@ -365,10 +384,9 @@ export function createTendDrawer({
           if ((i + 1) % BATCH_CHUNK === 0) {
             // Double yield: rAF guarantees a paint frame, setTimeout
             // after rAF gives GC + idle tasks (polish, salience) a
-            // turn before we kick off the next accept. ~28 ms total
-            // pause per accept at 60 Hz.
+            // turn before we kick off the next accept.
             await new Promise((resolve) => {
-              requestAnimationFrame(() => setTimeout(resolve, BATCH_PAUSE_MS));
+              requestAnimationFrame(() => setTimeout(resolve, pauseMs));
             });
           }
         }

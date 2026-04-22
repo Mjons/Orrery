@@ -393,6 +393,20 @@ export function initSettings({
         </button>
         <span class="settings-row-num" id="s-tend-status"></span>
       </div>
+      <label class="settings-row">
+        <span>Bulk pace</span>
+        <div class="settings-quality-pick" id="s-tend-pace-pick">
+          <button type="button" data-pace="fast">Fast</button>
+          <button type="button" data-pace="chill">Chill</button>
+          <button type="button" data-pace="manual">Manual</button>
+        </div>
+      </label>
+      <p class="settings-hint">
+        Accept-all tempo. <b>Fast</b> is the legacy sprint (~80 items/s) —
+        good for small batches on beefy machines. <b>Chill</b> matches
+        what the LLM polish pass can keep up with (~4 items/s), safe at
+        any batch size. <b>Manual</b> hides the Accept-all button entirely.
+      </p>
     </section>
 
     <section class="settings-group" id="s-weed-section">
@@ -467,6 +481,7 @@ export function initSettings({
   const showConstellations = pane.querySelector("#s-show-constellations");
   const qualityPick = pane.querySelector("#s-quality-pick");
   const qualityAuto = pane.querySelector("#s-quality-auto");
+  const tendPacePick = pane.querySelector("#s-tend-pace-pick");
   const homeViewSelect = pane.querySelector("#s-home-view");
 
   // Populate ambience options once; selection reflects current setting on
@@ -519,6 +534,23 @@ export function initSettings({
     const buttons = qualityPick.querySelectorAll("button[data-tier]");
     for (const b of buttons) {
       b.classList.toggle("is-active", b.dataset.tier === tier);
+    }
+  }
+  if (tendPacePick) {
+    tendPacePick.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-pace]");
+      if (!btn) return;
+      const pace = btn.dataset.pace;
+      if (!pace) return;
+      onChange({ tend_bulk_pace: pace });
+      syncTendPacePick(pace);
+    });
+  }
+  function syncTendPacePick(pace) {
+    if (!tendPacePick) return;
+    const buttons = tendPacePick.querySelectorAll("button[data-pace]");
+    for (const b of buttons) {
+      b.classList.toggle("is-active", b.dataset.pace === pace);
     }
   }
   const chorusOn = pane.querySelector("#s-chorus-on");
@@ -747,6 +779,7 @@ export function initSettings({
     if (qualityAuto) {
       qualityAuto.checked = settings.render_quality_auto !== false;
     }
+    syncTendPacePick(settings.tend_bulk_pace || "chill");
     homeViewSelect.value = settings.home_view || "last_focused";
     chorusOn.checked = !!settings.observer_chorus;
     if (confirmUnlink)

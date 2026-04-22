@@ -558,11 +558,12 @@ async function runTendAndOpen({ enabled } = {}) {
     onUpdate: (proposal) => {
       tendDrawer.refresh?.(proposal);
     },
-    // Stop polishing when the user kicks off a bulk-accept. Already-
-    // polished entries keep their reasons; unpolished ones stay on
-    // their rule-derived fallback. Acceptable — during a bulk
-    // accept the user isn't reading reasons anyway.
-    getAborted: () => isBulkInProgress,
+    // Stop polishing during Fast-pace bulk accepts where every
+    // main-thread microsecond matters. At Chill pace (default) the
+    // 250 ms between accepts leaves ample room for polish to run
+    // concurrently — which is the "no rush, LLM tempo" design from
+    // TEND_STAMP_MISMATCH.md §7.5.
+    getAborted: () => isBulkInProgress && settings.tend_bulk_pace === "fast",
   }).catch((err) => {
     console.warn("[bz] tend-polish harvester threw", err);
   });
@@ -757,11 +758,15 @@ const tendDrawer = createTendDrawer({
     // Suspend polish + salience so the bulk write loop has the
     // main thread to itself. The flag is checked by polish's
     // getAborted and salience's getPaused callbacks below.
+    // TEND_STAMP_MISMATCH.md §7.5 — only meaningful at Fast pace;
+    // at Chill pace the bulk yields long enough (250 ms) that
+    // polish can run concurrently without competing.
     isBulkInProgress = true;
   },
   onBulkEnd: () => {
     isBulkInProgress = false;
   },
+  getBulkPace: () => settings.tend_bulk_pace || "chill",
 });
 
 // Weed drawer — prune-candidate triage. One shared instance, opened via
@@ -1899,11 +1904,10 @@ async function setWorkspace(ws) {
       // current theme. Null when no theme is active or the theme
       // fell back to random (too few members).
       getThemeSet: () => themeSetCache,
-      // Suspend the scanner tick while a tend bulk-accept is
-      // running. Pair-sampling + resonance checks are nontrivial
-      // on large vaults and compete for the main thread exactly
-      // when the bulk loop needs it.
-      getPaused: () => isBulkInProgress,
+      // Suspend the scanner tick during Fast-pace bulk accepts
+      // only — Chill pace leaves plenty of room for salience to
+      // keep ticking concurrently (TEND_STAMP_MISMATCH.md §7.5).
+      getPaused: () => isBulkInProgress && settings.tend_bulk_pace === "fast",
       utterance,
       onPairSpawn: ({ midpoint, kind }) => {
         // Two-spark model (DREAM_ENGINE.md §11.9 Q1):
@@ -2848,6 +2852,13 @@ function handleSettingsChange(patch) {
   if ("render_quality_auto" in patch) {
     qualityMonitor.setEnabled(patch.render_quality_auto);
     applyRenderTier(qualityMonitor.getCurrentTier());
+  }
+  if ("tend_bulk_pace" in patch) {
+    // Re-render the drawer so the Accept-all button shows/hides to
+    // match the new pace. Mid-bulk pace changes don't retroactively
+    // affect the running loop — the pause value was snapshotted at
+    // click time — but a fresh Accept-all picks up the new value.
+    tendDrawer.refresh?.();
   }
   // folder_influence, chorus_density and chorus_font_size are read live via
   // their respective getters — no refresh call needed.

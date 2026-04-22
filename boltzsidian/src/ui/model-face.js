@@ -196,7 +196,7 @@ export function createModelFace({ mountId = "model-face" } = {}) {
   // clears it after the animation completes. Scheduled ambiently with
   // a long random gap so it feels like a tic, not a loop. Suppressed
   // when the face is sleeping — closed eyes don't pop.
-  const BULGE_MS = 1050;
+  const BULGE_MS = 3150;
   let bulgeTimer = 0;
   function bulge() {
     svg.dataset.bulge = "1";

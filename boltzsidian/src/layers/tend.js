@@ -335,11 +335,22 @@ function alreadyTended(vault, proposal) {
   const note = vault.byId.get(proposal.noteId);
   if (!note) return true; // can't propose on a deleted note
   const stamp = note.frontmatter?.tended_on;
-  if (!stamp || typeof stamp !== "object") return false;
-  // stamp shape (set by tend-apply): { "tag-infer": iso, "obvious-link:<targetId>": iso, … }
-  // For passes that target another note (link, collision), key includes the target id.
+  if (!stamp) return false;
   const key = keyForProposal(proposal);
-  return !!stamp[key];
+  const rejectedKey = `rejected:${key}`;
+  // TEND_STAMP_MISMATCH.md — tend-apply writes tended_on as an
+  // ARRAY of "<pass>:<target?>" strings. The original dict-shape
+  // check always returned undefined on an array + string index,
+  // which meant every accepted proposal was considered fresh and
+  // re-proposed on every scan. Handle both shapes: current writes
+  // are arrays; any legacy dict-shape frontmatter still resolves.
+  if (Array.isArray(stamp)) {
+    return stamp.includes(key) || stamp.includes(rejectedKey);
+  }
+  if (typeof stamp === "object") {
+    return !!stamp[key] || !!stamp[rejectedKey];
+  }
+  return false;
 }
 
 export function keyForProposal(proposal) {

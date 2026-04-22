@@ -75,6 +75,12 @@ export const DEFAULT_SETTINGS = {
   // prior behaviour.
   render_quality_ceiling: "high",
   render_quality_auto: true,
+  // TEND_STAMP_MISMATCH.md §7.5 — how fast "Accept all" processes
+  // a batch. `fast` = 12 ms per accept (old default, crash-prone on
+  // 1000+ proposals); `chill` = 250 ms per accept (matches LLM
+  // turnaround, survives any batch size); `manual` = no Accept-all
+  // button, user clicks each accept individually.
+  tend_bulk_pace: "chill",
   // User-renamed constellations. Keyed by an arbitrary slot id; each
   // entry carries the memberIds snapshot from when the user named it
   // so we can match the same region back even after cluster ids
