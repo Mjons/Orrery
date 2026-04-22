@@ -129,10 +129,19 @@ export function idealShapePosition(hubPos, shape, index) {
   const n = shape.satIds.length;
   if (n === 0) return [hubPos[0], hubPos[1], hubPos[2]];
 
+  // Shared 3D noise — small deterministic wobble on every axis so
+  // nothing ever sits on a compass-perfect point. Amplitude scales
+  // with radius so big figures breathe more than tight ones.
+  const wobble = shape.radius * 0.04;
+  const jx = Math.sin(index * 2.7 + shape.rotation * 3.1) * wobble;
+  const jy = Math.sin(index * 4.1 + shape.rotation * 5.3) * wobble;
+  const jz = Math.sin(index * 3.5 + shape.rotation * 1.9) * wobble;
+
   if (shape.shape === "disc") {
-    // Two-ring galactic disc. Inner half at 60% of outer radius,
-    // outer half at full radius. Angular offset between the two
-    // rings so notes don't stack radially.
+    // Galactic disc with real thickness. Inner core at ~58% radius,
+    // outer arm at full radius. Vertical thickness scales with
+    // radius so the disc tapers toward the edge — feels like a
+    // galaxy you could rotate around.
     const half = Math.ceil(n / 2);
     const isInner = index < half;
     const within = isInner ? index : index - half;
@@ -140,59 +149,73 @@ export function idealShapePosition(hubPos, shape, index) {
     const r = shape.radius * (isInner ? 0.58 : 1.0);
     const offset = isInner ? 0 : Math.PI / half; // stagger between rings
     const theta = shape.rotation + offset + (within / count) * Math.PI * 2;
-    const jitter = Math.sin(index * 2.7 + shape.rotation * 3.1) * 10;
+    // Disc-thickness: ±30% of radius, weighted so the core has more
+    // vertical spread than the outer edge.
+    const thickness = shape.radius * (isInner ? 0.35 : 0.18);
+    const y = Math.sin(theta * 2 + index * 1.3) * thickness;
     return [
-      hubPos[0] + Math.cos(theta) * r,
-      hubPos[1] + jitter,
-      hubPos[2] + Math.sin(theta) * r,
+      hubPos[0] + Math.cos(theta) * r + jx,
+      hubPos[1] + y + jy,
+      hubPos[2] + Math.sin(theta) * r + jz,
     ];
   }
 
   if (shape.shape === "spine") {
-    // Linear row through the hub — half the satellites to each side.
-    // Good for timelines and sequences. Oriented by shape.rotation
-    // so two spines in the same vault don't point the same way.
-    // Tiny Y-jitter + a gentle zig-zag around the center line so
-    // the row doesn't read as a ruler.
+    // Helix along the rotation axis — a timeline that spirals.
+    // Each satellite advances along the axis AND rotates around
+    // it, so every one gets a different Y height. Reads as a
+    // strand of DNA more than a ruler.
     const spacing = Math.max(70, (shape.radius * 2) / Math.max(1, n - 1));
     const offset = (index - (n - 1) / 2) * spacing;
     const cosR = Math.cos(shape.rotation);
     const sinR = Math.sin(shape.rotation);
-    const jitter = Math.sin(index * 2.7 + shape.rotation * 3.1) * 14;
-    // Side-offset perpendicular to the spine so alternating notes
-    // sit slightly above/below the line — reads as backbone, not
-    // ruler.
-    const side = (index % 2 === 0 ? 1 : -1) * 18;
+    // Helix radius ~35% of full shape radius; two full turns over
+    // the length so neighbors stay visually distinct.
+    const helixR = shape.radius * 0.35;
+    const turns = 2;
+    const phase = (index / Math.max(1, n - 1)) * turns * Math.PI * 2;
+    const hx = Math.cos(phase) * helixR;
+    const hy = Math.sin(phase) * helixR;
     return [
-      hubPos[0] + offset * cosR + -sinR * side,
-      hubPos[1] + jitter,
-      hubPos[2] + offset * sinR + cosR * side,
+      hubPos[0] + offset * cosR + -sinR * hx + jx,
+      hubPos[1] + hy + jy,
+      hubPos[2] + offset * sinR + cosR * hx + jz,
     ];
   }
 
   if (shape.shape === "fan") {
-    // Arc of ~140° in one direction from the hub. Good for catalogs
-    // and "variations on a theme" where the hub points at everything.
-    const arcRad = (140 / 180) * Math.PI;
-    const t = n <= 1 ? 0.5 : index / (n - 1);
-    const theta = shape.rotation + (t - 0.5) * arcRad;
-    const r = shape.radius;
-    const jitter = Math.sin(index * 2.7 + shape.rotation * 3.1) * 10;
+    // Wedge fanning out in one direction — spread across BOTH
+    // azimuth (horizontal arc) and elevation (vertical arc). Reads
+    // as a spray of options, not a flat row.
+    const azArc = (110 / 180) * Math.PI; // horizontal spread
+    const elArc = (55 / 180) * Math.PI; // vertical spread
+    // Deterministic 2D scatter — low-discrepancy so the wedge
+    // fills evenly even for small N.
+    const phi = 1.61803398875; // golden ratio for spread
+    const u = (index + 0.5) / n - 0.5; // [-0.5, 0.5]
+    const v = ((index * phi) % 1) - 0.5; // [-0.5, 0.5]
+    const az = shape.rotation + u * azArc;
+    const el = v * elArc;
+    const r = shape.radius * (0.85 + (index % 3) * 0.075); // mild depth variation
     return [
-      hubPos[0] + Math.cos(theta) * r,
-      hubPos[1] + jitter,
-      hubPos[2] + Math.sin(theta) * r,
+      hubPos[0] + Math.cos(az) * Math.cos(el) * r + jx,
+      hubPos[1] + Math.sin(el) * r + jy,
+      hubPos[2] + Math.sin(az) * Math.cos(el) * r + jz,
     ];
   }
 
-  // Default: ring.
+  // Default: ring — 3D crown. Satellites on a circle whose Y
+  // coordinate waves up and down around the ring, so it reads as
+  // a crown from most viewing angles instead of a flat halo.
   const theta = shape.rotation + (index / n) * Math.PI * 2;
   const r = shape.radius;
-  const jitter = Math.sin(index * 2.7 + shape.rotation * 3.1) * 8;
+  // Crown wave: three peaks around the ring, amplitude ~40% of r.
+  const crownAmp = r * 0.4;
+  const crownY = Math.sin(theta * 3 + shape.rotation * 2) * crownAmp;
   return [
-    hubPos[0] + Math.cos(theta) * r,
-    hubPos[1] + jitter,
-    hubPos[2] + Math.sin(theta) * r,
+    hubPos[0] + Math.cos(theta) * r + jx,
+    hubPos[1] + crownY + jy,
+    hubPos[2] + Math.sin(theta) * r + jz,
   ];
 }
 
