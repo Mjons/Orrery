@@ -30,6 +30,13 @@ function parseYaml(src) {
     if (colon === -1) continue;
     const key = line.slice(0, colon).trim();
     if (!key) continue;
+    // Skip keys that are obviously corrupted — a bare orphan line like
+    //   "obvious-link: "01KP...\\\\...","
+    // that the escape-runaway bug (TENDING_BUGS_ROOT_CAUSE.md) used to
+    // emit would parse as a key starting with `"` and never closing.
+    // Dropping these here lets the next save write a clean frontmatter.
+    if (key.startsWith('"') && !key.endsWith('"')) continue;
+    if (key.startsWith("'") && !key.endsWith("'")) continue;
     const value = line.slice(colon + 1).trim();
     data[key] = parseScalar(value);
   }
@@ -46,11 +53,25 @@ function parseScalar(s) {
     if (!inner) return [];
     return splitCsv(inner).map((x) => parseScalar(x.trim()));
   }
-  if (
-    (s.startsWith('"') && s.endsWith('"')) ||
-    (s.startsWith("'") && s.endsWith("'"))
-  ) {
-    return s.slice(1, -1);
+  // Double-quoted strings are JSON-compatible. Use JSON.parse so that
+  // backslash escapes are resolved correctly — the previous
+  // `s.slice(1, -1)` preserved backslashes literally, and every save
+  // cycle then re-escaped them via JSON.stringify, producing the
+  // escape-runaway corruption in TENDING_BUGS_ROOT_CAUSE.md §Bug 1.
+  if (s.startsWith('"') && s.endsWith('"')) {
+    try {
+      return JSON.parse(s);
+    } catch {
+      // Malformed (historical corruption). Best-effort: strip outer
+      // quotes, remove any backslash garbage and inner double-quotes.
+      // Next save re-serializes this cleanly.
+      return s.slice(1, -1).replace(/\\+/g, "").replace(/"/g, "");
+    }
+  }
+  // Single-quoted: outer quotes strip literally. YAML's `''` → `'`
+  // escape isn't something our serializer produces, but honour it.
+  if (s.startsWith("'") && s.endsWith("'")) {
+    return s.slice(1, -1).replace(/''/g, "'");
   }
   return s;
 }
@@ -89,12 +110,31 @@ export function stringifyFrontmatter(data, body) {
 }
 
 function stringifyScalar(v) {
+  if (Array.isArray(v)) {
+    return `[${v.map(stringifyItem).join(", ")}]`;
+  }
+  return stringifyItem(v);
+}
+
+// Shared by top-level scalars and array elements. MUST be
+// round-trip-safe: serialized form must parse back to the same
+// value. Previously the serializer recursed through stringifyScalar
+// for array elements, which combined with a non-unescaping parser
+// to produce the escape-runaway bug (TENDING_BUGS_ROOT_CAUSE.md §1).
+// Flattening to a single path for both scalars and array elements
+// prevents that class of accident.
+function stringifyItem(v) {
   if (v === null || v === undefined) return "null";
   if (typeof v === "boolean") return v ? "true" : "false";
   if (typeof v === "number") return String(v);
-  if (Array.isArray(v)) return `[${v.map(stringifyScalar).join(", ")}]`;
   const s = String(v);
-  // quote if contains characters that would confuse our parser
-  if (/[:#\[\]"']/.test(s) || s !== s.trim()) return JSON.stringify(s);
+  // Quote if the string would otherwise parse as null/bool/number,
+  // or if it contains characters the parser's grammar treats as
+  // structural (colon, brackets, quotes, commas, backslashes, `#`).
+  // Leading/trailing whitespace is not representable without quotes.
+  const reserved =
+    s === "" || s === "null" || s === "~" || s === "true" || s === "false";
+  if (reserved || /^-?\d+(\.\d+)?$/.test(s)) return JSON.stringify(s);
+  if (/[:#\[\],"'\\]/.test(s) || s !== s.trim()) return JSON.stringify(s);
   return s;
 }
