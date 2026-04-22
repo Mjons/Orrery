@@ -116,6 +116,17 @@ function resolveRoot(vault, note) {
 }
 
 async function maybeRename(vault, note, beforeTitle, settings, root) {
+  // Kill-switch for the rename-on-save misfire documented in
+  // TENDING_BUGS_ROOT_CAUSE.md. Default off — opt-in only. Every save
+  // was previously re-deriving a stem from the H1, which combined
+  // with the `# FILENAME.md — Subtitle` convention produces
+  // double-`.md` filenames on first tend. Off until the three
+  // tend-pipeline bugs are actually fixed.
+  if (settings?.auto_rename_on_title !== true) return { renamed: false };
+  // Only consider a rename when the title ACTUALLY changed. The
+  // pipeline reparses the note on every save, which was triggering
+  // a rename check even when the H1 was untouched.
+  if (note.title === beforeTitle) return { renamed: false };
   const desiredStem = titleToStem(note.title);
   const currentStem = note.name.replace(/\.md$/i, "");
   if (desiredStem === currentStem) return { renamed: false };
