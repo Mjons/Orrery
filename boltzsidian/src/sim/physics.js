@@ -489,8 +489,10 @@ export function createPhysics({
   // the figure. `mix` is a dream-depth fade.
   //
   // Stiffness history: 0.06 was barely visible; 0.6 still lost to
-  // springs; 2.5 finally wins clearly on real vaults.
-  const SHAPE_K = 2.5;
+  // springs; 2.5 moved some but satellites with multiple
+  // independent link-springs stayed clumped. 5.0 wins even against
+  // a satellite with 3-4 competing spring vectors.
+  const SHAPE_K = 5.0;
   const _hubTmp = [0, 0, 0];
   function applyShapeForces(shapes, live, mix) {
     for (const shape of shapes) {
@@ -563,9 +565,10 @@ export function createPhysics({
         const dy = ideal[1] - positions[ai + 1];
         const dz = ideal[2] - positions[ai + 2];
         // Velocity kick proportional to distance — far satellites
-        // travel faster, close ones barely move. Scaled so a 180-
-        // unit gap takes ~0.6s at wake maxSpeed.
-        const KICK = 0.9;
+        // travel faster, close ones barely move. 1.5 is close to
+        // the speed cap (600) at 400-unit gaps, so the launch
+        // reads as an obvious snap toward the ring.
+        const KICK = 1.5;
         velocities[ai] += dx * KICK;
         velocities[ai + 1] += dy * KICK;
         velocities[ai + 2] += dz * KICK;
