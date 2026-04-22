@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDAJC15HEWX41D0YHMBE
+created: "2026-04-19T23:41:09.544Z"
+---
+
 # CENTER_VANISH.md — Why Centers of Mass Keep Disappearing
 
 A deep-dive on all the reasons the galactic core / central black hole
@@ -446,3 +452,5 @@ the orbit" in a way they cannot learn "the feature randomly gave up
 after 90 seconds."
 
 Ship the easy fixes. Live with the hard ones.
+
+#star #user #risk

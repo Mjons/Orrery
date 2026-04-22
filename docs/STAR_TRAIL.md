@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDTEQF01TCJJSPNJCB1S
+created: "2026-04-19T01:55:34.880Z"
+---
+
 # STAR_TRAIL.md — The Endless Trail
 
 Draw a persistent line through the world showing where the followed body
@@ -330,3 +336,5 @@ For future launch copy, prose shamelessly stolen from this doc:
 > Click a star. Look at where it came from.
 
 That last one's the tweet.
+
+#phase #user #star

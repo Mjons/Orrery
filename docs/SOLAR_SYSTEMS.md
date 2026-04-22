@@ -1,3 +1,8 @@
+---
+id: 01KPS9CFDJTR71A86YWAMCXE87
+created: "2026-04-21T20:01:50-04:00"
+---
+
 # SOLAR_SYSTEMS.md — A System Around Every Star
 
 Click any star. Follow-cam attaches and a small, procedurally generated
@@ -553,3 +558,5 @@ effort. If not, the concept needs rethinking, not more polish.
 > Sixteen thousand stars. Sixteen thousand private universes.
 
 That last one is the front-page-of-HN line.
+
+#star #user #feature

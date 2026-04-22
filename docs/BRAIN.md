@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDA6BY4GFVAYWPJHCGMC
+created: "2026-04-19T16:24:18.432Z"
+---
+
 # BRAIN.md — The Simulator as Memory Substrate
 
 A speculative design doc. What if we stopped treating the 4096 particles as
@@ -561,3 +567,5 @@ No tidy answers. These are the parts that would have to be lived with.
 
 The simulator is already a brain. Wire up the sidecar, name the moods,
 don't script the dreams.
+
+#user #person #feature

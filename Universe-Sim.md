@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDYFN85B8N3Y1ENGJ3GM
+created: "2026-04-17T14:21:08.211Z"
+---
+
 # Universe Sim
 
 GPU-accelerated N-body universe simulator. Browser, Three.js, WebGL2.
@@ -106,3 +112,5 @@ The simulator aims for surprises. Several mechanics cooperate:
   grain → output (order matters).
 
 See `SPEC.md` for the core physics spec and `ROADMAP.md` for what's planned.
+
+#panel

@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDMJP20SD4H90X1YM5HM
+created: "2026-04-21T22:45:40.611Z"
+---
+
 # MULTI_PROJECT_AUDIT.md — Phase 0 inventory
 
 Output of `MULTI_PROJECT_PLAN.md` Phase 0. Every single-workspace
@@ -438,3 +444,5 @@ Phase 1 — `src/vault/manifest.js` + `src/state/settings.js` schema
 change + dev-hook for `parseManifest`. Estimated 4 hours. No
 user-visible change; the sole-root flow is dormantly still in
 place.
+
+#phase #panel #reference

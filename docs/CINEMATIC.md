@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDBV5HN5ZJH2S5NDJN9P
+created: "2026-04-17T15:40:07.259Z"
+---
+
 # CINEMATIC.md — Endless Director Mode
 
 A plan for a cinematic mode that drifts the sim forever without ever looking
@@ -265,3 +271,5 @@ Hotkey: `C` toggles on/off. `Shift+C` cycles pace. No other surface area.
 Ship phase 1 alone first. Live with it for a few days before phase 3
 — the reframe system is the expensive bet and shouldn't be designed
 from a cold start.
+
+#phase #user #star

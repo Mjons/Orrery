@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDVDX5ZCXF3V9C87SPZH
+created: "2026-04-21T10:54:50.204Z"
+---
+
 # STREAM_SETUP.md — 24/7 Twitch Setup From Scratch
 
 Everything required to go from a bare 1080ti box to a live, unattended,
@@ -648,3 +654,5 @@ If you only do four things, do these:
 4. Nightly scheduled Chrome restart.
 
 Everything above is polish. These four will get you 90% of the way.
+
+#panel #user #daily

@@ -1,6 +1,12 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDKZ314PWR4YP7VY2CGH
+created: "2026-04-21T22:29:33.461Z"
+---
+
 # MULTI_PROJECT.md — Linking project markdown into Boltzsidian
 
-Sibling to DREAM_ENGINE.md and MODEL_SURFACES.md. Scoped to the
+Sibling to [[DREAM_ENGINE]] and [[MODEL_SURFACES]]. Scoped to the
 specific problem of surfacing markdown scattered across many
 project directories (`L:/projects_claudecode/*`) inside a single
 Boltzsidian universe — while preserving each project's
@@ -343,7 +349,7 @@ doesn't persist) or is disabled in UI.
 
 ## 4. The privacy surface expands
 
-Phase A of DREAM_ENGINE.md put note body excerpts into the
+Phase A of [[DREAM_ENGINE]] put note body excerpts into the
 idea-seed prompt. That was fine when the vault was one folder of
 notes the user chose to point Boltzsidian at. Once we aggregate
 many projects, the excerpt surface grows:
@@ -494,3 +500,5 @@ one merged vault whose writes land in a dedicated writable root —
 fewer moving parts than any "true multi-vault" design, good
 enough for weekend Boltzsidian use across ten repos, leaves
 every project's git history untouched.
+
+#user #panel #design

@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDEHXHS8DE8BTFG0J39G
+created: "2026-04-19T01:24:22.032Z"
+---
+
 # FOLLOW_CAM.md — Follow a Single Body
 
 Attach the camera to one particle and watch where it goes. A dust mote
@@ -386,3 +392,5 @@ don't build 2–5 yet — tune 1.
 > collision. Drifts forever. WebGL. 65,000 bodies. No install.
 
 That's the pitch. Follow-cam is what makes the third sentence land.
+
+#user #phase #feature

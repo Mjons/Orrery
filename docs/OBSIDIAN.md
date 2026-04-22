@@ -1,6 +1,11 @@
+---
+id: 01KPS9CFDGHZCHTKVJP1792738
+created: "2026-04-21T20:01:50-04:00"
+---
+
 # OBSIDIAN.md — The Vault as Seed Corpus
 
-A speculative design doc. BOLTZMANN.md sketched a meaning layer where stars
+A speculative design doc. [[BOLTZMANN]] sketched a meaning layer where stars
 carry memories and interact. That doc left one thing open: _where do the
 memories come from?_ Template Mad-Libs are fine for a demo, but the payoff
 is higher if the memories are **real** — the user's own notes, loaded into
@@ -30,17 +35,17 @@ Nothing here is a plan. It's a map of how the vault and the sim could talk.
 
 ## 1. The mapping
 
-| Obsidian                   | Sim                                              |
-| -------------------------- | ------------------------------------------------ |
-| Note                       | One star (kind 0) — or one galaxy, if it's big   |
-| `[[wikilink]]`             | Hebbian bias on K between the two notes' kinds   |
-| Tag (`#idea`, `#question`) | Kind assignment (see §3)                         |
-| Folder                     | Galaxy / scene cluster                           |
-| Backlink count             | Mass (salience)                                  |
-| File mtime                 | ageNorm (recency of "rehearsal")                 |
-| Frontmatter `affinity:`    | The 8-float affinity vector from BOLTZMANN.md §5 |
-| Daily note                 | The scene's "now" — high-mass, short-life        |
-| Canvas file                | Saved viewpoint + pre-placed body layout         |
+| Obsidian                   | Sim                                               |
+| -------------------------- | ------------------------------------------------- |
+| Note                       | One star (kind 0) — or one galaxy, if it's big    |
+| `[[wikilink]]`             | Hebbian bias on K between the two notes' kinds    |
+| Tag (`#idea`, `#question`) | Kind assignment (see §3)                          |
+| Folder                     | Galaxy / scene cluster                            |
+| Backlink count             | Mass (salience)                                   |
+| File mtime                 | ageNorm (recency of "rehearsal")                  |
+| Frontmatter `affinity:`    | The 8-float affinity vector from [[BOLTZMANN]] §5 |
+| Daily note                 | The scene's "now" — high-mass, short-life         |
+| Canvas file                | Saved viewpoint + pre-placed body layout          |
 
 The vault is already almost structured this way. We just read it.
 
@@ -123,7 +128,7 @@ for each [[a → b]]:
     K[kind_a][kind_b] += η_link
 ```
 
-With decay. This is the Hebbian update from BRAIN.md §3.2 but _seeded from
+With decay. This is the Hebbian update from [[BRAIN]] §3.2 but _seeded from
 the vault's already-discovered associations_ instead of learned from sim
 time. Your existing notes give us a warm-start K matrix for free.
 
@@ -148,7 +153,7 @@ it writes back.
 
 ### 4.1 Promoted ideas become notes
 
-BOLTZMANN.md §5 described an idea being promoted when its meaning-score
+[[BOLTZMANN]] §5 described an idea being promoted when its meaning-score
 crosses threshold. When that happens:
 
 - A new markdown file is written to `universe/ideas/YYYY-MM-DD-HHMM-<slug>.md`.
@@ -190,7 +195,7 @@ project.
 - Default to **read-only**. Write-back (§4.1) is off until the user opts in,
   per-folder.
 - Everything stays local. No note content ever leaves the machine unless
-  the user picks the Claude-API utterance path (BOLTZMANN.md §4.3), in
+  the user picks the Claude-API utterance path ([[BOLTZMANN]] §4.3), in
   which case we send snapshots, not full notes, and we tell them exactly
   what's going in the payload.
 - A `.universeignore` file in the vault root, globbed like `.gitignore`,
@@ -238,3 +243,5 @@ Shippable in an afternoon:
 
 That alone — _my actual notes, as a universe_ — is worth the afternoon.
 Everything else layers on top if the first sight of it lands.
+
+#user #feature #phase

@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDJQEXCQ6F5R21YB4002
+created: "2026-04-21T13:05:01.626Z"
+---
+
 # LIBRARIAN.md — Letting the universe help you tidy
 
 A speculative design doc. The question Michael asked:
@@ -365,3 +371,5 @@ If the posture holds, Phase 8 is the thing that makes Boltzsidian not
 just beautiful and not just useful, but _remarkable_ — the note-taking
 app that actually helps you think clearer without doing the thinking
 for you.
+
+#user #phase #feature

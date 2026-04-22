@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDC7WVJ5RB76HWR3WSSD
+created: "2026-04-18T19:05:53.041Z"
+---
+
 # CINEMATIC_MODES.md — Director Flavours
 
 `CINEMATIC.md` defines _one_ director (dwell → reframe → approach →
@@ -241,3 +247,5 @@ Everything else stays invisible.
 
 Ship Drift alone first. Live with it for a week before adding Long Shadow.
 Pulse and Oracle earn their keep during launch week.
+
+#phase

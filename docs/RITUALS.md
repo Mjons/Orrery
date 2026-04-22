@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDPKR1QVPZ8S2R1946KG
+created: "2026-04-21T18:39:26.324Z"
+---
+
 # RITUALS.md — Times of day the universe remembers
 
 A speculative design doc. Michael's note, verbatim:
@@ -354,3 +360,5 @@ Rituals are user-authored times of day the universe quietly remembers
 — surfaced through the same ambient voices that already describe the
 sky, suppressed when the sky is dreaming, and completed by a gesture
 smaller than a breath.
+
+#user #star #feature

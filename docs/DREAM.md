@@ -1,7 +1,13 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDCK9PMDKK78KNSS4QEC
+created: "2026-04-21T05:00:04.871Z"
+---
+
 # DREAM.md — The Sim at Night
 
-A speculative design doc. BRAIN.md says the sim can be a mind. BOLTZMANN.md
-gives it fleeting observers. OBSIDIAN.md feeds it the user's actual notes.
+A speculative design doc. [[BRAIN]] says the sim can be a mind. [[BOLTZMANN]]
+gives it fleeting observers. [[OBSIDIAN]] feeds it the user's actual notes.
 The obvious fourth: **what does this system do when no one is watching?**
 
 A mind that only runs while observed isn't a mind. A mind that also runs
@@ -91,7 +97,7 @@ consolidation has cleared the noise.
 
 ## 3. What happens to the vault overnight
 
-If OBSIDIAN.md is loaded, the dream mode has teeth. The vault is the
+If [[OBSIDIAN]] is loaded, the dream mode has teeth. The vault is the
 substrate being replayed.
 
 ### 3.1 Replay
@@ -108,7 +114,7 @@ of the interesting collisions happen here.
 ### 3.2 Collisions and new ideas
 
 With the dream K-noise and loose thresholds, star-memory interactions
-(BOLTZMANN.md §5.2) fire much more often. Most resonances fail the
+([[BOLTZMANN]] §5.2) fire much more often. Most resonances fail the
 waking-state filter; at dream thresholds, many promote.
 
 Children spawned during dreaming inherit a flag: `born_in_dream: true`.
@@ -200,7 +206,7 @@ still dreams. Measure before optimizing.
 
 ### 5.2 Scheduled (later)
 
-A local helper process (see OBSIDIAN.md §2.2) that kicks the sim headlessly
+A local helper process (see [[OBSIDIAN]] §2.2) that kicks the sim headlessly
 overnight — a separate Chromium instance running from 2 AM to 7 AM —
 and writes the morning report to disk.
 
@@ -235,8 +241,8 @@ one becomes a real piece of writing.
 Over weeks, this loop has a property worth naming: the vault stops being
 inert. It's acted on every night. The user stops being its sole author.
 
-This is the distinguishing claim of the whole speculative stack — BRAIN,
-BOLTZMANN, OBSIDIAN, DREAM. Individually each of them is a cute metaphor.
+This is the distinguishing claim of the whole speculative stack — [[BRAIN]],
+[[BOLTZMANN]], [[OBSIDIAN]], DREAM. Individually each of them is a cute metaphor.
 Together they describe a system that does something no other tool on the
 user's machine does: it thinks about their notes while they sleep, and has
 three things to say about it in the morning.
@@ -266,7 +272,7 @@ The mode is easy to get wrong in specific ways. Worth naming now:
 
 ## 8. Minimal first cut
 
-Shippable in a weekend, assuming BOLTZMANN §2 chorus and OBSIDIAN §7 are
+Shippable in a weekend, assuming [[BOLTZMANN]] §2 chorus and [[OBSIDIAN]] §7 are
 in place:
 
 1. **Sleep Depth** slider in the left rail. Default 0.
@@ -283,3 +289,5 @@ That alone — _the sim quiets down, drifts, and hands you three phrases
 about your notes when you come back to it_ — is worth the weekend.
 Consolidation, REM alternation, pruning to disk, and the full dream log
 can layer on top if the first morning lands.
+
+#user #star

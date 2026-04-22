@@ -1,6 +1,12 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDQQYW1RTQCRTZK7EFVA
+created: "2026-04-21T15:23:13.979Z"
+---
+
 # SALIENCE.md — The Sheath Around the Universe
 
-A speculative design doc. BOLTZMANN.md proposes that dream-born ideas
+A speculative design doc. [[BOLTZMANN]] proposes that dream-born ideas
 get scored by a "meaning filter" — a function that decides which
 children of the night survive to morning. This doc pushes that idea
 one step further: instead of a filter (a gate you pass or fail), the
@@ -42,7 +48,7 @@ A soft volumetric shell around the field of note-bodies. Not a separate
 scene — the same scene, with a new type of particle: the **mote**.
 
 Each mote is one candidate idea produced by the dream cycle
-(BOLTZMANN §5.2). At birth it lives at the interaction midpoint of its
+([[BOLTZMANN]] §5.2). At birth it lives at the interaction midpoint of its
 two parent notes and has:
 
 ```
@@ -98,7 +104,7 @@ across was novel, the fifth isn't.
 Because score can change, motes can reverse direction. An idea that
 was rising on day one can sink on day three if the user opens similar
 ideas in the interim. This is the system forgetting things that didn't
-land — the same pattern as DREAM.md §3.3 pruning, at the idea layer
+land — the same pattern as [[DREAM]] §3.3 pruning, at the idea layer
 rather than the note layer.
 
 ---
@@ -144,7 +150,7 @@ A surfaced mote sits at the edge of visibility. The user can:
   starts sinking back. If it reaches `depth = 1` without being touched
   again, it dissolves silently.
 
-This is the bit DREAM.md §7 flags as load-bearing: **tune pruning to
+This is the bit [[DREAM]] §7 flags as load-bearing: **tune pruning to
 hurt a little**. Ideas the user never engages with should visibly sink
 and go away. Without that, the sheath fills, the surface gets crowded,
 and every idea reads as equally noisy — the exact failure mode of a
@@ -168,7 +174,7 @@ After a dream cycle (overnight or Dream Now):
 - The peripheral noticed-bell in the corner shows a count.
 - Morning report lists the surfaced ones in the "Three things"
   section — capped at three, even if more surfaced, because the
-  promise (WORKSPACE.md) is three things, not twelve.
+  promise ([[WORKSPACE]]) is three things, not twelve.
 
 Over a week:
 
@@ -188,14 +194,14 @@ briefly populated, almost always fading.**
 
 ## 6. How it composes with existing layers
 
-| Layer                        | What it does                        | Relationship to salience                                                                    |
-| ---------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| BOLTZMANN §2 observer chorus | Narrates the field in-scene         | Chorus can narrate the _sheath_ too — an idea rising at the edge is commentable             |
-| BOLTZMANN §5.2 collisions    | Spawns candidate motes during dream | Produces the input to the sheath                                                            |
-| DREAM §3.3 pruning           | Removes orphaned notes              | Same verb, different target (notes vs. motes)                                               |
-| FORMATIONS §4                | Filter lenses on the universe       | A formation could include motes — e.g. "show me all rising motes above `θ_attention`"       |
-| Phase 5 morning report       | Surfaces dream artifacts            | Now sources "Three things" from **surfaced motes** instead of chorus captions where present |
-| K matrix                     | Learns which kinds cluster          | Weights the **reach** axis of score                                                         |
+| Layer                            | What it does                        | Relationship to salience                                                                    |
+| -------------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| [[BOLTZMANN]] §2 observer chorus | Narrates the field in-scene         | Chorus can narrate the _sheath_ too — an idea rising at the edge is commentable             |
+| BOLTZMANN §5.2 collisions        | Spawns candidate motes during dream | Produces the input to the sheath                                                            |
+| [[DREAM]] §3.3 pruning           | Removes orphaned notes              | Same verb, different target (notes vs. motes)                                               |
+| [[FORMATIONS]] §4                | Filter lenses on the universe       | A formation could include motes — e.g. "show me all rising motes above `θ_attention`"       |
+| Phase 5 morning report           | Surfaces dream artifacts            | Now sources "Three things" from **surfaced motes** instead of chorus captions where present |
+| K matrix                         | Learns which kinds cluster          | Weights the **reach** axis of score                                                         |
 
 The sheath is a place, not a pipeline. Every previous layer feeds it
 or reads from it.
@@ -223,7 +229,7 @@ The four weights together define "what the system finds salient." A
 user who tunes `novelty_weight` high will get a sheath that rewards
 surprise. One who tunes `reach_weight` high will get a sheath that
 rewards cross-domain ideas. The defaults should produce the behaviour
-the exit gate (BUILD_PLAN §Phase 6) measures: 3-5 promotions across 10
+the exit gate ([[BUILD_PLAN]] §Phase 6) measures: 3-5 promotions across 10
 dream runs on the demo vault.
 
 ---
@@ -323,3 +329,5 @@ Flat tone, same as every other doc in this stack. Say "noticed," not
 matters. It knows what stood out.
 
 That's enough, if we get the thresholds right.
+
+#user #risk #phase

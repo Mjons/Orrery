@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VD9MA6ZNAQ6587T41ADF
+created: "2026-04-21T17:05:14.694Z"
+---
+
 # BUILD_PLAN.md — Boltzsidian
 
 Operational build plan. [WORKSPACE.md](WORKSPACE.md) is the product spec;
@@ -378,7 +384,7 @@ feeling alive.
   Save K to `state.json`.
 - D3.8 — Pinned notes: `pinned: true` frontmatter freezes position.
   Editable in settings pane for a selected note.
-- D3.9 — Home view implementation: §4 of WORKSPACE.md. Settings toggle
+- D3.9 — Home view implementation: §4 of [[WORKSPACE]]. Settings toggle
   between the three modes; default is `last_focused`.
 
 **Acceptance.**
@@ -504,7 +510,7 @@ secondary sidebar by stealth.
 
 **Deliverables.**
 
-- D4.1 — Observer nominator (BOLTZMANN §2): 5Hz CPU scan of the
+- D4.1 — Observer nominator ([[BOLTZMANN]] §2): 5Hz CPU scan of the
   texturePosition readback. Score regions, pick up to 4, promote.
 - D4.2 — Template utterance library: 30–50 templates with slot patterns.
   Slots filled from local field (dominant kind, palette, nearest
@@ -537,7 +543,7 @@ fix a tonally wrong system.
 
 - D5.1 — Sleep Depth slider (0..1) in settings. Manual control.
 - D5.2 — `applyDreamParams(depth)` interpolates physics + filter
-  parameters per DREAM.md §1 table. One function, tested in isolation.
+  parameters per [[DREAM]] §1 table. One function, tested in isolation.
 - D5.3 — Idle detector: no pointer / keyboard / focus events for N
   minutes. Sleep Depth ramps to configured cap over 30 seconds.
 - D5.4 — REM / slow-wave cycle: depth oscillates gently between cap and
@@ -578,7 +584,7 @@ mystical / purple, tune voice. Both are fixable; neither is skippable.
 
 **Goal.** The universe writes notes at you.
 
-(Renamed from "Meaning filter" — see SALIENCE.md for the layer metaphor
+(Renamed from "Meaning filter" — see [[SALIENCE]] for the layer metaphor
 and the rationale. v1 ships as a flat filter; the volumetric sheath is a
 deferred v2 if the scoring tunes cleanly.)
 
@@ -596,7 +602,7 @@ deferred v2 if the scoring tunes cleanly.)
   mix of parents. Seed text from the paired-fact template bank with a
   raw `A ↔ B` fallback. **No file is written at spawn.**
 - D6.4 — Salience score: `novelty × coherence × reach × (1 - age_penalty)`
-  as described in BOLTZMANN §5.3. Reach is raw kind-diversity of nearest
+  as described in [[BOLTZMANN]] §5.3. Reach is raw kind-diversity of nearest
   neighbours — K matrix stays out of v1. Parameters tunable from a debug
   palette on `Shift+S`.
 - D6.5 — **Promotion writes to disk** (not spawning). Promoted ideas →
@@ -679,7 +685,7 @@ the tool isn't earning its keep. Aim for ~70% acceptance.
 
 **Goal.** Close the loop on Phase 5's prune candidates. The user
 actually sees the orphan list and acts on it. Hoarding risk
-(DREAM.md §7) gets a real countermeasure.
+([[DREAM]] §7) gets a real countermeasure.
 
 Full design in [STATES.md](STATES.md) §3.
 
@@ -819,7 +825,7 @@ Full design in [STATES.md](STATES.md) §2.2 (the "during dream" mode).
   Reject / Skip as the manual Tend drawer. Accept writes through the
   saver.
 - D7.5.4 — Settings toggle: `tend_during_dream: false` by default.
-  This is opt-in. The always-tending antipattern (STATES.md §7.4)
+  This is opt-in. The always-tending antipattern ([[STATES]] §7.4)
   gets avoided by keeping the user in charge of whether the
   housekeeping runs.
 
@@ -910,20 +916,20 @@ Explicitly not post-launch:
 
 Ranked by likelihood × impact.
 
-| Risk                                                                  | Mitigation                                               |
-| --------------------------------------------------------------------- | -------------------------------------------------------- |
-| Observer chorus reads as slop                                         | Phase 4 gate is hard. Don't ship if you turn it off.     |
-| Salience layer promotes junk 90% of the time                          | Phase 6 gate on Michael's real vault. Tune or cut.       |
-| Tend proposes obvious junk or non-obvious weirdness                   | Phase 6.5 gate: ~70% acceptance on the real vault.       |
-| Tend-in-dream drowns salience section of morning report               | Phase 7.5 kept opt-in; housekeeping visually separated.  |
-| CodeMirror integration bloats bundle past patience                    | Budget 600KB JS gzipped total. Audit at every phase.     |
-| FS Access API instability / permissions UX                            | Fallback to zip-import mode from day one.                |
-| 3D nav is too hard for non-technical users                            | Demo vault + coachmarks. Measure Phase 3.5 with 3 users. |
-| Browser tab throttling kills real overnight dreams                    | Accept for web; plan Electron post-1.0.                  |
-| Single-file-html culture clash with bundler                           | Document in branch CLAUDE.md; don't undo it.             |
-| Scope creep from the speculative docs (BRAIN / DREAM / STATES / etc.) | Phase gates. Each one has a kill condition.              |
-| Aesthetic drifts toward generic "tech app" over time                  | One person (Michael) owns accent / bloom / spacing.      |
-| Michael loses interest before Phase 5                                 | Phase 3 ships as a usable standalone app. Stop-points.   |
+| Risk                                                                              | Mitigation                                               |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Observer chorus reads as slop                                                     | Phase 4 gate is hard. Don't ship if you turn it off.     |
+| Salience layer promotes junk 90% of the time                                      | Phase 6 gate on Michael's real vault. Tune or cut.       |
+| Tend proposes obvious junk or non-obvious weirdness                               | Phase 6.5 gate: ~70% acceptance on the real vault.       |
+| Tend-in-dream drowns salience section of morning report                           | Phase 7.5 kept opt-in; housekeeping visually separated.  |
+| CodeMirror integration bloats bundle past patience                                | Budget 600KB JS gzipped total. Audit at every phase.     |
+| FS Access API instability / permissions UX                                        | Fallback to zip-import mode from day one.                |
+| 3D nav is too hard for non-technical users                                        | Demo vault + coachmarks. Measure Phase 3.5 with 3 users. |
+| Browser tab throttling kills real overnight dreams                                | Accept for web; plan Electron post-1.0.                  |
+| Single-file-html culture clash with bundler                                       | Document in branch CLAUDE.md; don't undo it.             |
+| Scope creep from the speculative docs ([[BRAIN]] / [[DREAM]] / [[STATES]] / etc.) | Phase gates. Each one has a kill condition.              |
+| Aesthetic drifts toward generic "tech app" over time                              | One person (Michael) owns accent / bloom / spacing.      |
+| Michael loses interest before Phase 5                                             | Phase 3 ships as a usable standalone app. Stop-points.   |
 
 ---
 
@@ -952,3 +958,5 @@ After that, start Phase 1.
 > universe has three things to tell you about your own notes.
 
 If a decision doesn't serve that sentence, it's out of scope.
+
+#phase #user #panel

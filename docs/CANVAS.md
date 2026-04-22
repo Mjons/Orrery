@@ -1,6 +1,12 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDB4NW1J1HTQJ610NNHE
+created: "2026-04-21T15:20:53.757Z"
+---
+
 # CANVAS.md — Should we speak Canvas?
 
-A speculative design doc. OBSIDIAN.md established that the vault is the
+A speculative design doc. [[OBSIDIAN]] established that the vault is the
 seed corpus. This doc takes the next obvious question: Obsidian Canvas is
 the _other_ big artifact users produce alongside their markdown. Should
 Boltzsidian read and write it? And if so, how without betraying what the
@@ -77,7 +83,7 @@ Assume for a moment we decide to import. The mapping falls out:
 | Node (link card)      | A body of kind `halo` labeled with the domain                            |
 | Edge                  | A **tether** (strong spring) between the two bodies                      |
 | Edge label            | The tether's display label, visible on hover                             |
-| Edge color            | Tether tint (uses the folder-aura palette from FORMATIONS §1.1)          |
+| Edge color            | Tether tint (uses the folder-aura palette from [[FORMATIONS]] §1.1)      |
 | Group                 | A named basin — like a folder (FORMATIONS §1.2), but scoped to the scene |
 | Group color           | Basin's aura tint                                                        |
 | Card x,y (px)         | Seeded body position (scaled into sim units)                             |
@@ -129,7 +135,7 @@ links actually want it to be.
 Canvas positions are discarded. Only the nodes, edges, and groups
 survive. Bodies are laid out by the normal Boltzsidian link-force
 algorithm, with canvas groups contributing a soft basin pull (per
-FORMATIONS §1.2). Tethers come from the canvas edges.
+[[FORMATIONS]] §1.2). Tethers come from the canvas edges.
 
 This is _"use your canvas as a graph"_. The drawing gave us nodes and
 edges we wouldn't otherwise have (text cards, link-card connections,
@@ -171,7 +177,7 @@ Arguments for:
   the user's existing tools already understand.
 - Canvases are static JSON, so once exported they're portable and
   non-destructive — you can ignore, delete, or curate them.
-- The morning report (OBSIDIAN.md §4.2) being a canvas instead of a daily
+- The morning report ([[OBSIDIAN]] §4.2) being a canvas instead of a daily
   note quote block is richer: arrows, colors, groupings, not just prose.
 
 Arguments against:
@@ -184,7 +190,7 @@ Arguments against:
 
 **Verdict: defer.** Ship import first. If users ask for export more than
 once, add it, but gate it behind the same per-folder opt-in as the
-ideas-write-back (OBSIDIAN.md §5).
+ideas-write-back ([[OBSIDIAN]] §5).
 
 ---
 
@@ -216,7 +222,7 @@ Three framings, weighted honestly.
   a rich source of edges and groupings that the markdown graph doesn't
   have. Text cards with no backing file are thoughts the user wrote
   _into_ Canvas specifically because they didn't have a note yet — those
-  are prime protostars (FORMATIONS §4.1).
+  are prime protostars ([[FORMATIONS]] §4.1).
 - Seeded mode (§2.2) doesn't dilute emergence; it _demonstrates_ it. The
   author drew what they thought the layout was; physics shows them what
   it actually is. That's the app's thesis, more vivid than any demo.
@@ -280,7 +286,7 @@ A sketch so whoever implements it doesn't have to redesign from scratch:
 2. JSON parse.
 3. For each `node`: resolve file path → existing body (if already loaded
    from the vault) or create new body. Assign kind per existing tag
-   rules (OBSIDIAN §3.1) when there's a file; assign kind `star` for
+   rules ([[OBSIDIAN]] §3.1) when there's a file; assign kind `star` for
    text cards.
 4. For each `edge`: create a tether (see `boltzsidian/src/sim/tethers.js`
    — tethers already exist, this is reusing, not building).
@@ -292,7 +298,7 @@ A sketch so whoever implements it doesn't have to redesign from scratch:
    "canvas-derived" for the HUD.
 
 Reuses: `src/vault/parser.js`, `src/sim/tethers.js`, whatever folder-aura
-code FORMATIONS produces. Net new: probably 200 lines.
+code [[FORMATIONS]] produces. Net new: probably 200 lines.
 
 ---
 
@@ -302,3 +308,5 @@ Canvas import is welcome as a scene seed, defaults to letting physics
 renegotiate the layout, and is never promoted to a top-level feature —
 because the app's job is to show you what your vault means, not to be a
 nicer viewer for what you've already drawn.
+
+#user #feature #phase

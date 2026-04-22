@@ -1,9 +1,15 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDWB8BKJT77BQ9GV3E2M
+created: "2026-04-21T19:08:18.427Z"
+---
+
 # SUGGESTIONS.md — Auto-suggesting tags and connections while writing
 
 A focused design doc, triggered by Michael's note "I Love Untitled"
 with body `Make it work\n[]` — the user literally typed the start of a
 link and found nothing waiting there for them. The library-layer
-librarian (LIBRARIAN.md) handles batched curation _after_ writing;
+librarian ([[LIBRARIAN]]) handles batched curation _after_ writing;
 this doc is about what happens _during_ writing.
 
 ---
@@ -121,7 +127,7 @@ already indexes every title.
 
 ### 2.2 LLM-assisted (opt-in)
 
-Phase 8 librarian (LIBRARIAN.md §1.4 + §1.5) eventually fills the
+Phase 8 librarian ([[LIBRARIAN]] §1.4 + §1.5) eventually fills the
 same slots, but with smarter signal:
 
 - Tag suggestions that capture semantic themes the heuristic missed.
@@ -135,7 +141,7 @@ heuristic (dot) or LLM (small sparkle). The user sees which.
 
 ## 3. Composition with the rest
 
-- **Librarian drawer** (LIBRARIAN.md): batched review of proposals
+- **Librarian drawer** ([[LIBRARIAN]]): batched review of proposals
   across the whole vault. This doc: suggestions for _this one note,
   right now_.
 - **Tag discovery prompt**: fires at vault-open when the mapping
@@ -223,3 +229,5 @@ index) argues for keeping them together.
 Suggestions meet you in the sentence you're writing — not in a drawer
 you have to remember to open — and they only ever propose things your
 own vault already contains.
+
+#user #phase #panel

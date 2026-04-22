@@ -1,9 +1,14 @@
+---
+id: 01KPS9CFDF7JS0SPA4YA23VKSQ
+created: "2026-04-21T20:01:50-04:00"
+---
+
 # MODEL_SURFACES.md — Where model output is allowed to live
 
 A speculative design doc. Phase 7 (BUILD*PLAN §Phase 7) ships the
 access layer: a pluggable `UtteranceBackend` interface, key storage
 with Credential-Management fallback, payload preview, transparent
-template fallback. The \_scope* in BUILD_PLAN is narrow — chorus
+template fallback. The \_scope* in [[BUILD_PLAN]] is narrow — chorus
 sentences, dream reports, maybe salience seed text.
 
 Local models break the narrow-scope argument. Once WebLLM is
@@ -419,3 +424,5 @@ release — the failure mode is unattributable.
 Phase 7 gives us a power strip; this doc is the list of things we're
 allowed to plug into it, and the rules every new appliance has to
 satisfy before we let it near the wall.
+
+#phase #feature #privacy

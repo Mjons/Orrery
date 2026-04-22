@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDDVQS5E39MPGAYTF0TT
+created: "2026-04-19T19:55:48.234Z"
+---
+
 # FILAMENT.md — Flow-Field Bead Chains
 
 Sibling feature to `FIDENZA_FILTER.md`. Instead of rendering each
@@ -450,3 +456,5 @@ the taper is too subtle (crank it to 0.85 and re-check).
 
 The middle one is the tweet — the pair-of-buttons line is
 memorable and sells the feature without needing a screenshot.
+
+#phase #reference #feature

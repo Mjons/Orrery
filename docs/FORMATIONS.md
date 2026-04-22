@@ -1,6 +1,12 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDFFPT7FQHN30TS2GMAJ
+created: "2026-04-21T11:40:58.387Z"
+---
+
 # FORMATIONS.md — Folder auras, cluster modes, and viewing filters
 
-A speculative design doc. WORKSPACE.md treats tags as the primary organizing
+A speculative design doc. [[WORKSPACE]] treats tags as the primary organizing
 axis and deliberately de-emphasizes folders. This doc asks: given that some
 vaults _are_ heavily foldered, how does Boltzsidian honor that without
 betraying the flat-universe ideal? And what kinds of _viewing filters_
@@ -208,7 +214,7 @@ Example saved formations:
 ## 5. How this composes with dream mode
 
 Formations are _wake-mode lenses_ on a static universe. Dream scenes
-(DREAM.md §1, Phase 5) are _physics regimes_ on a dynamic universe.
+([[DREAM]] §1, Phase 5) are _physics regimes_ on a dynamic universe.
 Different layers, complementary:
 
 - A formation filters _what you see_. It never moves bodies.
@@ -263,3 +269,5 @@ question at a time.
 Both are off by default. Both are always escapable. Neither writes to
 your files. The vault stays flat and portable; only the _view_ becomes
 multi-dimensional.
+
+#user #phase #star

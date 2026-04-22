@@ -48,6 +48,11 @@ export const DEFAULT_SETTINGS = {
   // 'hover'  = only the currently pointer-hovered body shows its title
   // 'never'  = no titles at all; universe reads as pure space
   label_mode: "always",
+  // Cluster-level labels. See CONSTELLATIONS.md. When zoomed out
+  // past a cluster's own extent, the cluster gets a soft centered
+  // label instead of its individual star titles. Off = no named
+  // regions; zoom behaviour on star labels is unchanged.
+  show_constellations: true,
   // Interaction safeguards.
   confirm_unlink: true, // confirm before right-click deletes a tether
   // Tend passes — per-pass opt-outs. Absent key = enabled by default so

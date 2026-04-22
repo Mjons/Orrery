@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDDHSY8WHMFTP226VPJ5
+created: "2026-04-19T10:32:19.634Z"
+---
+
 # FIDENZA_FILTER.md — Solidify the Frame Into Art
 
 Take a moment from the sim — the way bodies are flowing right now — and
@@ -596,3 +602,5 @@ so we know what space we're in:
 > enough to draw it.
 
 That last one is the line that sells it.
+
+#phase #user #feature

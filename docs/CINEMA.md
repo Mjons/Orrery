@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDBGX6B4FRNEPVZC4KDY
+created: "2026-04-19T14:29:15.052Z"
+---
+
 # CINEMA.md — Cinematic Polish Layer
 
 Two upgrades that make scripted camera work feel like _film_, not a
@@ -544,3 +550,5 @@ Week-long, only if the realtime path stutters in practice.
   _is_ the preview.
 - **Watermarks / overlays specific to captures.** Same aesthetic
   whether playing or recording; no "recorded-with" badges.
+
+#user #panel

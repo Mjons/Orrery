@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDX38N4P6KCD6KP771XR
+created: "2026-04-20T00:21:41.377Z"
+---
+
 # WEB_DEMO.md — Ship It on Your Website
 
 A concrete, start-to-finish plan for getting the sim running at a URL
@@ -401,3 +407,5 @@ on main. In 60 seconds you're live at
 domain if you want; point CNAME at GitHub; enable HTTPS. Done.
 Everything else — analytics, mobile fallback, CDN — is optimisation
 you only need if launch week succeeds.
+
+#user #feature

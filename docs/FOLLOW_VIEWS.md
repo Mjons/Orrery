@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDEYCV5G0D1N040578MP
+created: "2026-04-20T20:51:06.159Z"
+---
+
 # FOLLOW_VIEWS.md — Multiple Camera Angles While Following
 
 Plan for letting the user switch camera _view_ while a follow-cam
@@ -348,3 +354,5 @@ angles on the same body become a **short film**. The trail
 accumulating across cuts is the narrative: "same star, same arc, here
 from the side, here from above, here pulling back to show where it
 has been." That's the shareable clip people make from the feature.
+
+#user #feature #panel

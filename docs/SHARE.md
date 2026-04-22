@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDRX40THKTEJSX1J2P7S
+created: "2026-04-19T01:12:58.148Z"
+---
+
 # SHARE.md — Seeds and Shareable URLs
 
 A plan for encoding _everything the viewer is seeing_ — bodies, camera,
@@ -397,3 +403,5 @@ zero other changes. Phases 2–4 are polish around it.
 
 Outsized return relative to cost. This is the closest thing the
 project has to a growth-loop mechanic — ship it before launch week.
+
+#phase #user

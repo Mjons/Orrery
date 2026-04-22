@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDHYKM7CM3CWS63X9AK6
+created: "2026-04-18T18:33:19.946Z"
+---
+
 # LAUNCH.md — Going Public
 
 Plan for taking the universe simulator from a local artwork to a 24/7
@@ -348,3 +354,5 @@ Right now, today, before anything else:
 
 Everything else waits. The video is the oxygen supply for all three
 pillars. No video, no launch.
+
+#star #daily #feature

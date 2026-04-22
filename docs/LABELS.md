@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDJDKH3FAJA2J44YHPZK
+created: "2026-04-21T15:14:19.225Z"
+---
+
 # LABELS.md — When the titles get in the way
 
 A short design doc. Michael's observation:
@@ -188,3 +194,5 @@ Total change: probably ~80 lines across three files. An afternoon.
 Three label modes — Always, On hover, Never — let the user choose
 between a navigable diagram, a responsive field, and pure universe,
 with one key.
+
+#star #user #panel

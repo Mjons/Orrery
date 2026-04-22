@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDP4HGP70GAQNRJRS088
+created: "2026-04-21T15:51:18.838Z"
+---
+
 # PICKING.md — Knowing what the user is pointing at
 
 A focused design doc. After two attempts at fixing the hover-label
@@ -155,7 +161,7 @@ distance-scaling intercept, etc.
 mismatch.
 
 **Cons.** Bodies start to look clumpy; the fine-grained density
-clusters that AMBIENCE.md specifically wants to preserve get smudged
+clusters that [[AMBIENCE]] specifically wants to preserve get smudged
 into blobs. Makes the _symptom_ slightly better, not the bug. Doesn't
 help when the cursor is _between_ two bodies.
 
@@ -261,3 +267,5 @@ read from the same function.
 The picker and the renderer have to agree about what's drawn where —
 right now they don't, and no threshold value will make a wrong formula
 correct.
+
+#user #star #risk

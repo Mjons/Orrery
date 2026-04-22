@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDGJF94CY5W11X9RAZZ7
+created: "2026-04-21T12:49:43.130Z"
+---
+
 # GLOSSARY.md — Boltzsidian terms in plain English
 
 A quick reference to the vocabulary Boltzsidian uses. Many of these show
@@ -380,10 +386,12 @@ opt in for.
 
 ## See also
 
-- [WORKSPACE.md](WORKSPACE.md) — the product spec
-- [BUILD_PLAN.md](BUILD_PLAN.md) — phases 0–7 with acceptance criteria
-- [DREAM.md](DREAM.md) — the sleep/wake regime in detail
-- [BOLTZMANN.md](BOLTZMANN.md) — observers and the meaning layer
-- [FORMATIONS.md](FORMATIONS.md) — folder auras and filter modes
-- [OBSIDIAN.md](OBSIDIAN.md) — the vault as seed corpus
-- [BRAIN.md](BRAIN.md) — the sim as memory substrate
+- [[BOLTZMANN]] — observers and the meaning layer
+- [[BRAIN]] — the sim as memory substrate
+- [[BUILD_PLAN]] — phases 0–7 with acceptance criteria
+- [[DREAM]] — the sleep/wake regime in detail
+- [[FORMATIONS]] — folder auras and filter modes
+- [[OBSIDIAN]] — the vault as seed corpus
+- [[WORKSPACE]] — the product spec
+
+#phase #panel #user

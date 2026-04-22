@@ -20,6 +20,12 @@ const DEMO_SENTINEL = ".demo-installed";
 
 export const DEMO_THEMES = [
   {
+    id: "welcome",
+    label: "Welcome",
+    blurb: "A short tour of the universe. Start here.",
+    firstRunDefault: true,
+  },
+  {
     id: "astronomer",
     label: "Astronomer's notebook",
     blurb:
@@ -32,6 +38,9 @@ export const DEMO_THEMES = [
       "A developer's notes planning Boltzsidian itself — vision, phases, decisions, risks.",
   },
 ];
+
+const KNOWN_THEME_PREFIXES = ["welcome/", "project/"];
+const KNOWN_THEME_IDS = new Set(["welcome", "astronomer", "project"]);
 
 export function isOpfsSupported() {
   return !!(navigator.storage && navigator.storage.getDirectory);
@@ -50,7 +59,7 @@ export async function installDemoVault(
   root,
   { overwrite = false, onProgress, theme = "astronomer" } = {},
 ) {
-  const wantedTheme = theme === "project" ? "project" : "astronomer";
+  const wantedTheme = KNOWN_THEME_IDS.has(theme) ? theme : "astronomer";
   const already = await readSentinel(root);
   const themeMatches = already && already.theme === wantedTheme;
   if (already && themeMatches && !overwrite)
@@ -62,6 +71,12 @@ export async function installDemoVault(
   await clearDirectory(root);
 
   const filtered = filterThemeFiles(DEMO_FILES, wantedTheme);
+  // Welcome theme injects a daily note dated today — demonstrates the
+  // Protostars formation + the daily filament against a real, current
+  // date. Generated at install time so the date is always accurate.
+  if (wantedTheme === "welcome") {
+    filtered.push(buildTodayDailyEntry());
+  }
   let i = 0;
   for (const [relPath, content] of filtered) {
     await writeFileAt(root, relPath, content);
@@ -80,6 +95,28 @@ export async function installDemoVault(
     ),
   );
   return { installed: true, files: i, theme: wantedTheme };
+}
+
+// Construct today's daily-note entry for the welcome theme. Returns a
+// [relPath, content] tuple shaped like filterThemeFiles output so the
+// installer can push it straight into the write loop.
+function buildTodayDailyEntry() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const relPath = `daily/${y}-${m}-${d}.md`;
+  const content = `---
+tags: [daily, welcome]
+---
+
+# Today
+
+This is a daily note. They form a bright filament through your universe, ordered by date. Today's one is the brightest — me. As you write more daily notes, I'll stretch into a line.
+
+**Try it:** press **Shift+F** and pick **Protostars**. I should light up — I'm fresh.
+`;
+  return [relPath, content];
 }
 
 export async function getInstalledDemoTheme(root) {
@@ -125,21 +162,34 @@ async function writeFileAt(root, relPath, content) {
 }
 
 // Turn the glob's absolute-ish key into a vault-relative path filtered by
-// theme. astronomer = everything NOT under /project/. project = things under
-// /project/, with that prefix stripped.
+// theme. Each named subtree (welcome/, project/) is its own theme; the
+// leftover files at the root of /demo-vault/ are the astronomer theme
+// (for historical reasons — astronomer was the first theme).
 function filterThemeFiles(files, theme) {
   const out = [];
   for (const [globPath, content] of Object.entries(files)) {
     const rel = pathBelowDemoVault(globPath);
     if (!rel) continue;
+    if (theme === "welcome") {
+      if (!rel.startsWith("welcome/")) continue;
+      out.push([rel.slice("welcome/".length), content]);
+      continue;
+    }
     if (theme === "project") {
       if (!rel.startsWith("project/")) continue;
       out.push([rel.slice("project/".length), content]);
-    } else {
-      // astronomer: everything else
-      if (rel.startsWith("project/")) continue;
-      out.push([rel, content]);
+      continue;
     }
+    // astronomer — everything NOT under a named theme prefix.
+    let isUnderKnownPrefix = false;
+    for (const prefix of KNOWN_THEME_PREFIXES) {
+      if (rel.startsWith(prefix)) {
+        isUnderKnownPrefix = true;
+        break;
+      }
+    }
+    if (isUnderKnownPrefix) continue;
+    out.push([rel, content]);
   }
   return out;
 }

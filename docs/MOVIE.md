@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDKDJ4X11NSMZ1QSXXF1
+created: "2026-04-19T14:15:04.004Z"
+---
+
 # MOVIE.md — Film Mode
 
 A plan for a mode that is to Cinematic what a _film_ is to a _mixtape_.
@@ -426,7 +432,7 @@ One week of focused work to get v1 shipping.
 
 14. Mid-shot mood shifts scheduled from timeline.
 15. Per-film colour grading override (LUT or palette family map).
-16. Replay log export (like CINEMATIC.md Phase 7).
+16. Replay log export (like [[CINEMATIC]] Phase 7).
 17. User-authored films loadable from localStorage-pasted JSON.
 18. Soundtrack beat-syncing (Roadmap Phase 7).
 
@@ -500,3 +506,5 @@ total and land over three packs.
 If the primitives creep past 1000 lines, we over-engineered and
 should cut a program or a travel style until it fits. The films are
 the product, not the framework.
+
+#user #star #feature

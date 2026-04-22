@@ -49,7 +49,7 @@ function saveDismissed(set) {
   localStorage.setItem(DISMISS_KEY, JSON.stringify([...set]));
 }
 
-export function createCoachmarks() {
+export function createCoachmarks({ isSuppressed = () => false } = {}) {
   const dismissed = loadDismissed();
   const queue = [];
   let currentId = null;
@@ -79,6 +79,11 @@ export function createCoachmarks() {
   function schedule(id, options = {}) {
     if (!LIBRARY[id]) return false;
     if (dismissed.has(id)) return false;
+    // In the welcome tutorial vault, the vault IS the coachmark — the
+    // user is reading stars whose job is to teach the same gestures
+    // these tooltips would. Double-instructing is noise. See
+    // ONBOARDING.md §9.
+    if (isSuppressed(id)) return false;
     if (currentId === id || queue.some((q) => q.id === id)) return false;
     queue.push({ id, options });
     flush();

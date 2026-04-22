@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDQBHKX540117HN72ZRN
+created: "2026-04-17T14:03:01.653Z"
+---
+
 # Universe Sim — Artist Edition Roadmap
 
 Opinionated plan. Built for Michael, one user. Fewer knobs, better defaults, more capture. Every phase ships something usable on its own — don't start Phase N+1 until N feels _done enough to enjoy_.
@@ -446,3 +452,5 @@ Where does the emergence work land? **Inside each phase**, not as a phase of its
 Phases 2–4 can ship in any order once Phase 1 lands. Phases 5 and 6 want the earlier ones under them.
 
 The emergence substrate rides alongside: interaction matrix + curl-noise seeding land with Phase 2 (scenes need them); flocking + radiation pressure + supernovae land with Phase 3 (color needs them); "roll the dice" + time-reversal land with Phase 5 (sculpting needs them). Nothing about emergence waits until the end — if a phase lands without its emergence hook, the phase is incomplete.
+
+#phase #feature #done

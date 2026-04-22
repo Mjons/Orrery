@@ -1,3 +1,8 @@
+---
+id: 01KPS9CFDDM087QNW2D06G06MH
+created: "2026-04-21T20:01:50-04:00"
+---
+
 # DREAM_ENGINE.md — The generative recipe
 
 Sibling to [DREAM.md](DREAM.md) (high-level "what dreaming is for") and
@@ -114,7 +119,7 @@ this dream."
 
 ## 3. Wander — the physics is already doing this
 
-**What it does.** With dream K-noise and loose damping (see DREAM.md
+**What it does.** With dream K-noise and loose damping (see [[DREAM]]
 §2.2), particles drift further per unit time than they would at wake.
 Notes that normally never come within proximity do so briefly during
 dream.
@@ -471,7 +476,7 @@ candidates are the dream's waste product, the way most real dreams
 are forgotten.
 
 This has a privacy-adjacent benefit: the dream log (written at wake
-per DREAM.md §4) contains only the survivors, not the full generation
+per [[DREAM]] §4) contains only the survivors, not the full generation
 history. Hundreds of model responses don't accumulate on disk.
 
 Optional: a "Dream diagnostics" toggle in Settings that writes the
@@ -524,3 +529,5 @@ A dream isn't a summary of what you know — it's the handful of
 survivors from hundreds of brief collisions where two of your known
 things drifted together while each was being a little more like one
 of its own aspects than usual.
+
+#dream #phase #feature

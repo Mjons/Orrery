@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VD83P8Y75BQCKJ2MBAN5
+created: "2026-04-21T14:34:30.395Z"
+---
+
 # AMBIENCE.md — Cluster auras and the feel of the universe
 
 A speculative design doc. Michael's observation, captured from a demo
@@ -217,7 +223,7 @@ five built-ins.
 
 ### 4.3 Composition with Sleep Depth
 
-Sleep Depth (DREAM.md) already interpolates physics parameters between
+Sleep Depth ([[DREAM]]) already interpolates physics parameters between
 wake and a dream regime. Ambience joins the interpolation: at depth
 0.0, Default; at depth 1.0, Dream. Intermediate depths cross-fade bloom
 strength + CA + palette temperature. A soft nightfall every time the
@@ -245,16 +251,16 @@ repainting.
 
 ## 6. How this composes with what's already built
 
-| Existing concept                | Ambience interaction                                               |
-| ------------------------------- | ------------------------------------------------------------------ |
-| Accent color                    | Untouched. Ambience is lighting over identity.                     |
-| Kind tint                       | Unchanged. Body core colors still read.                            |
-| Folder aura (FORMATIONS §1.1)   | Cluster halo picks up folder tint when folder_tints are set.       |
-| Galactic core (FORMATIONS §4.2) | Reuse the cluster detection for its highlight.                     |
-| Solo folder                     | Non-solo cluster halos dim to match.                               |
-| Sleep Depth (DREAM §1)          | Drives ambience preset interpolation.                              |
-| Dream scenes                    | Each dream scene can declare a recommended ambience override.      |
-| Formations rail                 | Active formations dim non-matching cluster halos, not remove them. |
+| Existing concept                  | Ambience interaction                                               |
+| --------------------------------- | ------------------------------------------------------------------ |
+| Accent color                      | Untouched. Ambience is lighting over identity.                     |
+| Kind tint                         | Unchanged. Body core colors still read.                            |
+| Folder aura ([[FORMATIONS]] §1.1) | Cluster halo picks up folder tint when folder_tints are set.       |
+| Galactic core (FORMATIONS §4.2)   | Reuse the cluster detection for its highlight.                     |
+| Solo folder                       | Non-solo cluster halos dim to match.                               |
+| Sleep Depth ([[DREAM]] §1)        | Drives ambience preset interpolation.                              |
+| Dream scenes                      | Each dream scene can declare a recommended ambience override.      |
+| Formations rail                   | Active formations dim non-matching cluster halos, not remove them. |
 
 Nothing above is a breaking change. It all layers on what exists.
 
@@ -279,7 +285,7 @@ The negative-space section. These are tempting but out of scope:
 
 ## 8. Why this is the most important dream-mode story
 
-Dream mode (DREAM.md) cranks physics. Bodies move. Existing visual
+Dream mode ([[DREAM]]) cranks physics. Bodies move. Existing visual
 signals in wake mode all fade: links stretch and blur, tethers fade
 for clarity, labels retract. What's left?
 
@@ -364,3 +370,5 @@ Ask at the end, not here.
 
 The universe has always had clusters; until now it's just never
 admitted they were there.
+
+#user #phase #stack

@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VD8NT4GD1QZAFSR6SX6A
+created: "2026-04-19T01:05:59.401Z"
+---
+
 # BODY_COUNT.md — Density Levels
 
 Plan for runtime-selectable body counts. Today the sim boots at a single
@@ -236,3 +242,5 @@ this is a plumbing project, not a graphics one.
   Nothing about the integrator depends on N. Obvious, worth stating.
 - **The level selector must not be a "Pace" slider in disguise.** It's
   density, not speed. Do not conflate.
+
+#user #panel

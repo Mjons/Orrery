@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDWR54MXY517CS6DSYQG
+created: "2026-04-19T22:06:57.485Z"
+---
+
 # TRAILS.md — Star-Path Trail Persistence
 
 Plan for letting the **followed star's journey trail** run much longer
@@ -277,3 +283,5 @@ buggy" rather than "this feature has a cap I hit."
 
 10-line fix (A) is the floor. 40-line fix (A + B) is the answer.
 Ship A+B before the launch week.
+
+#star #user #feature

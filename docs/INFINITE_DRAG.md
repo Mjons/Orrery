@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDH6B33RX07P29T2MHQ3
+created: "2026-04-18T18:29:28.701Z"
+---
+
 # INFINITE_DRAG.md — Edge-Wrapping Mouse Drag
 
 Exploration for "when the mouse hits an edge, it teleports to the opposite
@@ -275,3 +281,5 @@ event accordingly.
 - Not worth building until the core feels right in a live session.
 
 Small feature. Outsized quality-of-life win if it works.
+
+#user #feature

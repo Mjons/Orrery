@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDXYB2RFMMS2FR4ZTW5M
+created: "2026-04-21T20:45:42.293Z"
+---
+
 # CHANGELOG
 
 Notable changes to this repository. Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
@@ -257,3 +263,5 @@ version control just never caught up. Grouped by phase / layer below.
 - `0d195b3` — Sim: seeded PRNG, share links, ring-mode trail,
   Milky Way scene, BH slingshot, `?objects=` URL param.
 - `814d585` — Initial commit: Orrery sim.
+
+#phase #panel #reference

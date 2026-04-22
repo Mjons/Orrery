@@ -90,6 +90,14 @@ export function initSettings({
         Toggle with <b>L</b>. Hover shows one title near the pointed star;
         Never keeps the universe silent.
       </p>
+      <label class="settings-row">
+        <span>Constellations</span>
+        <input type="checkbox" id="s-show-constellations" />
+      </label>
+      <p class="settings-hint">
+        Cluster-level labels that appear when you zoom out. Click one to
+        frame the whole region.
+      </p>
     </section>
 
     <section class="settings-group">
@@ -398,6 +406,7 @@ export function initSettings({
     "#s-ambience-intensity-value",
   );
   const labelModeSelect = pane.querySelector("#s-label-mode");
+  const showConstellations = pane.querySelector("#s-show-constellations");
   const homeViewSelect = pane.querySelector("#s-home-view");
 
   // Populate ambience options once; selection reflects current setting on
@@ -424,6 +433,11 @@ export function initSettings({
   labelModeSelect.addEventListener("change", () => {
     onChange({ label_mode: labelModeSelect.value });
   });
+  if (showConstellations) {
+    showConstellations.addEventListener("change", () => {
+      onChange({ show_constellations: showConstellations.checked });
+    });
+  }
   const chorusOn = pane.querySelector("#s-chorus-on");
   const chorusDensity = pane.querySelector("#s-chorus-density");
   const chorusFont = pane.querySelector("#s-chorus-font");
@@ -597,6 +611,9 @@ export function initSettings({
     const lm = settings.label_mode || "always";
     labelModeSelect.value =
       lm === "hover" || lm === "never" || lm === "always" ? lm : "always";
+    if (showConstellations) {
+      showConstellations.checked = settings.show_constellations !== false;
+    }
     homeViewSelect.value = settings.home_view || "last_focused";
     chorusOn.checked = !!settings.observer_chorus;
     if (confirmUnlink)

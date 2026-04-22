@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VD796AAB3HJSX0Z7AHRG
+created: "2026-04-21T23:55:05.346Z"
+---
+
 # CLAUDE.md — Boltzsidian branch
 
 Orientation for sessions working inside `boltzsidian/` on the `boltzsidian`
@@ -83,3 +89,5 @@ gate.
 - Never TypeScript. Never over-engineer.
 - When in doubt about whether a feature feels right, leave a minimal hook
   and ship the phase.
+
+#phase #user #feature

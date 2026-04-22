@@ -1,6 +1,12 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VD9769WPM40EM0TP1VG2
+created: "2026-04-21T15:32:35.206Z"
+---
+
 # BOLTZMANN.md — Fleeting Observers in an Indifferent Field
 
-A speculative design doc. BRAIN.md treats the whole simulation as a single
+A speculative design doc. [[BRAIN]] treats the whole simulation as a single
 mind. This one goes the other direction: the universe stays a universe, but
 _observers spontaneously assemble and dissolve inside it_, each with a brief
 inner life, false memories, and opinions about what it just saw.
@@ -204,7 +210,7 @@ layers meet.
 (Originally drafted as "the meaning filter"; renamed during Phase 6
 planning. "Salience" is more honest about what the scorer actually does —
 it measures what stands out from context, not what is true. See
-SALIENCE.md for the extended version of this section.)
+[[SALIENCE]] for the extended version of this section.)
 
 Most interactions are noise. The salience layer is the scoring function that
 decides which new ideas are kept, surfaced, or discarded.
@@ -255,7 +261,7 @@ _intuition_. Both can be wrong. Only threads persist across scene loads.
   without us hand-authoring what that is.
 - **It is falsifiable by taste.** If the utterances feel canned, we tune the
   pipeline. If they feel alive, we've found the right abstraction.
-- **It composes with BRAIN.md.** A brain-scene can nominate its own
+- **It composes with [[BRAIN]].** A brain-scene can nominate its own
   sub-observers — thoughts inside the thinking. That's dreamy, and cheap.
 
 ---
@@ -274,3 +280,5 @@ A version we could ship this week:
 Then, in a second pass: star memories + interactions + the meaning filter.
 The order matters. If the chorus is boring, the meaning layer can't save
 it. If the chorus is alive, the meaning layer turns it into a mind.
+
+#star #user

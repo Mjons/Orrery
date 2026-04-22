@@ -1,6 +1,11 @@
+---
+id: 01KPS9CFDKH8JWC7ZG213MSD2C
+created: "2026-04-21T20:01:50-04:00"
+---
+
 # STATES.md — What the Universe Does Besides Sleep
 
-A speculative design doc. DREAM.md introduced the idea that "dreaming"
+A speculative design doc. [[DREAM]] introduced the idea that "dreaming"
 isn't a separate codepath — it's a parameter regime applied to one
 physics engine. This doc takes that further: the universe has **several
 operational states**, each a different regime, each appropriate for a
@@ -26,7 +31,7 @@ A state is:
   thresholds, and UI mode are all tuned to one specific kind of work
 - **an optional user confirmation surface** — many states produce
   candidate actions rather than taking them (consistent with
-  SALIENCE.md §8.3)
+  [[SALIENCE]] §8.3)
 - **a transition in/out** — clear entry trigger, clear exit artefact
 
 The app already has two: **wake** (live editing) and **dream**
@@ -46,7 +51,7 @@ unattended.
 | Wake  | User input in last ~10m | Normal physics, chorus, gestures, panel editor   | Your notes                    |
 | Dream | Idle or Shift+D         | Soft physics, slow chorus, salience spawns ideas | Morning report + ideas drawer |
 
-Also named but not built: **focus** (DREAM.md §0 mention) and **replay**
+Also named but not built: **focus** ([[DREAM]] §0 mention) and **replay**
 (DREAM.md §0 mention). Those are referenced below and in §5/§6.
 
 ---
@@ -119,7 +124,7 @@ distinction matters for how seriously to read it.
 
 ## 3. Weed — the forgetting state
 
-DREAM.md §7 calls out hoarding as a risk: if nothing ever gets
+[[DREAM]] §7 calls out hoarding as a risk: if nothing ever gets
 aggressively pruned, the vault grows and the dreams get bland. Phase 5
 already writes prune candidates to `.universe/prune-candidates.json`,
 but nothing nudges the user to act on them.
@@ -147,7 +152,7 @@ the next weekly pass.
 
 Not every morning has a dream. If the user is opening the app on a
 fresh session with no overnight cycle to replay, the morning report is
-canned-template content (which is fine — SALIENCE.md lands in time) or
+canned-template content (which is fine — [[SALIENCE]] lands in time) or
 empty.
 
 **Brief** is the state that runs when you open the app and have 90
@@ -171,7 +176,7 @@ where I am."_
 
 ## 5. Echo — the replay state
 
-DREAM.md §0 promised this; never built. **Echo** replays a writing
+[[DREAM]] §0 promised this; never built. **Echo** replays a writing
 session — the last hour, the last day, the last commit — as an animated
 replay in the universe. Shows:
 
@@ -246,7 +251,7 @@ ignored. Tune thresholds to propose roughly 3–10 suggestions per 50
 notes — enough to feel useful, little enough to review in a coffee
 break.
 
-Same hard gate as SALIENCE.md: if Michael runs tend once on his real
+Same hard gate as [[SALIENCE]]: if Michael runs tend once on his real
 vault and rejects every suggestion, something is wrong with the scoring
 function, not with the number of suggestions.
 
@@ -291,8 +296,8 @@ first four already feel right.
 
 ## 9. What ties this together
 
-The underlying claim of the speculative stack (BRAIN, BOLTZMANN,
-OBSIDIAN, DREAM, SALIENCE) is that the vault is an active system, not
+The underlying claim of the speculative stack ([[BRAIN]], [[BOLTZMANN]],
+[[OBSIDIAN]], [[DREAM]], [[SALIENCE]]) is that the vault is an active system, not
 just a store. A vault that _only_ dreams while you're away is a limited
 version of that claim. A vault that also tends (quietly cleans), weeds
 (quietly forgets), briefs (quickly orients), and echoes (faithfully
@@ -305,3 +310,5 @@ claiming to know what you mean.
 
 > The universe has a small number of jobs. Making it look busy is
 > easy; making it useful is the whole project.
+
+#phase #user #feature

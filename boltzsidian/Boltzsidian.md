@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VD7K6WKG085QCSXDVHJS
+created: "2026-04-21T23:55:53.100Z"
+---
+
 # Boltzsidian
 
 A local-first markdown note-taking app whose workspace is a GPU-accelerated
@@ -36,3 +42,5 @@ the roadmap and [../docs/WORKSPACE.md](../docs/WORKSPACE.md) for the product spe
 ## License
 
 MIT.
+
+#phase

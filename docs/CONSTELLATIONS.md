@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDCBK5JN9TX65TYTZCZ7
+created: "2026-04-21T16:52:21.909Z"
+---
+
 # CONSTELLATIONS.md — Cluster-level labels that surface when you zoom out
 
 A focused design doc. Today's labels are per-star: a floating title near
@@ -235,7 +241,7 @@ for naming derivation and the rename prompt.
 
 - **Per-constellation color outside the curated palette.** Tempting,
   cheap to offer, would visually break the app.
-- **LLM-named clusters.** Deferred to the librarian (LIBRARIAN.md).
+- **LLM-named clusters.** Deferred to the librarian ([[LIBRARIAN]]).
   Constellations ship with heuristic naming; AI proposals can promote
   from there once that pipeline exists.
 - **Nested constellations.** Clusters-of-clusters at very wide zoom.
@@ -271,3 +277,5 @@ When the stars get small enough to stop reading as individuals, the
 sky should tell you the names of its regions — softly, centered, in
 atmospheric type, fading away again the moment you come close enough
 to see the stars themselves.
+
+#constellation #star #user

@@ -1,6 +1,11 @@
+---
+id: 01KPS9CFDMZGZV0QNH8M3DEYW8
+created: "2026-04-21T20:01:50-04:00"
+---
+
 # TENDING.md — How the Janitor Gets Better
 
-A speculative design doc. STATES.md §2 introduces Tend — the manual
+A speculative design doc. [[STATES]] §2 introduces Tend — the manual
 scanner that proposes obvious structural work on a vault. The v1
 shipped in Phase 6.5 and its first real-vault run was informative: it
 worked, it produced proposals, and most of them were wrong.
@@ -92,7 +97,7 @@ deleting. The data doesn't leave the vault.
 Simplest possible loop, and probably the most useful.
 
 For each pass, compute the 30-day rolling accept rate. If it deviates
-from the target (say 70% per BUILD_PLAN §Phase 6.5 exit gate), nudge
+from the target (say 70% per [[BUILD_PLAN]] §Phase 6.5 exit gate), nudge
 the pass's threshold:
 
 ```
@@ -314,3 +319,5 @@ Tend currently proposes what it thinks a human would notice; over
 time, it should propose what _this specific human, in this specific
 vault_ actually wants noticed — without ever sending a byte of that
 observation anywhere else.
+
+#user #phase #feature

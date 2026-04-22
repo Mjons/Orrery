@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDSSEHKMRH8A0MMWW1EG
+created: "2026-04-17T13:44:35.148Z"
+---
+
 # Universe Simulator — Technical Specification
 
 **Author:** Michael Jonsson
@@ -181,3 +187,5 @@ Galaxies are placed in the center-of-mass frame (total momentum = 0, total posit
 - Body mergers with conservation of momentum & mass
 - Recording → mp4 export
 - VR mode via WebXR
+
+#user #star

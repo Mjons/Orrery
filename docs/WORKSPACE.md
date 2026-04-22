@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDXRSCFZ9VABKEH1ZGG0
+created: "2026-04-21T05:09:27.813Z"
+---
+
 # WORKSPACE.md — The Universe as a Note-Taking Environment
 
 The keystone doc. [BRAIN](BRAIN.md), [BOLTZMANN](BOLTZMANN.md),
@@ -31,8 +37,8 @@ work while the user isn't looking, and has something useful to show them in
 the morning.** Every other note-taking app is inert between sessions. This
 one isn't. The workspace exists to make that loop productive — without
 writing, reading, and linking happening inside the sim, the dream layer
-(DREAM.md) has no substrate to replay and the meaning filter
-(BOLTZMANN.md §5) has no content to score.
+([[DREAM]]) has no substrate to replay and the meaning filter
+([[BOLTZMANN]] §5) has no content to score.
 
 So: we are not building a prettier graph view. We are building the minimum
 surface that lets a universe think about someone's notes usefully while
@@ -90,7 +96,7 @@ fires the physical binding event.
 on another body. Link created. Both notes' frontmatter updates. Both
 bodies receive a brief attractive impulse toward each other, then settle
 into a spring-pulled orbital resonance over the next ~5 seconds. The K
-matrix Hebbian-updates slightly between their kinds (OBSIDIAN.md §3.2).
+matrix Hebbian-updates slightly between their kinds ([[OBSIDIAN]] §3.2).
 
 Deleting a link (right-click the tether, or remove the `[[...]]` in the
 text) → tether fades over 500ms, spring releases, bodies drift back to
@@ -246,8 +252,8 @@ pinned      = frontmatter `pinned:` (sim leaves it at its position)
   configurable `daily/` folder. Rendered as a filament of bright bodies
   ordered by date along a soft curve in scene-space. Today's daily is
   heaviest and slightly brighter. Ages visibly as you scroll back.
-- **Idea notes (dream-born).** Generated under `ideas/` (DREAM §3.2,
-  BOLTZMANN §5.3). Marked with `born_in_dream: true` frontmatter. Rendered
+- **Idea notes (dream-born).** Generated under `ideas/` ([[DREAM]] §3.2,
+  [[BOLTZMANN]] §5.3). Marked with `born_in_dream: true` frontmatter. Rendered
   with a subtle halo so the user can tell what came from the universe vs.
   what they wrote. Can be promoted (strip the halo, move to a normal
   folder) or discarded from the drawer.
@@ -281,23 +287,23 @@ ephemera.
 These stop being features and become the actual product's layers. Reframe
 each:
 
-- **BRAIN.md** is the _tuning model_. It tells us what a healthy K matrix
+- **[[BRAIN]]** is the _tuning model_. It tells us what a healthy K matrix
   looks like, what radiation does, why separation matters. When we choose
   defaults for a new workspace, we're choosing from the palette BRAIN.md
   describes. An "artist" default preset is a real setting.
 
-- **OBSIDIAN.md** is the _data ingestion spec_. The mapping from note
+- **[[OBSIDIAN]]** is the _data ingestion spec_. The mapping from note
   metadata to body parameters (§5 here) is the concrete form of what
   OBSIDIAN.md §3 sketched. The "vault as seed corpus" is the actual
   workspace.
 
-- **BOLTZMANN.md** is the _ambient voice layer_. Observer chorus is an
+- **[[BOLTZMANN]]** is the _ambient voice layer_. Observer chorus is an
   ambient feature, off by default, toggled from the settings pane. It
   provides peripheral narration. The meaning filter (BOLTZMANN.md §5) is
   the idea-promotion pipeline that produces the dream-born notes in
   `ideas/`.
 
-- **DREAM.md** is the _engine of the differentiator_. Sleep Depth, idle
+- **[[DREAM]]** is the _engine of the differentiator_. Sleep Depth, idle
   triggers, morning reports, pruning suggestions. This is the loop that
   justifies the rest of the product's existence.
 
@@ -440,7 +446,7 @@ Output: the product. This is what ships as 1.0. Two weeks.
 
 ### Phase 4 — Observer chorus
 
-- BOLTZMANN.md §2 nominator: 2–4 observers max, templates only.
+- [[BOLTZMANN]] §2 nominator: 2–4 observers max, templates only.
 - Floating DOM captions, short lifetime, fade-out.
 - Settings toggle: off by default. Users opt in.
 
@@ -450,7 +456,7 @@ the templates read as noise.)
 ### Phase 5 — Dream mode
 
 - Sleep Depth slider + idle detection.
-- Parameter regime swap per DREAM.md §1.
+- Parameter regime swap per [[DREAM]] §1.
 - Morning report modal: weather, three things, prunings.
 - Write `dreams/YYYY-MM-DD.md` full log.
 - Never auto-delete files; prunings go to `prune-candidates.json`.
@@ -500,7 +506,7 @@ Things the doc can't decide alone:
    (c) learned from cluster patterns. I lean (a) with (b) as override.
 
 3. **What's the name?** "Universe Simulator" and "Orrery" belong to the
-   sim. A workspace product with BRAIN/BOLTZMANN/DREAM underneath probably
+   sim. A workspace product with [[BRAIN]]/BOLTZMANN/DREAM underneath probably
    wants a different handle. Not my call.
 
 4. **Monetization? Distribution?** Electron app on itch.io? Web-only via
@@ -533,3 +539,5 @@ Every other note-taking app is a filing cabinet that stops when you close
 the laptop. This one is a small, local, private machine that keeps
 thinking. That's the whole pitch. Everything in this doc is in service of
 that one sentence.
+
+#user #panel #phase

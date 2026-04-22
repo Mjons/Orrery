@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDY7MN04AFRX0560JDES
+created: "2026-04-17T14:21:55.282Z"
+---
+
 # CLAUDE.md — Universe Simulator
 
 Orientation document for future Claude sessions working on this codebase.
@@ -144,3 +150,5 @@ looks like a burst when bright). Resist the urge to script outcomes.
   sliders.
 - When in doubt about whether a feature feels right, leave a minimal hook and
   ship the phase — we'll iterate once he's lived with it.
+
+#phase #feature #user

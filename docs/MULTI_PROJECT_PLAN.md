@@ -1,3 +1,9 @@
+---
+tended_on: [tag-infer]
+id: 01KPS7VDN63F6ZE7BMXFJZYDQ3
+created: "2026-04-21T22:42:15.111Z"
+---
+
 # MULTI_PROJECT_PLAN.md — Sustainable §1.5 implementation
 
 Operational companion to `MULTI_PROJECT.md` §1.5. Each phase is a
@@ -216,7 +222,7 @@ rejected with a clear toast, never silently.
 4. `src/layers/dream-log.js`, `src/layers/prune.js`, `src/layers/weed.js`
    - All `.universe/*` writes go to `writeRoot.handle`.
    - Reads may stay at writeRoot for now (Option A from
-     MULTI_PROJECT.md §1.4 step 5 — shared `.universe/`).
+     [[MULTI_PROJECT]] §1.4 step 5 — shared `.universe/`).
 
 5. `src/layers/tend-apply.js`
    - Writes frontmatter / body edits back to the SOURCE root (the
@@ -498,3 +504,5 @@ Eight phases, each independently shippable, every intermediate state
 green, total effort under a focused week, with the codebase audit
 producing a checklist before any code is written so we never discover
 a surprise single-workspace assumption halfway through.
+
+#phase #user #reference

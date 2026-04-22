@@ -23,6 +23,7 @@ import { createSparks, SIZE_CONNECTION, SIZE_IDEA } from "./sim/sparks.js";
 import { createKMatrix } from "./sim/kmatrix.js";
 import { createHoverOrbit } from "./sim/hover-orbit.js";
 import { createLabels } from "./ui/labels.js";
+import { createConstellations } from "./ui/constellations.js";
 import { createPickDebug } from "./ui/pick-debug.js";
 import { createSearch } from "./ui/search.js";
 import { createLinkDrag } from "./ui/link-drag.js";
@@ -145,6 +146,7 @@ function getSourceRoot(noteId) {
 }
 let bodies = null;
 let labels = null;
+let constellations = null;
 let physics = null;
 let tethers = null;
 let sparks = null;
@@ -163,6 +165,7 @@ let ideasDrawer = null;
 // scoring pass.
 const salienceParams = { ...SALIENCE_DEFAULTS };
 let unsubscribeLabels = null;
+let unsubscribeConstellations = null;
 let unsubscribePhysics = null;
 let unsubscribeTethers = null;
 let unsubscribeSparks = null;
@@ -175,7 +178,12 @@ let tagPromptActive = false;
 const settings = loadSettings();
 applyAccent(settings.accent);
 
-const coachmarks = createCoachmarks();
+// Suppress coachmarks while the user is exploring the `welcome` demo —
+// its notes already teach every gesture the coachmarks would point at.
+const coachmarks = createCoachmarks({
+  isSuppressed: () =>
+    workspaceKind === "demo" && getDemoTheme && getDemoTheme() === "welcome",
+});
 
 // ── Utterance router (Phase 7) ──────────────────────────────
 // Single shared router for every voice surface — chorus lines, dream
@@ -814,6 +822,13 @@ if (demoButton) {
       // visibly separate. Otherwise every demo looks like one big mind map
       // until the user opens Settings and finds the slider.
       if (ws.freshInstall) seedDemoInfluence(theme);
+      // Welcome theme has been opened — from now on the first-run
+      // default shifts to astronomer's notebook. See ONBOARDING.md §10.
+      if (theme === "welcome") {
+        try {
+          localStorage.setItem(WELCOME_SEEN_KEY, "1");
+        } catch {}
+      }
       setProgress("");
       await setWorkspace(ws);
     } catch (err) {
@@ -823,14 +838,27 @@ if (demoButton) {
       setWelcomeBusy(false);
     }
   });
+
+  // First-run default: Welcome for users who've never opened it;
+  // astronomer for everyone else. The welcome radio is already
+  // `checked` in the HTML — only switch away if the user has already
+  // been through the tour. No-op for fresh IndexedDB / localStorage.
+  if (localStorage.getItem(WELCOME_SEEN_KEY) === "1") {
+    const astroRadio = document.querySelector(
+      "#welcome-theme input[name='demo-theme'][value='astronomer']",
+    );
+    if (astroRadio) astroRadio.checked = true;
+  }
 }
+
+const WELCOME_SEEN_KEY = "boltzsidian.welcome.seen.v1";
 
 // Read whichever theme radio is currently selected on the welcome card.
 function pickedWelcomeTheme() {
   const el = document.querySelector(
     "#welcome-theme input[name='demo-theme']:checked",
   );
-  return el ? el.value : "astronomer";
+  return el ? el.value : "welcome";
 }
 
 // Seed folder basin strength for a freshly-installed demo so the
@@ -839,7 +867,11 @@ function pickedWelcomeTheme() {
 // sub-projects and wants a stronger basin; the astronomer theme has
 // categories inside one domain and wants a gentler pull.
 function seedDemoInfluence(theme) {
-  const target = theme === "project" ? 0.55 : 0.3;
+  // Welcome is a tiny hand-authored ring — basins would fight the
+  // pinned positions, so leave it at 0. Project has two genuinely
+  // separate sub-projects that want strong pull. Astronomer has
+  // categories inside one domain and wants a gentler pull.
+  const target = theme === "welcome" ? 0 : theme === "project" ? 0.55 : 0.3;
   settings.folder_influence = target;
   saveSettings(settings);
 }
@@ -1644,6 +1676,23 @@ async function setWorkspace(ws) {
       hoverOrbit.update(dt, t);
     });
 
+    // CONSTELLATIONS.md — cluster-level labels that rise when you zoom
+    // out past a cluster's own extent. Runs on the same frame cadence
+    // as star labels; the update loop short-circuits when the setting
+    // is off or dream depth is high.
+    if (unsubscribeConstellations) unsubscribeConstellations();
+    if (constellations) constellations.dispose();
+    constellations = createConstellations({
+      vault,
+      bodies,
+      camera,
+      getMode: () => settings.show_constellations !== false,
+      getDreamDepth: () => (dream ? dream.getDepth() : 0),
+      getSettings: () => settings,
+      onConstellationClick: (cid) => focusCluster(cid),
+    });
+    unsubscribeConstellations = onFrame(() => constellations.update());
+
     if (unsubscribePhysics) unsubscribePhysics();
     unsubscribePhysics = onFrame((dt) => physics.step(dt));
 
@@ -2100,6 +2149,34 @@ function focusNote(noteId) {
 let camSnapshot = null;
 let camTween = null;
 const TMP_OFFSET = new THREE.Vector3();
+
+// CONSTELLATIONS.md §5 — click a constellation to frame the whole
+// cluster. Distance chosen so zoom_ratio lands around 3 (slightly
+// inside the cross-fade, stars just starting to read).
+function focusCluster(clusterId) {
+  if (!vault?.clusters?.byId) return;
+  const cluster = vault.clusters.byId.get(clusterId);
+  if (!cluster?.centroid) return;
+  const target = new THREE.Vector3(
+    cluster.centroid[0],
+    cluster.centroid[1],
+    cluster.centroid[2],
+  );
+  // Preserve the viewing angle — just reset distance. Distance = 3×
+  // extent puts the cluster almost filling the frame with a little
+  // breathing room.
+  TMP_OFFSET.subVectors(camera.position, controls.target);
+  const dist = Math.max(80, cluster.extent * 3);
+  TMP_OFFSET.normalize().multiplyScalar(dist);
+  const toPos = target.clone().add(TMP_OFFSET);
+  if (!camSnapshot) {
+    camSnapshot = {
+      pos: camera.position.clone(),
+      target: controls.target.clone(),
+    };
+  }
+  startTween(toPos, target, 0.9);
+}
 
 function focusCamera(worldPos) {
   if (!worldPos) return;
