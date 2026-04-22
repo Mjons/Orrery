@@ -1173,12 +1173,28 @@ window.addEventListener(
   { capture: true },
 );
 
-// Cursor affordance — while Alt/Shift is held with the pointer over
-// the canvas, the cursor flips so the user sees delete is armed.
-// Cosmetic; the real gate is the key check in the handler above.
+// Cursor affordance — while Alt/Shift is held AND the pointer is
+// actually near a tether, the cursor flips so the user sees delete
+// is armed. Cosmetic; the real gate is the key check in the
+// pointerdown handler above. Narrowed to "hovering a tether" so
+// modifier-hotkeys (Shift / Alt during typing combos) don't flip
+// the whole canvas cursor.
+let _lastPointerX = -1;
+let _lastPointerY = -1;
 function updateTetherCursor(e) {
   if (!canvas) return;
-  const armed = !!(e.altKey || e.shiftKey) && !!tethers;
+  // `e` is either a keydown/keyup (no clientX) or a pointermove.
+  if (typeof e.clientX === "number") {
+    _lastPointerX = e.clientX;
+    _lastPointerY = e.clientY;
+  }
+  const modHeld = !!(e.altKey || e.shiftKey);
+  let armed = false;
+  if (modHeld && tethers && _lastPointerX >= 0) {
+    // Only arm when the pointer is near a real tether segment.
+    const hit = tethers.pickAt?.(_lastPointerX, _lastPointerY);
+    armed = !!hit;
+  }
   canvas.classList.toggle("tether-delete-armed", armed);
 }
 window.addEventListener("keydown", updateTetherCursor);

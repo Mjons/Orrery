@@ -443,14 +443,10 @@ export function createKeywordLinkPicker({ getVault, onApply } = {}) {
     for (let i = 0; i < autocompleteMatches.length; i++) {
       const n = autocompleteMatches[i];
       const row = document.createElement("div");
+      row.dataset.idx = String(i);
       Object.assign(row.style, {
         padding: "6px 12px",
         cursor: "pointer",
-        color: i === autocompleteCursor ? "#fff" : "rgba(215, 219, 228, 0.75)",
-        background:
-          i === autocompleteCursor
-            ? "rgba(138, 180, 255, 0.12)"
-            : "transparent",
         display: "flex",
         justifyContent: "space-between",
         gap: "8px",
@@ -468,17 +464,51 @@ export function createKeywordLinkPicker({ getVault, onApply } = {}) {
       r.style.textTransform = "uppercase";
       row.append(t, r);
       row.addEventListener("mouseenter", () => {
-        autocompleteCursor = i;
-        renderAutocomplete(q);
+        // Update styles only — re-rendering here would destroy the
+        // row mid-click (browser detaches the node between mouseenter
+        // and click), which is why clicking wasn't registering.
+        if (autocompleteCursor !== i) {
+          autocompleteCursor = i;
+          paintAutocompleteCursor();
+        }
       });
-      row.addEventListener("click", (e) => {
+      // Use mousedown so the pick fires before any blur/focus shuffle
+      // can detach the node. Belt-and-braces with click as well.
+      const pick = (e) => {
         e.stopPropagation();
+        e.preventDefault();
         pickTarget(n);
-      });
+      };
+      row.addEventListener("mousedown", pick);
+      row.addEventListener("click", pick);
       autocomplete.appendChild(row);
     }
+    paintAutocompleteCursor();
     positionAutocompleteBelow(targetRow.input);
     autocomplete.style.display = "flex";
+    // Auto-pick the top result as a tentative target so Apply can
+    // light up immediately. The user can still click / arrow to a
+    // different row — pickTarget will overwrite. Skip if the user
+    // has already explicitly picked a target whose title matches
+    // the current input (don't clobber an explicit choice).
+    if (
+      autocompleteMatches[0] &&
+      (!target || target.title !== targetRow.input.value)
+    ) {
+      target = autocompleteMatches[0];
+      scheduleScan();
+    }
+  }
+
+  function paintAutocompleteCursor() {
+    for (const row of autocomplete.children) {
+      const i = Number(row.dataset.idx);
+      const active = i === autocompleteCursor;
+      row.style.color = active ? "#fff" : "rgba(215, 219, 228, 0.75)";
+      row.style.background = active
+        ? "rgba(138, 180, 255, 0.12)"
+        : "transparent";
+    }
   }
 
   function cursorAutocomplete(delta) {
@@ -486,7 +516,7 @@ export function createKeywordLinkPicker({ getVault, onApply } = {}) {
     autocompleteCursor =
       (autocompleteCursor + delta + autocompleteMatches.length) %
       autocompleteMatches.length;
-    renderAutocomplete(targetRow.input.value);
+    paintAutocompleteCursor();
   }
 
   function pickTarget(note) {
