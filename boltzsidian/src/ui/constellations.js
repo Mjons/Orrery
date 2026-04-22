@@ -51,6 +51,46 @@ export function createConstellations({
   getDreamDepth, // () => number in [0, 1]
   getSettings, // () => settings — for folder tint lookup
 }) {
+  // Drag-threshold gate so mid-gesture pointer releases over a
+  // constellation label don't fire the batch-link picker, rename, or
+  // focus-camera actions. OrbitControls uses right-button for pan
+  // and left+middle for rotate, both of which can end anywhere on
+  // the viewport including over a label. We only want the label's
+  // click actions to fire when the user tapped WITHOUT dragging.
+  const DRAG_THRESHOLD_SQ = 64; // 8px in each axis
+  let pointerDownAt = null; // { x, y, button } | null
+  let wasDragging = { 0: false, 1: false, 2: false }; // by button
+  window.addEventListener(
+    "pointerdown",
+    (e) => {
+      pointerDownAt = { x: e.clientX, y: e.clientY, button: e.button };
+      wasDragging[e.button] = false;
+    },
+    true,
+  );
+  window.addEventListener(
+    "pointermove",
+    (e) => {
+      if (!pointerDownAt) return;
+      const dx = e.clientX - pointerDownAt.x;
+      const dy = e.clientY - pointerDownAt.y;
+      if (dx * dx + dy * dy > DRAG_THRESHOLD_SQ) {
+        wasDragging[pointerDownAt.button] = true;
+      }
+    },
+    true,
+  );
+  window.addEventListener(
+    "pointerup",
+    () => {
+      pointerDownAt = null;
+      // Leave wasDragging[button] true through the immediately
+      // following click/contextmenu so handlers can consult it, then
+      // reset on next pointerdown.
+    },
+    true,
+  );
+
   const container = document.createElement("div");
   container.id = "constellations";
   Object.assign(container.style, {
@@ -111,6 +151,10 @@ export function createConstellations({
         e.stopPropagation();
         return;
       }
+      // Suppress focus-camera if the pointer just finished a drag —
+      // user was orbiting the canvas and happened to release over
+      // the label. Click without drag = real intent.
+      if (wasDragging[0]) return;
       const cid = clusterIdBySlot[i];
       if (cid == null) return;
       e.stopPropagation();
@@ -135,6 +179,10 @@ export function createConstellations({
       if (cid == null) return;
       e.preventDefault();
       e.stopPropagation();
+      // Suppress action if the right-button press was a drag —
+      // user was panning the camera and happened to release over
+      // the label. Only a stationary right-click opens the menu.
+      if (wasDragging[2]) return;
       if (e.shiftKey) {
         beginEdit(i);
         return;

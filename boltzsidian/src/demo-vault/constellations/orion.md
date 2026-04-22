@@ -1,3 +1,7 @@
+---
+id: 01KPSFM3SAAJAW84927SYMYBJK
+created: "2026-04-21T12:35:51.698Z"
+---
 # Orion
 
 The anchor of the winter sky. Three belt stars, a sword hanging below
@@ -16,3 +20,5 @@ around the same distance, born from the same gas.
 Related: [[Deep sky challenge]].
 
 #constellation #winter
+
+[[Patient Portal — Exploration & Mindmap Planning]]
