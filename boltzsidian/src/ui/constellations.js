@@ -304,11 +304,16 @@ export function createConstellations({
   let cachedVaultNotes = -1;
 
   let frame = 0;
+  // RENDER_QUALITY.md Phase A — visible cap + update cadence can be
+  // dialed per tier. Same pattern as labels.js. The DOM pool stays
+  // allocated; unused slots just paint opacity 0.
+  let qualityVisibleCap = MAX_CONSTELLATIONS;
+  let qualityUpdateEveryN = UPDATE_EVERY_N_FRAMES;
   const screenBuf = new Array(MAX_CONSTELLATIONS);
 
   function update() {
     frame++;
-    if (frame % UPDATE_EVERY_N_FRAMES !== 0) return;
+    if (frame % qualityUpdateEveryN !== 0) return;
 
     const on = getMode ? getMode() : true;
     if (!on) {
@@ -372,7 +377,7 @@ export function createConstellations({
     }
     ranked.sort((a, b) => b.noteCount - a.noteCount);
 
-    const limit = Math.min(ranked.length, MAX_CONSTELLATIONS);
+    const limit = Math.min(ranked.length, qualityVisibleCap);
     for (let i = 0; i < MAX_CONSTELLATIONS; i++) {
       const slot = pool[i];
       if (i >= limit) {
@@ -470,7 +475,20 @@ export function createConstellations({
     container.remove();
   }
 
-  return { update, dispose };
+  // RENDER_QUALITY.md Phase A — tier dial for visible cap + cadence.
+  function setQuality(tier) {
+    const capScale = Math.max(0, Math.min(2, tier.constellationMaxScale ?? 1));
+    qualityVisibleCap = Math.max(
+      3,
+      Math.min(MAX_CONSTELLATIONS, Math.round(MAX_CONSTELLATIONS * capScale)),
+    );
+    qualityUpdateEveryN = Math.max(
+      1,
+      Math.min(12, tier.constellationUpdateEveryN ?? UPDATE_EVERY_N_FRAMES),
+    );
+  }
+
+  return { update, dispose, setQuality };
 }
 
 // Naming priority: project root → top-level folder → heaviest node →

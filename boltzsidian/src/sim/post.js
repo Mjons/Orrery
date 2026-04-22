@@ -81,6 +81,20 @@ export function createPost({ renderer, scene, camera }) {
   const outputPass = new OutputPass();
   composer.addPass(outputPass);
 
+  // RENDER_QUALITY.md Phase A — quality tier multiplies the
+  // ambience-authored values. We cache the last-applied ambience +
+  // intensity so `setQuality` can re-apply with the new scales
+  // without the caller having to know what was active.
+  let currentAmbience = null;
+  let currentIntensity = 1;
+  let qualityScales = {
+    bloomStrengthScale: 1,
+    bloomRadiusScale: 1,
+    vignetteScale: 1,
+    grainScale: 1,
+    temperatureScale: 1,
+  };
+
   function setSize(w, h) {
     composer.setSize(w, h);
     bloomPass.setSize(w, h);
@@ -93,17 +107,42 @@ export function createPost({ renderer, scene, camera }) {
   // — bloom character is part of the preset's identity.
   function apply(ambience, intensity = 1) {
     if (!ambience) return;
+    currentAmbience = ambience;
+    currentIntensity = intensity;
     const k = Math.max(0, intensity);
-    bloomPass.strength = ambience.bloomStrength;
-    bloomPass.radius = ambience.bloomRadius;
+    const q = qualityScales;
+    bloomPass.strength = ambience.bloomStrength * q.bloomStrengthScale;
+    bloomPass.radius = ambience.bloomRadius * q.bloomRadiusScale;
     bloomPass.threshold = ambience.bloomThreshold;
-    lookPass.uniforms.uVignette.value = ambience.vignette * k;
-    lookPass.uniforms.uTemperature.value = ambience.temperature * k;
-    lookPass.uniforms.uGrain.value = ambience.grain * k;
+    lookPass.uniforms.uVignette.value = ambience.vignette * k * q.vignetteScale;
+    lookPass.uniforms.uTemperature.value =
+      ambience.temperature * k * q.temperatureScale;
+    lookPass.uniforms.uGrain.value = ambience.grain * k * q.grainScale;
   }
 
   function tickTime(t) {
     lookPass.uniforms.uTime.value = t;
+  }
+
+  // RENDER_QUALITY.md Phase A — accept a tier record and re-apply
+  // the current ambience with the tier's scales. Also reconciles
+  // composer pixel ratio after `renderer.setPixelRatio`.
+  function setQuality(tier) {
+    qualityScales = {
+      bloomStrengthScale: tier.bloomStrengthScale ?? 1,
+      bloomRadiusScale: tier.bloomRadiusScale ?? 1,
+      vignetteScale: tier.vignetteScale ?? 1,
+      grainScale: tier.grainScale ?? 1,
+      temperatureScale: tier.temperatureScale ?? 1,
+    };
+    // Re-align render-target dimensions with the renderer's (possibly
+    // freshly-changed) pixel ratio. Without setPixelRatio + setSize,
+    // bloom renders into a mismatched buffer and the output looks
+    // blurry or scaled wrong after a tier transition.
+    composer.setPixelRatio(renderer.getPixelRatio());
+    composer.setSize(window.innerWidth, window.innerHeight);
+    bloomPass.setSize(window.innerWidth, window.innerHeight);
+    if (currentAmbience) apply(currentAmbience, currentIntensity);
   }
 
   return {
@@ -113,5 +152,6 @@ export function createPost({ renderer, scene, camera }) {
     setSize,
     apply,
     tickTime,
+    setQuality,
   };
 }

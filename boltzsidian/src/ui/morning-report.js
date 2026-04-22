@@ -187,6 +187,17 @@ function buildSnapshot(vault, bodies, settings, chorus, dream, salienceLayer) {
         day: "numeric",
       });
 
+  // DREAM_THEMES.md Phase E — theme callout at the top of the report.
+  // Only rendered when the dream used a theme. `filterStats.before`
+  // is the raw pool size; `after` is the surviving size after the
+  // theme filter. Zero after means "no candidates landed on the
+  // theme this cycle" — surface that honestly.
+  const themeStats = salienceLayer?.getLastThemeFilterStats?.() || null;
+  const themeLabel =
+    themeStats?.themed && settings?.dream_theme
+      ? describeTheme(settings.dream_theme, vault)
+      : null;
+
   return {
     isReal,
     date: dateLine,
@@ -194,7 +205,35 @@ function buildSnapshot(vault, bodies, settings, chorus, dream, salienceLayer) {
     things,
     prunings,
     dreamLogPath: dream ? dreamLogPathFromEnd(dream.endedAt) : null,
+    themeLabel,
+    themeStats,
   };
+}
+
+// Render a human-readable label for a dream theme. Used at the top
+// of the morning report so "what was this dream about?" is clear.
+function describeTheme(theme, vault) {
+  if (!theme?.kind || !theme?.value) return null;
+  switch (theme.kind) {
+    case "constellation": {
+      const id = Number(theme.value);
+      const cluster = vault?.clusters?.byId?.get(id);
+      if (!cluster) return "a constellation";
+      const sampleId = cluster.noteIds?.[0];
+      const sampleNote = sampleId ? vault.byId?.get(sampleId) : null;
+      return sampleNote?.title
+        ? `the ${sampleNote.title} region`
+        : `region ${id}`;
+    }
+    case "folder":
+      return `#${theme.value}/`;
+    case "tag":
+      return `#${theme.value}`;
+    case "root":
+      return theme.value;
+    default:
+      return null;
+  }
 }
 
 function pickThings(vault, bodies, settings, chorus, dream, salienceLayer) {
@@ -400,6 +439,23 @@ function template(s) {
         s.isReal
           ? `<section class="mr-synthesis" data-backend="">
                <p class="mr-synthesis-text"><span class="mr-synthesis-dot"></span><span class="mr-synthesis-dot"></span><span class="mr-synthesis-dot"></span></p>
+             </section>`
+          : ""
+      }
+
+      ${
+        s.themeLabel
+          ? `<section class="mr-section mr-theme">
+               <h3>Theme</h3>
+               <p class="mr-weather">
+                 ${escapeHtml(s.themeLabel)}${
+                   s.themeStats && s.themeStats.before > 0
+                     ? ` <span class="mr-hint-inline">— ${s.themeStats.after} of ${s.themeStats.before} candidate${s.themeStats.before === 1 ? "" : "s"} survived</span>`
+                     : s.themeStats && s.themeStats.before === 0
+                       ? ` <span class="mr-hint-inline">— no candidates this cycle</span>`
+                       : ""
+                 }
+               </p>
              </section>`
           : ""
       }

@@ -6,6 +6,7 @@
 
 import { NUM_KINDS } from "../vault/kind.js";
 import { AURA_PALETTE, listTopLevelFolders } from "../vault/folders.js";
+import { deriveClusterName } from "./constellations.js";
 import { DEMO_THEMES } from "../vault/opfs.js";
 import { AMBIENCE_PRESETS, AMBIENCE_ORDER } from "../sim/ambience.js";
 import { PASSES as TEND_PASSES } from "../layers/tend.js";
@@ -32,6 +33,7 @@ export function initSettings({
   onResetDemo,
   onSwitchDemo,
   onDreamNow,
+  onDreamPreview, // () => void — force peak attractor for 30s preview
   onSetSleepDepth,
   getSleepDepth,
   onRunTend, // (enabledPasses: string[]) => Promise<number> — returns proposal count
@@ -99,6 +101,25 @@ export function initSettings({
       <p class="settings-hint">
         Cluster-level labels that appear when you zoom out. Click one to
         frame the whole region.
+      </p>
+      <label class="settings-row">
+        <span>Quality</span>
+        <div class="settings-quality-pick" id="s-quality-pick">
+          <button type="button" data-tier="low">Low</button>
+          <button type="button" data-tier="medium">Medium</button>
+          <button type="button" data-tier="high">High</button>
+          <button type="button" data-tier="ultra">Ultra</button>
+        </div>
+      </label>
+      <label class="settings-row">
+        <span>Auto-throttle</span>
+        <input type="checkbox" id="s-quality-auto" />
+      </label>
+      <p class="settings-hint">
+        The chosen quality is the ceiling. Auto-throttle may temporarily
+        drop lower under peak load (heavy dream motion, post-bulk settle)
+        and raise back up when the scene quiets. Turn off for stable
+        recording / screenshots.
       </p>
     </section>
 
@@ -188,6 +209,41 @@ export function initSettings({
       <div class="settings-row">
         <button type="button" id="s-dream-now" class="ghost">Dream now</button>
       </div>
+      <label class="settings-row">
+        <span>Gravity</span>
+        <input type="checkbox" id="s-dream-gravity" />
+      </label>
+      <p class="settings-hint">
+        An invisible attractor wanders through the universe while you
+        sleep, curling linked notes into arcs. Off = quieter dream.
+      </p>
+      <label class="settings-row">
+        <span>Strength</span>
+        <input
+          type="range"
+          id="s-dream-gravity-strength"
+          min="0"
+          max="10000"
+          step="200"
+        />
+        <span class="settings-row-num" id="s-dream-gravity-strength-val">2800</span>
+      </label>
+      <div class="settings-row">
+        <button type="button" id="s-dream-preview" class="ghost">Preview peak</button>
+      </div>
+      <p class="settings-hint">
+        Preview forces Sleep depth to 0.85 for 30&nbsp;s so you can see the
+        attractor at its most aggressive without waiting through the cycle.
+      </p>
+      <label class="settings-row">
+        <span>Theme</span>
+        <select id="s-dream-theme"></select>
+      </label>
+      <p class="settings-hint">
+        Tonight's dream focuses here. Pairs can still come from anywhere,
+        but every suggestion at morning time is FOR the theme. Random =
+        no focus.
+      </p>
     </section>
 
     <section class="settings-group">
@@ -409,6 +465,8 @@ export function initSettings({
   );
   const labelModeSelect = pane.querySelector("#s-label-mode");
   const showConstellations = pane.querySelector("#s-show-constellations");
+  const qualityPick = pane.querySelector("#s-quality-pick");
+  const qualityAuto = pane.querySelector("#s-quality-auto");
   const homeViewSelect = pane.querySelector("#s-home-view");
 
   // Populate ambience options once; selection reflects current setting on
@@ -439,6 +497,29 @@ export function initSettings({
     showConstellations.addEventListener("change", () => {
       onChange({ show_constellations: showConstellations.checked });
     });
+  }
+  if (qualityPick) {
+    qualityPick.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-tier]");
+      if (!btn) return;
+      const tier = btn.dataset.tier;
+      if (!tier) return;
+      onChange({ render_quality_ceiling: tier });
+      syncQualityPick(tier);
+    });
+  }
+  if (qualityAuto) {
+    qualityAuto.addEventListener("change", () => {
+      onChange({ render_quality_auto: qualityAuto.checked });
+    });
+  }
+
+  function syncQualityPick(tier) {
+    if (!qualityPick) return;
+    const buttons = qualityPick.querySelectorAll("button[data-tier]");
+    for (const b of buttons) {
+      b.classList.toggle("is-active", b.dataset.tier === tier);
+    }
   }
   const chorusOn = pane.querySelector("#s-chorus-on");
   const chorusDensity = pane.querySelector("#s-chorus-density");
@@ -488,6 +569,13 @@ export function initSettings({
   const sleepCapVal = pane.querySelector("#s-sleep-cap-val");
   const idleMin = pane.querySelector("#s-idle-min");
   const dreamNowBtn = pane.querySelector("#s-dream-now");
+  const dreamGravityToggle = pane.querySelector("#s-dream-gravity");
+  const dreamGravityStrength = pane.querySelector("#s-dream-gravity-strength");
+  const dreamGravityStrengthVal = pane.querySelector(
+    "#s-dream-gravity-strength-val",
+  );
+  const dreamPreviewBtn = pane.querySelector("#s-dream-preview");
+  const dreamThemeSelect = pane.querySelector("#s-dream-theme");
   const tendPassesEl = pane.querySelector("#s-tend-passes");
   const tendRunBtn = pane.querySelector("#s-tend-run");
   const tendStatusEl = pane.querySelector("#s-tend-status");
@@ -575,6 +663,44 @@ export function initSettings({
       if (onDreamNow) onDreamNow();
     });
   }
+  if (dreamGravityToggle) {
+    dreamGravityToggle.addEventListener("change", () => {
+      onChange({ dream_gravity: dreamGravityToggle.checked });
+    });
+  }
+  if (dreamGravityStrength) {
+    dreamGravityStrength.addEventListener("input", () => {
+      const v = Number(dreamGravityStrength.value);
+      if (dreamGravityStrengthVal)
+        dreamGravityStrengthVal.textContent = String(v);
+      onChange({ dream_gravity_strength: v });
+    });
+  }
+  if (dreamPreviewBtn) {
+    dreamPreviewBtn.addEventListener("click", () => {
+      if (onDreamPreview) onDreamPreview();
+    });
+  }
+  if (dreamThemeSelect) {
+    dreamThemeSelect.addEventListener("change", () => {
+      const raw = dreamThemeSelect.value;
+      // "" sentinel = random / no theme.
+      if (!raw) {
+        onChange({ dream_theme: null });
+        return;
+      }
+      // Format: "<kind>::<value>". Split only on the first "::" so
+      // values containing colons (rare but possible in tags) survive.
+      const sep = raw.indexOf("::");
+      if (sep < 0) {
+        onChange({ dream_theme: null });
+        return;
+      }
+      const kind = raw.slice(0, sep);
+      const value = raw.slice(sep + 2);
+      onChange({ dream_theme: { kind, value } });
+    });
+  }
 
   addBtn.addEventListener("click", () => {
     const tag = newTagInput.value.trim().replace(/^#/, "");
@@ -616,6 +742,11 @@ export function initSettings({
     if (showConstellations) {
       showConstellations.checked = settings.show_constellations !== false;
     }
+    const currentTier = settings.render_quality_ceiling || "high";
+    syncQualityPick(currentTier);
+    if (qualityAuto) {
+      qualityAuto.checked = settings.render_quality_auto !== false;
+    }
     homeViewSelect.value = settings.home_view || "last_focused";
     chorusOn.checked = !!settings.observer_chorus;
     if (confirmUnlink)
@@ -632,6 +763,17 @@ export function initSettings({
     sleepCap.value = String(capV);
     sleepCapVal.textContent = capV.toFixed(2);
     idleMin.value = String(settings.idle_minutes_to_dream || 10);
+    if (dreamGravityToggle) {
+      dreamGravityToggle.checked = settings.dream_gravity !== false;
+    }
+    if (dreamGravityStrength) {
+      const strengthV = Number(settings.dream_gravity_strength);
+      const v = Number.isFinite(strengthV) ? strengthV : 2800;
+      dreamGravityStrength.value = String(v);
+      if (dreamGravityStrengthVal)
+        dreamGravityStrengthVal.textContent = String(v);
+    }
+    renderDreamThemeOptions();
     const inf = Number(settings.folder_influence || 0);
     folderInfluence.value = String(inf);
     folderInfluenceVal.textContent = inf.toFixed(2);
@@ -1137,6 +1279,105 @@ export function initSettings({
       workspaceDesc.textContent = "No workspace open yet.";
     }
     renderWorkspaceRoots();
+  }
+
+  // DREAM_THEMES.md Phase A — populate the theme dropdown from the
+  // live vault: constellations (≥ 3 members, named or ordinal),
+  // top-level folders, top tags, and roots when multi-root. Option
+  // value format: `<kind>::<value>`. Random is the empty string
+  // sentinel.
+  function renderDreamThemeOptions() {
+    if (!dreamThemeSelect) return;
+    const vault = getVault ? getVault() : null;
+    const settings = getSettings();
+    const currentTheme = settings.dream_theme || null;
+    const currentKey = currentTheme
+      ? `${currentTheme.kind}::${currentTheme.value}`
+      : "";
+
+    // Preserve scroll / focus by rebuilding in memory then swapping.
+    const frag = document.createDocumentFragment();
+
+    const randomOpt = document.createElement("option");
+    randomOpt.value = "";
+    randomOpt.textContent = "Random (any pair)";
+    frag.appendChild(randomOpt);
+
+    if (!vault) {
+      dreamThemeSelect.innerHTML = "";
+      dreamThemeSelect.appendChild(frag);
+      dreamThemeSelect.value = currentKey;
+      return;
+    }
+
+    // Constellations — clusters with ≥ 3 members.
+    const clusters = [...(vault.clusters?.byId?.values?.() || [])]
+      .filter((c) => (c.noteIds?.length || 0) >= 3)
+      .sort((a, b) => (b.noteIds?.length || 0) - (a.noteIds?.length || 0));
+    if (clusters.length > 0) {
+      const group = document.createElement("optgroup");
+      group.label = "Constellations";
+      for (const c of clusters) {
+        const label = deriveClusterName(c, vault);
+        const opt = document.createElement("option");
+        opt.value = `constellation::${c.id}`;
+        opt.textContent = `${label} · ${c.noteIds.length}`;
+        group.appendChild(opt);
+      }
+      frag.appendChild(group);
+    }
+
+    // Folders.
+    const folders = listTopLevelFolders(vault);
+    if (folders.length > 0) {
+      const group = document.createElement("optgroup");
+      group.label = "Folders";
+      for (const f of folders) {
+        const opt = document.createElement("option");
+        opt.value = `folder::${f}`;
+        opt.textContent = f;
+        group.appendChild(opt);
+      }
+      frag.appendChild(group);
+    }
+
+    // Tags — top 12 by count.
+    const tagCounts = vault.tagCounts;
+    if (tagCounts && tagCounts.size > 0) {
+      const top = [...tagCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 12);
+      const group = document.createElement("optgroup");
+      group.label = "Tags";
+      for (const [tag, count] of top) {
+        const opt = document.createElement("option");
+        opt.value = `tag::${tag}`;
+        opt.textContent = `#${tag} · ${count}`;
+        group.appendChild(opt);
+      }
+      frag.appendChild(group);
+    }
+
+    // Roots — only when multi-root.
+    const roots = vault.roots || [];
+    if (roots.length > 1) {
+      const group = document.createElement("optgroup");
+      group.label = "Roots";
+      for (const r of roots) {
+        const opt = document.createElement("option");
+        opt.value = `root::${r.id}`;
+        opt.textContent = r.name || r.id;
+        group.appendChild(opt);
+      }
+      frag.appendChild(group);
+    }
+
+    dreamThemeSelect.innerHTML = "";
+    dreamThemeSelect.appendChild(frag);
+    // Restore selection. If the current theme no longer resolves
+    // (cluster dissolved, folder renamed), fall back to random.
+    const options = [...dreamThemeSelect.options].map((o) => o.value);
+    dreamThemeSelect.value = options.includes(currentKey) ? currentKey : "";
   }
 
   function renderWorkspaceRoots() {

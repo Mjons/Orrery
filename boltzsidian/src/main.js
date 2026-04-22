@@ -9,6 +9,12 @@
 
 import * as THREE from "three";
 import { createRenderer } from "./sim/renderer.js";
+import {
+  TIERS as RENDER_TIERS,
+  DEFAULT_TIER as DEFAULT_RENDER_TIER,
+} from "./sim/render-quality.js";
+import { createQualityMonitor } from "./sim/quality-monitor.js";
+import { createQualityHud } from "./ui/quality-hud.js";
 import { createBodies } from "./sim/bodies.js";
 import { layoutNotes } from "./sim/layout.js";
 import { computeLocalDensity, recomputeCentroidsLive } from "./sim/clusters.js";
@@ -78,6 +84,11 @@ import { createChorus } from "./layers/chorus.js";
 import { createCaptions } from "./ui/captions.js";
 import { createHover } from "./ui/hover.js";
 import { createDream } from "./layers/dream.js";
+import {
+  resolveThemeSet,
+  themeCentroid,
+  MIN_THEME_SIZE,
+} from "./layers/dream-theme.js";
 import { assignAffinities, affinityFor } from "./layers/affinity.js";
 import { createSalienceLayer } from "./layers/salience-layer.js";
 import { DEFAULT_PARAMS as SALIENCE_DEFAULTS } from "./layers/salience.js";
@@ -149,6 +160,27 @@ let bodies = null;
 let labels = null;
 let constellations = null;
 let batchLinkPicker = null;
+// Hoisted so openNote() can promote the open note's body into its
+// orange "orrery" state (orbiting planets), not just label-hover.
+let hoverOrbit = null;
+let activeNoteId = null;
+// DREAM_GRAVITY.md preview — while this timestamp is in the future,
+// physics callbacks below report "dreaming · playing" so the
+// attractor runs at full strength even though the dream controller
+// isn't actually in a cycle.
+let previewUntil = 0;
+// TEND_BULK_CRASH — flipped during a tend bulk-accept so background
+// work (polish pipeline, salience scanner) suspends itself and
+// leaves the main thread free for the write + reparse cascade.
+let isBulkInProgress = false;
+// DREAM_THEMES.md Phase C — cached theme anchor (centroid + extent)
+// recomputed alongside the live cluster centroids every ~30 frames.
+// Null when no theme is set OR the theme is too small (< MIN_THEME_SIZE).
+let themeAnchorCache = null;
+// DREAM_THEMES.md Phase D — cached theme Set<noteId> used by the
+// salience layer for pair-sampling bias. Refreshed on the same tick
+// as the anchor. Null when no theme is set.
+let themeSetCache = null;
 let physics = null;
 let tethers = null;
 let sparks = null;
@@ -221,8 +253,60 @@ function applyUtteranceBackendSetting(choice) {
 
 // ── Renderer ────────────────────────────────────────────────
 const canvas = document.getElementById("canvas");
-const { scene, camera, controls, renderer, onFrame, applyAmbience } =
-  createRenderer(canvas);
+const {
+  scene,
+  camera,
+  controls,
+  renderer,
+  onFrame,
+  applyAmbience,
+  setQuality: setRenderQuality,
+} = createRenderer(canvas);
+
+// RENDER_QUALITY.md Phase A/C — direct tier application. Named
+// tier → dispatched to every wired subsystem. Called from the
+// monitor on tier transitions and from setWorkspace after new
+// subsystems come online.
+function applyRenderTier(name) {
+  const tier = RENDER_TIERS[name] || RENDER_TIERS[DEFAULT_RENDER_TIER];
+  if (setRenderQuality) setRenderQuality(tier);
+  if (labels?.setQuality) labels.setQuality(tier);
+  if (constellations?.setQuality) constellations.setQuality(tier);
+  if (tethers?.setQuality) tethers.setQuality(tier);
+  if (sparks?.setQuality) sparks.setQuality(tier);
+  if (physics?.setQuality) physics.setQuality(tier);
+}
+
+// RENDER_QUALITY.md Phase C — auto-throttle monitor. Owns the
+// "effective tier" state and fires onTierChange only when a
+// transition actually happens. We subscribe to onFrame below so
+// the monitor sees every frame's dt.
+const qualityMonitor = createQualityMonitor({
+  onTierChange: (name) => applyRenderTier(name),
+});
+qualityMonitor.setCeiling(
+  settings.render_quality_ceiling || DEFAULT_RENDER_TIER,
+);
+qualityMonitor.setEnabled(settings.render_quality_auto !== false);
+// Initial explicit apply — monitor's initial currentTier equals
+// ceiling, which is the SAME value setCeiling just sent it, so
+// setCeiling doesn't fire onTierChange on its own. Apply once
+// here so renderer + post pick up the tier at boot.
+applyRenderTier(qualityMonitor.getCurrentTier());
+onFrame((dt) => qualityMonitor.tick(dt));
+
+// RENDER_QUALITY.md Phase D — quiet HUD pill that surfaces when the
+// monitor has dropped below the user's ceiling. Hidden when
+// effective === ceiling so the UI stays silent in the common case.
+createQualityHud({ qualityMonitor });
+
+// Keep a small wrapper so old call sites (and the Phase-D HUD pill)
+// can ask "re-apply whatever the current effective tier is" without
+// knowing whether it's come from the ceiling or the monitor's
+// throttle logic.
+function applyCurrentRenderQuality() {
+  applyRenderTier(qualityMonitor.getCurrentTier());
+}
 
 // Pick-radius debug overlay (PICKING.md §3). Off by default. Toggle from
 // the console via `__boltzsidian.debug.showPickRadii = true`.
@@ -241,6 +325,26 @@ const pickDebug = createPickDebug({
   getOverrides: () => pickOverrides,
 });
 onFrame(() => pickDebug.update());
+
+// Face "hone in" — when a note is open, aim the observer face's pupils
+// at the focused body's screen-space projection. Falls back to cursor
+// tracking (handled inside model-face.js) when no note is active.
+// Throttled to ~6 Hz so the pupils drift rather than snap every frame.
+const _faceLookTmp = new THREE.Vector3();
+let _faceLookNext = 0;
+onFrame(() => {
+  const now = performance.now();
+  if (now < _faceLookNext) return;
+  _faceLookNext = now + 160;
+  if (!activeNoteId || !bodies) return;
+  const p = bodies.positionOf?.(activeNoteId);
+  if (!p) return;
+  _faceLookTmp.set(p[0], p[1], p[2]).project(camera);
+  if (_faceLookTmp.z >= 1) return;
+  const sx = (_faceLookTmp.x * 0.5 + 0.5) * window.innerWidth;
+  const sy = (1 - (_faceLookTmp.y * 0.5 + 0.5)) * window.innerHeight;
+  modelFace.lookAt(sx, sy);
+});
 
 // ── HUD elements ────────────────────────────────────────────
 const workspaceNameEl = document.getElementById("workspace-name");
@@ -308,6 +412,28 @@ const settingsUI = initSettings({
     }
     dream.dreamNow();
     toast("Dreaming — move the mouse to wake up early.", { duration: 2500 });
+  },
+  onDreamPreview: () => {
+    if (!dream) {
+      toast("Open a workspace first.");
+      return;
+    }
+    // DREAM_GRAVITY.md visual-tuning aid: force the attractor to
+    // peak-strength conditions for 30s without waiting through
+    // falling + warming. `previewUntil` is read by the physics
+    // phase/state getters below; while it's in the future, they
+    // lie to physics and say "state=dreaming, phase=playing" so
+    // the weight table returns 1.0.
+    dream.setManualDepth(0.85);
+    previewUntil = performance.now() + 30_000;
+    toast("Previewing dream gravity for 30s — peak strength.", {
+      duration: 2500,
+    });
+    window.setTimeout(() => {
+      if (performance.now() >= previewUntil) {
+        dream.setManualDepth(0);
+      }
+    }, 30_500);
   },
   onSetSleepDepth: (v) => {
     if (!dream) return;
@@ -425,9 +551,18 @@ async function runTendAndOpen({ enabled } = {}) {
   // the proposal and refreshes the drawer so the user sees the
   // polished reason land in real time.
   polishProposalsSerial(ranked, utterance, {
-    onUpdate: () => {
-      tendDrawer.refresh?.();
+    // Pass the polished proposal through so tendDrawer.refresh can
+    // update ONLY that row's reason text, not rebuild the entire
+    // list. TEND_BULK_CRASH.md — full rebuild on every polish was
+    // the crash vector on large batches.
+    onUpdate: (proposal) => {
+      tendDrawer.refresh?.(proposal);
     },
+    // Stop polishing when the user kicks off a bulk-accept. Already-
+    // polished entries keep their reasons; unpolished ones stay on
+    // their rule-derived fallback. Acceptable — during a bulk
+    // accept the user isn't reading reasons anyway.
+    getAborted: () => isBulkInProgress,
   }).catch((err) => {
     console.warn("[bz] tend-polish harvester threw", err);
   });
@@ -440,6 +575,12 @@ const notePanel = createNotePanel({
   getVault: () => vault,
   onClose: () => {
     if (bodies) bodies.setSelected(null);
+    activeNoteId = null;
+    if (hoverOrbit) hoverOrbit.setTarget(null);
+    // The observer face slides back to its home side when no note is
+    // open — CSS handles the swap via body.note-open.
+    document.body.classList.remove("note-open");
+    if (modelFace) modelFace.lookAt(null, null);
     returnCamera();
   },
   onNavigate: (noteId) => focusNote(noteId),
@@ -535,6 +676,30 @@ ideasDrawer = createIdeasDrawer({
   onOpenParent: (noteId) => openNote(noteId),
 });
 
+// TEND_BULK_CRASH.md §5C — coalesce physics/tether/kind rebuilds
+// across a tick. During bulk accept, many proposals schedule a
+// rebuild in quick succession; rAF-gating collapses them to one
+// rebuild per animation frame (typically one per batch).
+let _pendingGraphRebuild = false;
+function scheduleGraphRebuild() {
+  if (_pendingGraphRebuild) return;
+  _pendingGraphRebuild = true;
+  requestAnimationFrame(() => {
+    _pendingGraphRebuild = false;
+    if (physics) physics.rebuildEdges();
+    if (tethers) tethers.rebuild();
+  });
+}
+let _pendingKindRefresh = false;
+function scheduleKindRefresh() {
+  if (_pendingKindRefresh) return;
+  _pendingKindRefresh = true;
+  requestAnimationFrame(() => {
+    _pendingKindRefresh = false;
+    if (bodies) bodies.refreshAllKinds?.();
+  });
+}
+
 // Tend drawer — janitorial proposals from the Tend scanner. One shared
 // instance; proposals are passed in as a snapshot per Tend run.
 const tendDrawer = createTendDrawer({
@@ -552,18 +717,25 @@ const tendDrawer = createTendDrawer({
       return;
     }
     const result = await applyProposal({ proposal, vault, saver });
-    // An obvious-link accept adds a wikilink to the note body — the
-    // vault's forward/backward maps update via reparseNote, but the
-    // physics edge list and tether geometry don't auto-sync. Rebuild
-    // both so the new tether actually appears in the canvas. Cheap
-    // enough to run on every accept; the other pass kinds (tag-infer,
-    // fm-normalise, stub, title-collision) get a harmless no-op on
-    // the rebuild side since their edge set didn't change. Kinds can
-    // shift on tag-infer too (tag→kind mapping) so refresh those.
+    // TEND_BULK_CRASH.md §5B — only rebuild physics/tethers for
+    // passes that actually change the link graph, and only refresh
+    // kinds for passes that change tags. Previously we ran all
+    // three on every accept; for a bulk batch mostly composed of
+    // fm-normalise / stub / title-collision proposals that's pure
+    // wasted work compounding the DOM churn on §5A's hot path.
     if (result?.applied) {
-      if (physics) physics.rebuildEdges();
-      if (tethers) tethers.rebuild();
-      if (bodies) bodies.refreshAllKinds?.();
+      const pass = proposal.pass;
+      // TEND_BULK_CRASH.md §5C — coalesce rebuilds. During a bulk
+      // accept the loop awaits an FS write between proposals, so
+      // many accepts schedule in rapid succession. Using rAF-gated
+      // schedulers means multiple schedule calls collapse to ONE
+      // rebuild per frame regardless of how many accepts fired.
+      if (pass === TEND_PASSES.OBVIOUS_LINK) {
+        scheduleGraphRebuild();
+      }
+      if (pass === TEND_PASSES.TAG_INFER) {
+        scheduleKindRefresh();
+      }
     }
   },
   onReject: async (proposal) => {
@@ -581,6 +753,15 @@ const tendDrawer = createTendDrawer({
     await rejectProposal({ proposal, vault, saver });
   },
   onOpenNote: (noteId) => openNote(noteId),
+  onBulkStart: () => {
+    // Suspend polish + salience so the bulk write loop has the
+    // main thread to itself. The flag is checked by polish's
+    // getAborted and salience's getPaused callbacks below.
+    isBulkInProgress = true;
+  },
+  onBulkEnd: () => {
+    isBulkInProgress = false;
+  },
 });
 
 // Weed drawer — prune-candidate triage. One shared instance, opened via
@@ -1509,6 +1690,27 @@ async function setWorkspace(ws) {
       getPinnedIds: null,
       getFolderInfluence: () => settings.folder_influence || 0,
       getDreamDepth: () => (dream ? dream.getDepth() : 0),
+      // DREAM_GRAVITY.md — the attractor needs state + phase to
+      // pick its weight (ramping during warming, exhaling during
+      // discerning). dream controller may not exist yet at the
+      // very first boot frame, so both callbacks defend.
+      getDreamPhase: () => {
+        if (performance.now() < previewUntil) return "playing";
+        return dream ? dream.getPhase() : null;
+      },
+      getDreamState: () => {
+        if (performance.now() < previewUntil) return "dreaming";
+        return dream ? dream.getState() : "wake";
+      },
+      getDreamGravity: () => settings.dream_gravity !== false,
+      getDreamGravityStrength: () => {
+        const v = Number(settings.dream_gravity_strength);
+        return Number.isFinite(v) ? v : 2800;
+      },
+      // DREAM_THEMES.md — theme anchor is refreshed every ~30 frames
+      // in the same tick that updates cluster centroids. Physics
+      // reads the cached value so every step is O(1).
+      getThemeAnchor: () => themeAnchorCache,
     });
 
     tethers = createTethers({
@@ -1693,6 +1895,15 @@ async function setWorkspace(ws) {
       getBodies: () => bodies,
       getDreamDepth: () => (dream ? dream.getDepth() : 0),
       getParams: () => salienceParams,
+      // DREAM_THEMES.md Phase D — tell the sampler about the
+      // current theme. Null when no theme is active or the theme
+      // fell back to random (too few members).
+      getThemeSet: () => themeSetCache,
+      // Suspend the scanner tick while a tend bulk-accept is
+      // running. Pair-sampling + resonance checks are nontrivial
+      // on large vaults and compete for the main thread exactly
+      // when the bulk loop needs it.
+      getPaused: () => isBulkInProgress,
       utterance,
       onPairSpawn: ({ midpoint, kind }) => {
         // Two-spark model (DREAM_ENGINE.md §11.9 Q1):
@@ -1727,7 +1938,10 @@ async function setWorkspace(ws) {
     });
 
     if (unsubscribeLabels) unsubscribeLabels();
-    const hoverOrbit = createHoverOrbit({ scene, bodies, vault, renderer });
+    hoverOrbit = createHoverOrbit({ scene, bodies, vault, renderer });
+    // If a note was already open when the vault reloaded, promote it
+    // back into the orrery state.
+    if (activeNoteId) hoverOrbit.setTarget(activeNoteId);
     labels = createLabels({
       vault,
       bodies,
@@ -1736,7 +1950,9 @@ async function setWorkspace(ws) {
       getHoveredId: () => hover?.getHoveredId?.() || null,
       onLabelHover: (id) => {
         if (bodies) bodies.setLabelHover?.(id);
-        hoverOrbit.setTarget(id);
+        // Hover is transient; when it clears, fall back to the open
+        // note (if any) so the orrery stays on the current note.
+        hoverOrbit.setTarget(id || activeNoteId);
       },
       onLabelClick: (id) => openNote(id),
     });
@@ -1784,13 +2000,25 @@ async function setWorkspace(ws) {
       getVault: () => vault,
       onChoose: (cluster, target) => applyBatchLink(cluster, target),
     });
+
+    // RENDER_QUALITY.md Phase A — by now every visual subsystem is
+    // wired (tethers, sparks, labels, constellations). Re-dispatch
+    // the current tier so each sees the right pool size + cadence
+    // before the first frame renders with the new vault.
+    applyCurrentRenderQuality();
     // Centroid drift fix — physics moves bodies but cluster.centroid
     // was baked at initial layout. Refresh every ~30 frames (~500ms
     // @60fps) so constellation halos follow their actual clusters.
     // Cheap: O(notes) per pass, no clustering re-run.
     let _centroidTick = 0;
     unsubscribeConstellations = onFrame(() => {
-      if (++_centroidTick % 30 === 0) recomputeCentroidsLive(vault, bodies);
+      if (++_centroidTick % 30 === 0) {
+        recomputeCentroidsLive(vault, bodies);
+        // DREAM_THEMES.md Phases C+D — refresh theme caches on
+        // the same tick. Both null when no theme, or the theme is
+        // under MIN_THEME_SIZE (fall back to random everywhere).
+        refreshThemeCaches();
+      }
       constellations.update();
     });
 
@@ -2217,6 +2445,14 @@ function openNote(noteId, { mode = "read", skipFocusSnapshot = false } = {}) {
   const note = vault?.byId.get(noteId);
   if (!note) return;
   bodies.setSelected(noteId);
+  // Promote the opened note into its orange "orrery" state — planets
+  // orbit the selected body so the currently-read note reads as the
+  // center of its own little system. Cleared on panel close.
+  activeNoteId = noteId;
+  if (hoverOrbit) hoverOrbit.setTarget(noteId);
+  // Slide the observer face to the right so it doesn't sit under the
+  // note panel, and aim its pupils at the focused body.
+  document.body.classList.add("note-open");
   const pos = bodies.positionOf(noteId);
   if (pos) {
     if (skipFocusSnapshot) {
@@ -2378,6 +2614,29 @@ async function applyBatchLink(cluster, target) {
 // (e.g. every project has its own `INDEX.md`), write `[[id|Title]]`
 // so each source note resolves to the EXACT target the user picked,
 // not its own-root namesake via the prefer-same-root policy.
+// DREAM_THEMES.md Phases B–D — compute both the member Set and the
+// centroid/extent anchor in one pass. The Set is also used by the
+// salience layer for pair-sampling bias. Returns `{ set, anchor }`
+// where either may be null if the theme isn't viable.
+function refreshThemeCaches() {
+  const theme = settings.dream_theme;
+  if (!theme || !vault || !bodies) {
+    themeSetCache = null;
+    themeAnchorCache = null;
+    return;
+  }
+  const ids = resolveThemeSet(vault, theme);
+  if (ids.size < MIN_THEME_SIZE) {
+    // Too narrow to be useful — fall back to random behaviour
+    // everywhere (attractor AND salience).
+    themeSetCache = null;
+    themeAnchorCache = null;
+    return;
+  }
+  themeSetCache = ids;
+  themeAnchorCache = themeCentroid(ids, bodies);
+}
+
 function composeBatchLinkToken(target, vault) {
   if (!target) return "";
   const key = String(target.title || "")
@@ -2485,6 +2744,9 @@ onFrame((dt, t) => {
 // Camera auto-orbit while dreaming. Slow yaw around the current target
 // when depth > 0.2, no user tween active, no panel open — i.e. no one is
 // looking but the mode. See DREAM.md §1 "Camera: auto-orbit + drift".
+// DREAM_GRAVITY.md adds a second term: the orbit target lerps toward
+// the attractor so the viewpoint drifts along with the cluster that's
+// being pulled, instead of rotating around an empty point.
 const _dreamOrbit = new THREE.Vector3();
 onFrame((dt) => {
   if (!dream) return;
@@ -2493,6 +2755,19 @@ onFrame((dt) => {
   if (camTween) return;
   if (notePanel.isOpen()) return;
   if (linkDrag && linkDrag.isActive) return;
+
+  // DREAM_GRAVITY.md §"First cut" point 5 — orbit target rides the
+  // attractor's current position, weighted by depth so the pull is
+  // subtle when drifting off and strong at peak generating.
+  const att = physics?.getAttractor?.();
+  if (att?.active) {
+    const k = Math.min(1, 0.3 * depth * dt);
+    const target = controls.target;
+    target.x += (att.position[0] - target.x) * k;
+    target.y += (att.position[1] - target.y) * k;
+    target.z += (att.position[2] - target.z) * k;
+  }
+
   // Rotate camera position around controls.target, on the Y axis.
   const yaw = 0.035 * depth * dt;
   _dreamOrbit.copy(camera.position).sub(controls.target);
@@ -2557,6 +2832,22 @@ function handleSettingsChange(patch) {
   }
   if ("utterance_backend" in patch) {
     applyUtteranceBackendSetting(patch.utterance_backend);
+  }
+  if ("dream_theme" in patch) {
+    // Invalidate immediately so the user doesn't wait ~500 ms (one
+    // refresh tick) to see the attractor swing + the salience layer
+    // start biasing toward the new theme.
+    refreshThemeCaches();
+  }
+  if ("render_quality_ceiling" in patch) {
+    // Phase C — route through the monitor so effective tier clamps
+    // to the new ceiling and the streak counters reset.
+    qualityMonitor.setCeiling(patch.render_quality_ceiling);
+    applyRenderTier(qualityMonitor.getCurrentTier());
+  }
+  if ("render_quality_auto" in patch) {
+    qualityMonitor.setEnabled(patch.render_quality_auto);
+    applyRenderTier(qualityMonitor.getCurrentTier());
   }
   // folder_influence, chorus_density and chorus_font_size are read live via
   // their respective getters — no refresh call needed.

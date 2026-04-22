@@ -60,6 +60,15 @@ export function createSalienceLayer({
   // to make bumps visible. Fires BEFORE the model call lands — the spark
   // is the "bump," not the resulting idea.
   getParams, // returns the live params object (for dev palette tuning)
+  // DREAM_THEMES.md Phase D — when a theme is set, the seed always
+  // comes from the theme set, and 60% of pairs keep both sides in
+  // theme while 40% force a mixed (one-theme / one-outside) pair
+  // for cross-pollination. Null = random (current behaviour).
+  getThemeSet, // () => Set<noteId> | null
+  // Short-circuit the scanner tick while external work dominates the
+  // main thread — e.g., a tend bulk-accept writing 1000+ files.
+  // Returns true to pause; false/unset runs normally.
+  getPaused,
   utterance, // optional Phase 7 router — when present, salience routes
   // seed-text generation through `idea-seed` for the chance at model-
   // generated hallucinations. Template stays the synchronous floor so
@@ -104,6 +113,7 @@ export function createSalienceLayer({
   start();
 
   function tick() {
+    if (getPaused && getPaused()) return;
     const depth = getDreamDepth ? getDreamDepth() : 0;
     if (depth < 0.1) return; // only run while dreaming
     // Only produce candidates while the cycle is actively collecting
@@ -122,15 +132,50 @@ export function createSalienceLayer({
 
     const params = getParams ? getParams() : DEFAULT_PARAMS;
 
-    // Sample K random seeds.
+    // DREAM_THEMES.md Phase D — cache theme set for this tick so we
+    // don't re-spread it on every seed draw. Null OR empty = random.
+    const themeSet = getThemeSet ? getThemeSet() : null;
+    const themeActive = themeSet && themeSet.size > 0;
+    const themeArr = themeActive ? [...themeSet] : null;
+
+    // Sample K seeds. With a theme, every seed comes from the theme
+    // set; 60% of pairs stay inside the theme, 40% force a mixed
+    // neighbour from outside for cross-pollination.
     for (let i = 0; i < PAIRS_PER_TICK; i++) {
-      const seed = notes[Math.floor(rng() * notes.length)];
+      let seed;
+      if (themeActive) {
+        const id = themeArr[Math.floor(rng() * themeArr.length)];
+        seed = vault.byId?.get(id);
+        if (!seed) continue;
+      } else {
+        seed = notes[Math.floor(rng() * notes.length)];
+      }
       if (!seed.affinity) continue;
       const seedPos = bodies.positionOf(seed.id);
       if (!seedPos) continue;
 
       // Find M nearest neighbours within PROXIMITY_RADIUS. Cheap O(n) scan.
-      const neighbours = findNearest(seed, seedPos, notes, bodies);
+      let neighbours = findNearest(seed, seedPos, notes, bodies);
+
+      if (themeActive) {
+        const mixed = rng() < 0.4;
+        if (mixed) {
+          // Force the OTHER side of the pair to be outside the theme
+          // — that's where fresh angles come from (DREAM_THEMES.md §2.1).
+          const outside = neighbours.filter((n) => !themeSet.has(n.id));
+          if (outside.length > 0) neighbours = outside;
+          // else: no non-theme neighbours nearby this tick — let the
+          // inside-theme pair go through rather than skipping, so the
+          // tick isn't wasted.
+        } else {
+          const inside = neighbours.filter((n) => themeSet.has(n.id));
+          if (inside.length > 0) neighbours = inside;
+          // else: no theme neighbours near this seed — take what's
+          // available. Happens when the attractor hasn't yet pulled
+          // members together; avoids starving the pool.
+        }
+      }
+
       for (const neighbour of neighbours) {
         attemptPair(seed, neighbour, bodies, vault, params, depth);
       }
@@ -430,6 +475,7 @@ export function createSalienceLayer({
     surfaced.length = 0;
     lastJudgeReasoning = "";
     lastJudgeAt = 0;
+    lastThemeFilterStats = { themed: false, before: 0, after: 0 };
     // Fresh harvester state. Cycle starts with an empty queue and
     // an open-for-business gate.
     pendingQueue.length = 0;
@@ -467,8 +513,29 @@ export function createSalienceLayer({
     stopHarvester();
     pendingQueue.length = 0;
     if (!pool) return surfaced.slice();
-    const finalPool = pool.slice();
+    let finalPool = pool.slice();
+    const poolSizeBeforeFilter = finalPool.length;
     pool = null;
+
+    // DREAM_THEMES.md Phase E — theme surfacing filter. A candidate
+    // survives only if at least one parent is in the theme set. Pairs
+    // where both parents drifted outside the theme are silently
+    // discarded (not added to surfaced, not sent to the judge). The
+    // morning report reads `lastThemeFilterStats` to tell the user
+    // how fertile the theme was.
+    const themeSet = getThemeSet ? getThemeSet() : null;
+    if (themeSet && themeSet.size > 0) {
+      finalPool = finalPool.filter(
+        (c) =>
+          (c.parentA && themeSet.has(c.parentA.id)) ||
+          (c.parentB && themeSet.has(c.parentB.id)),
+      );
+    }
+    lastThemeFilterStats = {
+      themed: !!(themeSet && themeSet.size > 0),
+      before: poolSizeBeforeFilter,
+      after: finalPool.length,
+    };
 
     applySalienceWinners(finalPool, topK);
     // Kick off the judge in the background if we have a router AND
@@ -677,6 +744,15 @@ export function createSalienceLayer({
   }
   function getLastJudgeAt() {
     return lastJudgeAt;
+  }
+
+  // DREAM_THEMES.md Phase E — how much of the pool landed in the
+  // theme after filtering. Consumed by the morning report so the
+  // user can see "8 of 23 survived on [[Theme]]." Reset at the start
+  // of each cycle.
+  let lastThemeFilterStats = { themed: false, before: 0, after: 0 };
+  function getLastThemeFilterStats() {
+    return { ...lastThemeFilterStats };
   }
 
   // Abort a cycle without running discernment (e.g., user woke the dream
@@ -891,6 +967,7 @@ export function createSalienceLayer({
     setPlayListener,
     getLastJudgeReasoning,
     getLastJudgeAt,
+    getLastThemeFilterStats,
     dispose: () => {
       stopPlaying();
       stop();

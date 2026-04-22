@@ -392,6 +392,31 @@
         color: var(--text-faint);
         font-size: 11px;
       }
+      #settings .settings-quality-pick {
+        display: flex;
+        flex: 1 1 auto;
+        gap: 4px;
+      }
+      #settings .settings-quality-pick button {
+        flex: 1 1 auto;
+        font-size: 11px;
+        padding: 5px 0;
+        background: transparent;
+        color: var(--text-faint);
+        border: 1px solid var(--glass-border);
+        border-radius: 4px;
+        letter-spacing: 0.05em;
+        cursor: pointer;
+      }
+      #settings .settings-quality-pick button:hover {
+        color: var(--text-dim);
+        border-color: rgba(215, 219, 228, 0.35);
+      }
+      #settings .settings-quality-pick button.is-active {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.5);
+        background: rgba(138, 180, 255, 0.08);
+      }
       #settings .settings-row .kind-num {
         flex: 0 0 22px;
         color: var(--text-faint);
@@ -1070,6 +1095,11 @@
         color: var(--text-faint);
         margin: 4px 0 0;
       }
+      #tend-drawer .drawer-head-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
       #tend-drawer .drawer-close {
         background: transparent;
         border: 0;
@@ -1084,6 +1114,25 @@
       #tend-drawer .drawer-close:hover {
         color: var(--text);
         background: rgba(255, 255, 255, 0.06);
+      }
+      #tend-drawer .drawer-clear {
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-faint);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-family: inherit;
+      }
+      #tend-drawer .drawer-clear:hover {
+        color: var(--tend-accent);
+        border-color: rgba(230, 184, 92, 0.45);
+      }
+      #tend-drawer:not(.has-items) .drawer-clear {
+        display: none;
       }
       #tend-drawer .drawer-empty {
         padding: 24px;
@@ -1133,6 +1182,15 @@
       #tend-drawer .tend-bulk-btn:hover:not(:disabled) {
         color: var(--tend-accent);
         border-color: rgba(230, 184, 92, 0.45);
+      }
+      #tend-drawer .tend-pending-hint {
+        padding: 14px 24px;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        color: var(--text-faint);
+        text-align: center;
+        border-top: 1px solid var(--glass-border);
+        margin: 0;
       }
       #tend-drawer .tend-item {
         padding: 12px 24px;
@@ -1530,19 +1588,130 @@
       }
 
       /* ── Model face — the observer's persona ─────────────── */
-      /* Persistent top-left HUD. Always visible while a workspace is
-       * open. Expression tracks job kind on every model call; glow
-       * tints by backend. SVG rather than sprites so the accent
-       * colour drives everything via CSS custom properties. */
+      /* Large, translucent, tilted, floating behind the universe off
+       * to the side. Reads as "something watching" rather than a HUD
+       * badge. Expression tracks job kind; glow tints by backend.
+       * See MODEL_FACE_OBSERVER.md for the rationale. */
       #model-face {
         position: fixed;
-        top: 16px;
-        left: 300px;
-        width: 112px;
-        height: 112px;
-        z-index: 26;
+        /* Lower-LEFT quadrant by default, bleeds slightly off-canvas.
+         * Slides to the right when a note panel is open so the face
+         * doesn't sit underneath the reader. */
+        left: -8vmin;
+        bottom: 10vh;
+        top: auto;
+        right: auto;
+        width: 70vmin;
+        height: 70vmin;
+        z-index: 3; /* behind bodies/tethers/UI, above starfield */
         pointer-events: none;
-        transition: opacity 300ms ease;
+        opacity: 0.5;
+        /* Base tilt + a small extra rotation that tracks the user's
+         * focus. JS updates --mface-look-tilt (±3°) every frame so the
+         * face appears to lean slightly toward whatever you're doing. */
+        transform: rotate(
+          calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg))
+        );
+        transform-origin: 70% 60%;
+        /* Tilt-shift — top and bottom fade to transparent so the face
+         * reads as a slice of a larger field, not a disk in a box. */
+        -webkit-mask-image: linear-gradient(
+          to bottom,
+          transparent 0%,
+          rgba(0, 0, 0, 0.85) 26%,
+          rgba(0, 0, 0, 1) 50%,
+          rgba(0, 0, 0, 0.85) 74%,
+          transparent 100%
+        );
+        mask-image: linear-gradient(
+          to bottom,
+          transparent 0%,
+          rgba(0, 0, 0, 0.85) 26%,
+          rgba(0, 0, 0, 1) 50%,
+          rgba(0, 0, 0, 0.85) 74%,
+          transparent 100%
+        );
+        /* Soft atmospheric blur so the features don't look engraved.
+         * Blend additively with the starfield so the face contributes
+         * light rather than covering pixels. */
+        filter: blur(0.6px) saturate(0.9) hue-rotate(var(--mface-hue, 0deg));
+        mix-blend-mode: screen;
+        transition:
+          opacity 600ms ease,
+          right 900ms cubic-bezier(0.2, 0.7, 0.2, 1),
+          left 900ms cubic-bezier(0.2, 0.7, 0.2, 1),
+          transform 900ms cubic-bezier(0.2, 0.7, 0.2, 1),
+          filter 600ms ease;
+        /* Slow hue drift so the face never reads as the same static
+         * object. Resets on backend change via a class toggle in JS. */
+        animation: mface-huecycle 90s ease-in-out infinite;
+      }
+      /* Amorphous cloud behind the face features. Stack of radial
+       * gradients that each breathe on their own phase — the
+       * interference creates a slowly-morphing blob silhouette. */
+      #model-face::before {
+        content: "";
+        position: absolute;
+        inset: 4% 8%;
+        border-radius: 50%;
+        background:
+          radial-gradient(
+            ellipse 62% 58% at 50% 50%,
+            color-mix(
+                in srgb,
+                var(--mface-cloud-color, #8ab4ff) 38%,
+                transparent
+              )
+              0%,
+            color-mix(
+                in srgb,
+                var(--mface-cloud-color, #8ab4ff) 18%,
+                transparent
+              )
+              38%,
+            transparent 70%
+          ),
+          radial-gradient(
+            ellipse 46% 54% at 38% 44%,
+            color-mix(
+                in srgb,
+                var(--mface-cloud-color, #8ab4ff) 22%,
+                transparent
+              )
+              0%,
+            transparent 60%
+          ),
+          radial-gradient(
+            ellipse 40% 48% at 62% 58%,
+            color-mix(
+                in srgb,
+                var(--mface-cloud-color, #8ab4ff) 22%,
+                transparent
+              )
+              0%,
+            transparent 60%
+          );
+        filter: blur(18px);
+        animation: mface-cloud-breathe 11s ease-in-out infinite;
+      }
+      /* Note panel lives on the right; face slides to the right
+       * quadrant so it sits just behind / beside the reader instead
+       * of being squeezed off-screen on the opposite side. */
+      body.note-open #model-face {
+        left: auto;
+        right: -8vmin;
+        transform: rotate(
+          calc(var(--mface-tilt, 14deg) * -1 + var(--mface-look-tilt, 0deg))
+        );
+      }
+      /* Respect reduced motion — no drift, no breathing. */
+      @media (prefers-reduced-motion: reduce) {
+        #model-face {
+          animation: none;
+        }
+        #model-face::before {
+          animation: none;
+        }
       }
       #model-face .mface {
         width: 100%;
@@ -1551,21 +1720,33 @@
       }
       /* Backend tint. Custom property drives the glow + stroke accent
        * so switching between local / claude / webllm / template only
-       * needs one variable change, no SVG rewrites. */
+       * needs one variable change, no SVG rewrites. Defined on the
+       * mount (#model-face) so both the SVG children AND the ::before
+       * amorphous cloud inherit the same colour. */
+      #model-face[data-backend="local"],
       #model-face .mface[data-backend="local"] {
         --mface-glow: #8ab4ff;
+        --mface-cloud-color: #8ab4ff;
       }
+      #model-face[data-backend="claude"],
       #model-face .mface[data-backend="claude"] {
         --mface-glow: #c288ff;
+        --mface-cloud-color: #c288ff;
       }
+      #model-face[data-backend="webllm"],
       #model-face .mface[data-backend="webllm"] {
         --mface-glow: #8affb0;
+        --mface-cloud-color: #8affb0;
       }
+      #model-face[data-backend="template"],
       #model-face .mface[data-backend="template"] {
         --mface-glow: #777c85;
+        --mface-cloud-color: #777c85;
       }
+      #model-face,
       #model-face .mface {
         --mface-glow: #777c85;
+        --mface-cloud-color: #777c85;
       }
       /* Halo. Intensity rides on the expression — idle/template are
        * dim, result expressions flash brighter for the dwell window. */
@@ -1639,7 +1820,11 @@
       #model-face .mface-z {
         fill: none;
         stroke: var(--mface-glow);
-        stroke-width: 2;
+        /* SVG viewBox is 100×100 but the container is now 70vmin —
+         * without non-scaling-stroke, a 2px stroke would render as
+         * ~14px visual. Keep strokes pixel-sized regardless of scale. */
+        vector-effect: non-scaling-stroke;
+        stroke-width: 2.4;
         stroke-linecap: round;
         stroke-linejoin: round;
       }
@@ -1649,14 +1834,15 @@
       #model-face .mface-scribble {
         fill: none;
         stroke: var(--mface-glow);
-        stroke-width: 2.8;
+        vector-effect: non-scaling-stroke;
+        stroke-width: 3.2;
         stroke-linecap: round;
         stroke-linejoin: round;
       }
       /* Mouths get a touch more weight for character. */
       #model-face .mface-mouth,
       #model-face .mface-mouth-curve {
-        stroke-width: 2.6;
+        stroke-width: 3;
       }
       #model-face .mface-mouth-dot {
         fill: var(--mface-glow);
@@ -1725,6 +1911,94 @@
         50% {
           opacity: 1;
         }
+      }
+      /* Slow hue drift on the observer face — cycles ±~30° around
+       * the backend's base tint over 90s so the colour never feels
+       * static. Reset by re-triggering the animation when the
+       * backend changes (JS removes + adds the class). */
+      @keyframes mface-huecycle {
+        0%,
+        100% {
+          --mface-hue: -28deg;
+        }
+        50% {
+          --mface-hue: 28deg;
+        }
+      }
+      /* Amorphous cloud breathes on its own phase, decoupled from the
+       * SVG expression breath so the overall silhouette morphs. */
+      @keyframes mface-cloud-breathe {
+        0%,
+        100% {
+          transform: scale(1) translate(0, 0);
+          filter: blur(18px);
+        }
+        33% {
+          transform: scale(1.06) translate(1.2%, -0.6%);
+          filter: blur(22px);
+        }
+        66% {
+          transform: scale(0.97) translate(-1%, 0.8%);
+          filter: blur(16px);
+        }
+      }
+      /* Observer blink — fires every ~11s for 180ms. Targets the
+       * visible expression's eye scribbles. A bit of jitter via
+       * nth-child offsets so both eyes don't close in perfect sync. */
+      @keyframes mface-slow-blink {
+        0%,
+        94%,
+        100% {
+          transform: scaleY(1);
+        }
+        96%,
+        98% {
+          transform: scaleY(0.08);
+        }
+      }
+      #model-face .mface-expr {
+        transform-origin: center;
+        /* Eye tracking — JS pushes --mface-eye-dx / --mface-eye-dy
+         * (SVG viewBox units, range ~±4.5) every frame so the whole
+         * expression group drifts toward what the user is doing. No
+         * CSS transition: JS already eases the value. */
+        transform: translate(
+          calc(var(--mface-eye-dx, 0) * 1px),
+          calc(var(--mface-eye-dy, 0) * 1px)
+        );
+      }
+      #model-face .mface-expr .mface-scribble {
+        transform-origin: center;
+        animation: mface-slow-blink 11s ease-in-out infinite;
+      }
+      #model-face .mface-expr .mface-scribble:nth-child(2) {
+        animation-delay: 0.08s;
+      }
+      /* Bulge — occasional surprised-eyes pop. Swells both eye scribbles
+       * to ~2.4× over ~480ms, holds a beat, deflates back. Overrides the
+       * slow-blink for the duration via the [data-bulge="1"] selector. */
+      @keyframes mface-bulge {
+        0% {
+          transform: scale(1);
+        }
+        42% {
+          transform: scale(2.4);
+        }
+        58% {
+          transform: scale(2.4);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      #model-face .mface[data-bulge="1"] .mface-expr .mface-scribble {
+        animation: mface-bulge 1050ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+      }
+      #model-face
+        .mface[data-bulge="1"]
+        .mface-expr
+        .mface-scribble:nth-child(2) {
+        animation-delay: 40ms;
       }
 
       /* ── Settings status pill ──────────────────────────── */
@@ -2182,7 +2456,14 @@
 
       #note-panel .panel-body {
         flex: 1 1 auto;
+        /* min-height: 0 is REQUIRED for overflow-y to actually scroll inside
+         * a flex column — without it, content can push the flex child past
+         * its allotted height and the scrollbar never activates. */
+        min-height: 0;
         overflow-y: auto;
+        /* Keep mouse-wheel scroll inside the note instead of chaining out
+         * to the 3D canvas (which would zoom the camera). */
+        overscroll-behavior: contain;
         padding: 20px 24px 24px;
         font-size: 14px;
         line-height: 1.65;
@@ -3296,7 +3577,19 @@
             Housekeeping proposals — obvious connections and tidying.
           </p>
         </div>
-        <button class="drawer-close" type="button" aria-label="Close">×</button>
+        <div class="drawer-head-actions">
+          <button
+            class="drawer-clear"
+            type="button"
+            aria-label="Clear all pending proposals"
+            title="Clear every pending proposal. Press T to rescan."
+          >
+            Clear
+          </button>
+          <button class="drawer-close" type="button" aria-label="Close">
+            ×
+          </button>
+        </div>
       </header>
       <div class="drawer-empty">
         Nothing obvious to tend right now. Run Tend from Settings → Workspace to

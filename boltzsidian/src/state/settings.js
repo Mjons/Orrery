@@ -53,6 +53,28 @@ export const DEFAULT_SETTINGS = {
   // label instead of its individual star titles. Off = no named
   // regions; zoom behaviour on star labels is unchanged.
   show_constellations: true,
+  // DREAM_GRAVITY.md — invisible wandering attractor during dream
+  // mode that pulls bodies into curling arcs. Toggle off for a
+  // quieter dream (no gravitational protagonist, just the loose
+  // springs and wander noise).
+  dream_gravity: true,
+  // Peak attractor strength. With the strong-near/zero-at-edge force
+  // profile, force magnitude at d=100 is roughly `strength * 0.0055`.
+  // 2800 default ≈ 15.4 per axis, comparable to dream spring forces.
+  // 0 disables without flipping the toggle; 5000+ starts to feel like
+  // a true gravity well; 8000+ risks collapse despite the softening.
+  dream_gravity_strength: 2800,
+  // DREAM_THEMES.md — null = random (dream about anything), or
+  // { kind: 'constellation' | 'folder' | 'tag' | 'root', value: string }
+  // Phase A ships only the persistence + UI; runtime effect lands
+  // in phases B–E.
+  dream_theme: null,
+  // RENDER_QUALITY.md — user-selectable ceiling + auto-throttle
+  // toggle. Phase A ships the registry + plumbing; the UI and
+  // auto-detect land in Phases B / C. Default `high` preserves
+  // prior behaviour.
+  render_quality_ceiling: "high",
+  render_quality_auto: true,
   // User-renamed constellations. Keyed by an arbitrary slot id; each
   // entry carries the memberIds snapshot from when the user named it
   // so we can match the same region back even after cluster ids

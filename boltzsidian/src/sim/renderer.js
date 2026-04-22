@@ -79,6 +79,18 @@ export function createRenderer(canvas) {
     controls,
     onFrame,
     applyAmbience: (preset, intensity) => post.apply(preset, intensity),
+    // RENDER_QUALITY.md Phase A — one hook for both renderer's
+    // pixel-ratio and post's bloom/vignette/grain scales. Internal
+    // `post.setQuality` re-allocates render targets so the order
+    // (setPixelRatio first, then post.setQuality) matters.
+    setQuality(tier) {
+      const pr =
+        tier.pixelRatio == null
+          ? Math.min(window.devicePixelRatio || 1, 2)
+          : tier.pixelRatio;
+      renderer.setPixelRatio(pr);
+      post.setQuality(tier);
+    },
     dispose() {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", resize);

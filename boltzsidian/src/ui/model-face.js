@@ -43,6 +43,8 @@ export function createModelFace({ mountId = "model-face" } = {}) {
       onGenerateStart: () => {},
       onGenerateResult: () => {},
       setSleepDepth: () => {},
+      lookAt: () => {},
+      bulge: () => {},
     };
   }
 
@@ -59,6 +61,78 @@ export function createModelFace({ mountId = "model-face" } = {}) {
   function applyClasses() {
     svg.dataset.expression = expression;
     svg.dataset.backend = backend;
+    // Mirror onto the mount so CSS custom properties (--mface-glow,
+    // --mface-cloud-color) cascade to both the SVG AND the ::before
+    // amorphous cloud element.
+    mount.dataset.backend = backend;
+  }
+
+  // ── Eye tracking ───────────────────────────────────────────
+  // The observer's pupils drift toward whatever the user is focused
+  // on — by default the cursor, but callers can hand us a specific
+  // screen point (e.g. the currently-open note's body position).
+  // Drift, don't snap: a small max offset, interpolated each frame.
+  const EYE_MAX = 4.5; // in SVG viewBox units (viewBox is 100 wide)
+  let lookTargetX = 0; // normalized [-1, 1]
+  let lookTargetY = 0;
+  let lookX = 0;
+  let lookY = 0;
+  let rafPending = false;
+  let lastMove = 0;
+  function scheduleTick() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(tickLook);
+  }
+  function tickLook(t) {
+    rafPending = false;
+    // Ease current offset toward target (~12% per frame).
+    lookX += (lookTargetX - lookX) * 0.12;
+    lookY += (lookTargetY - lookY) * 0.12;
+    const dx = (lookX * EYE_MAX).toFixed(2);
+    const dy = (lookY * EYE_MAX).toFixed(2);
+    svg.style.setProperty("--mface-eye-dx", dx);
+    svg.style.setProperty("--mface-eye-dy", dy);
+    // Tilt the face slightly toward the focus — "honing in". Max
+    // extra tilt ±3°, added to the base rotation in CSS.
+    const extraTilt = (lookX * -3).toFixed(2);
+    mount.style.setProperty("--mface-look-tilt", `${extraTilt}deg`);
+    // Keep ticking while something is in flight (smooth drift). When
+    // idle, stop after the offset has settled.
+    const settled =
+      Math.abs(lookTargetX - lookX) < 0.005 &&
+      Math.abs(lookTargetY - lookY) < 0.005;
+    if (!settled || t - lastMove < 800) scheduleTick();
+  }
+  function setLookTarget(nx, ny) {
+    // Accept normalized [-1, 1]. Clamp to avoid extreme eye offsets.
+    lookTargetX = Math.max(-1, Math.min(1, Number(nx) || 0));
+    lookTargetY = Math.max(-1, Math.min(1, Number(ny) || 0));
+    lastMove = performance.now();
+    scheduleTick();
+  }
+  // Default: follow the cursor. Caller can override with lookAt(x, y).
+  window.addEventListener(
+    "pointermove",
+    (e) => {
+      // Cursor normalized around viewport center, then damped so the
+      // pupils don't swing all the way to the edge.
+      const nx = ((e.clientX / window.innerWidth) * 2 - 1) * 0.85;
+      const ny = ((e.clientY / window.innerHeight) * 2 - 1) * 0.75;
+      setLookTarget(nx, ny);
+    },
+    { passive: true },
+  );
+  // Public setter — caller can hand us a screen-space point (e.g. the
+  // focused body's projection) and we'll aim the pupils at it.
+  function lookAt(clientX, clientY) {
+    if (clientX == null || clientY == null) {
+      setLookTarget(0, 0);
+      return;
+    }
+    const nx = ((clientX / window.innerWidth) * 2 - 1) * 0.85;
+    const ny = ((clientY / window.innerHeight) * 2 - 1) * 0.75;
+    setLookTarget(nx, ny);
   }
 
   function setExpression(next) {
@@ -116,6 +190,33 @@ export function createModelFace({ mountId = "model-face" } = {}) {
     scheduleIdle();
   }
 
+  // ── Bulge ──────────────────────────────────────────────────
+  // Occasional surprised-eyes pop. CSS keyframe does the swell+deflate
+  // via [data-bulge="1"] on the <svg>. JS just toggles the flag and
+  // clears it after the animation completes. Scheduled ambiently with
+  // a long random gap so it feels like a tic, not a loop. Suppressed
+  // when the face is sleeping — closed eyes don't pop.
+  const BULGE_MS = 1050;
+  let bulgeTimer = 0;
+  function bulge() {
+    svg.dataset.bulge = "1";
+    if (bulgeTimer) clearTimeout(bulgeTimer);
+    bulgeTimer = window.setTimeout(() => {
+      delete svg.dataset.bulge;
+      bulgeTimer = 0;
+    }, BULGE_MS);
+  }
+  function scheduleAmbientBulge() {
+    // 45–120s between fires. Long enough that it reads as a spontaneous
+    // reaction, short enough that you'll catch it in a session.
+    const delay = 45000 + Math.random() * 75000;
+    setTimeout(() => {
+      if (expression !== "sleeping" && sleepDepth < 0.85) bulge();
+      scheduleAmbientBulge();
+    }, delay);
+  }
+  scheduleAmbientBulge();
+
   function scheduleIdle() {
     if (dwellTimer) clearTimeout(dwellTimer);
     dwellTimer = window.setTimeout(() => {
@@ -135,6 +236,8 @@ export function createModelFace({ mountId = "model-face" } = {}) {
     onGenerateStart,
     onGenerateResult,
     setSleepDepth,
+    lookAt,
+    bulge,
   };
 }
 

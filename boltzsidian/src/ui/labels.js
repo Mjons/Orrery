@@ -20,6 +20,9 @@ import * as THREE from "three";
 
 const MAX_LABELS = 80;
 const UPDATE_EVERY_N_FRAMES = 3;
+// RENDER_QUALITY.md Phase A — tier can dial a subset of the pool +
+// slow the update cadence. Defaults match the original constants
+// (tier "high"). Any mutation via setQuality clamps to MAX_LABELS.
 const FADE_START = 350;
 const FADE_END = 1600;
 const LENS_RADIUS = 240;
@@ -125,6 +128,14 @@ export function createLabels({
   });
 
   let frame = 0;
+  // RENDER_QUALITY.md Phase A — live tier knobs. `qualityVisibleCap`
+  // limits how many of the MAX_LABELS slots are populated per pass;
+  // higher slots have their opacity zeroed on re-paint so the DOM
+  // pool stays pre-allocated but the hot `update()` loop iterates
+  // fewer items. `qualityUpdateEveryN` lets Low-tier slow the tick
+  // to ~10 Hz.
+  let qualityVisibleCap = MAX_LABELS;
+  let qualityUpdateEveryN = UPDATE_EVERY_N_FRAMES;
   const candidates = [];
   // Tracks which note the hover-mode proximity pass is currently treating
   // as hovered. Fires onLabelHover only on change — avoids spamming the
@@ -138,7 +149,7 @@ export function createLabels({
 
   function update() {
     frame++;
-    if (frame % UPDATE_EVERY_N_FRAMES !== 0) return;
+    if (frame % qualityUpdateEveryN !== 0) return;
 
     const mode = (getMode && getMode()) || "always";
 
@@ -311,8 +322,9 @@ export function createLabels({
       ambientCount++;
     }
 
-    // Limit total to pool size.
-    const limit = Math.min(chosen.length, MAX_LABELS);
+    // Limit total to pool size — clamped further by the current
+    // quality tier (RENDER_QUALITY.md Phase A).
+    const limit = Math.min(chosen.length, qualityVisibleCap);
 
     // Render — slot i gets chosen[i], else hide.
     for (let i = 0; i < MAX_LABELS; i++) {
@@ -380,5 +392,21 @@ export function createLabels({
     container.remove();
   }
 
-  return { update, dispose };
+  // RENDER_QUALITY.md Phase A — accept a tier record and adjust the
+  // visible cap + update cadence. DOM pool stays pre-allocated so
+  // we're not disposing and re-creating 80 elements on every tier
+  // transition; unused slots are just painted opacity 0.
+  function setQuality(tier) {
+    const capScale = Math.max(0, Math.min(2, tier.labelMaxScale ?? 1));
+    qualityVisibleCap = Math.max(
+      8,
+      Math.min(MAX_LABELS, Math.round(MAX_LABELS * capScale)),
+    );
+    qualityUpdateEveryN = Math.max(
+      1,
+      Math.min(12, tier.labelUpdateEveryN ?? UPDATE_EVERY_N_FRAMES),
+    );
+  }
+
+  return { update, dispose, setQuality };
 }

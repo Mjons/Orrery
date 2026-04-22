@@ -74,6 +74,19 @@ export function createPhysics({
   getPinnedIds,
   getFolderInfluence,
   getDreamDepth,
+  // DREAM_GRAVITY.md — optional dream-attractor plumbing. When these
+  // aren't supplied (tests, scene setups that don't use dream mode),
+  // the attractor stays at rest with strength 0 and contributes no
+  // force. Default values below so old callers still work.
+  getDreamPhase, // () => 'warming'|'generating'|'playing'|'discerning'|null
+  getDreamState, // () => 'wake'|'falling'|'dreaming'|'waking'
+  getDreamGravity, // () => boolean — user can disable the attractor
+  getDreamGravityStrength, // () => number — peak strength constant (Settings slider)
+  // DREAM_THEMES.md Phase C — anchor the attractor on a specific
+  // region when a theme is set. Returns null when no theme is
+  // active or the theme is too small to be viable; otherwise
+  // { centroid: [x,y,z], extent, size }.
+  getThemeAnchor,
 }) {
   const positions = bodies.buffers.position;
   const velocities = bodies.buffers.velocity;
@@ -92,6 +105,19 @@ export function createPhysics({
 
   let edges = [];
   rebuildEdges();
+
+  // DREAM_GRAVITY.md — invisible wandering attractor. Lissajous
+  // wander on three different frequencies so the path doesn't
+  // visibly repeat over a dream cycle (~4.9 min). Amplitude bounded
+  // to keep it inside the visible universe.
+  const attractor = {
+    position: [0, 0, 0],
+    strength: 0, // computed each step; sign = direction (neg = repel)
+    radius: 900, // finite — past this bodies don't feel it
+    softening: 60, // minimum distance in the denominator, prevents singularity
+    t: 0, // wander clock (seconds)
+    amp: 620,
+  };
 
   function rebuildEdges() {
     const seen = new Set();
@@ -216,6 +242,18 @@ export function createPhysics({
       }
     }
 
+    // DREAM_GRAVITY.md — dream attractor. Only active when depth > 0
+    // and the user hasn't disabled it. Strength is phase-weighted so
+    // it ramps in during warming, peaks during generating/playing,
+    // flips to an exhale during discerning, decays during waking.
+    if (depth > 0.01) {
+      updateAttractor(dt, depth);
+      if (attractor.strength !== 0) applyAttractorForce(live);
+    } else if (attractor.strength !== 0) {
+      // Wake: ensure no residual pull lingers in the force buffer.
+      attractor.strength = 0;
+    }
+
     // Integrate.
     const damp = profile.damping;
     const maxV = profile.maxSpeed;
@@ -253,6 +291,120 @@ export function createPhysics({
     }
 
     bodies.markPositionsDirty();
+  }
+
+  // Phase-weight table from DREAM_GRAVITY.md §"Phase coupling".
+  // Negative weight = exhale (repulsive). Zero for outer states that
+  // don't have a dream engine running. The weight is multiplied by
+  // `depth` in updateAttractor so even peak-weight phases fade in
+  // naturally as the user falls asleep.
+  function phaseWeight(state, phase) {
+    if (state === "wake" || state === "waking") return 0;
+    if (state === "falling") return 0.3;
+    if (state === "dreaming") {
+      if (phase === "warming") return 0.6;
+      if (phase === "generating") return 1.0;
+      if (phase === "playing") return 1.0;
+      if (phase === "discerning") return -0.5; // exhale — disperse before wake
+    }
+    return 0;
+  }
+
+  function updateAttractor(dt, depth) {
+    const enabled = getDreamGravity ? getDreamGravity() !== false : true;
+    if (!enabled) {
+      attractor.strength = 0;
+      return;
+    }
+    const state = getDreamState ? getDreamState() : "dreaming";
+    const phase = getDreamPhase ? getDreamPhase() : null;
+    const w = phaseWeight(state, phase);
+    // Peak-strength constant is user-tunable via Settings → Dream →
+    // Strength. Defaults to 2800; 0 effectively disables without
+    // flipping the toggle. Sign carried through to allow the
+    // discerning-phase exhale.
+    const peak = getDreamGravityStrength ? getDreamGravityStrength() : 2800;
+    attractor.strength = w * depth * peak;
+
+    attractor.t += dt;
+    const t = attractor.t;
+    const anchor = getThemeAnchor ? getThemeAnchor() : null;
+    if (anchor && anchor.centroid) {
+      // DREAM_THEMES.md §3 — theme-anchored motion.
+      const cx = anchor.centroid[0];
+      const cy = anchor.centroid[1];
+      const cz = anchor.centroid[2];
+      // Amplitude keyed to theme extent: "tighter Lissajous inside
+      // the theme cluster's shape." Floor at 80 so a tight theme
+      // still has breathing room; 1.3× extent means the attractor
+      // occasionally strays just past the theme's edge to pull in
+      // neighbours.
+      const amp = Math.max(80, anchor.extent * 1.3);
+      if (phase === "warming") {
+        // Pinned at centroid with a tiny jitter — visually a
+        // "gathering" before the roaming starts.
+        attractor.position[0] = cx + Math.sin(t * 0.5) * 15;
+        attractor.position[1] = cy + Math.cos(t * 0.7) * 15;
+        attractor.position[2] = cz + Math.sin(t * 0.3 + 1) * 15;
+      } else {
+        // Lissajous centered on the theme centroid, amplitude
+        // scaled so motion stays inside the cluster.
+        attractor.position[0] = cx + amp * Math.sin(t * 0.063);
+        attractor.position[1] = cy + amp * 0.55 * Math.sin(t * 0.101 + 1.3);
+        attractor.position[2] = cz + amp * Math.cos(t * 0.079 + 0.7);
+      }
+    } else {
+      // Random / no theme — default full-box Lissajous.
+      const A = attractor.amp;
+      attractor.position[0] = A * Math.sin(t * 0.063);
+      attractor.position[1] = A * 0.55 * Math.sin(t * 0.101 + 1.3);
+      attractor.position[2] = A * Math.cos(t * 0.079 + 0.7);
+    }
+  }
+
+  function applyAttractorForce(live) {
+    const ax = attractor.position[0];
+    const ay = attractor.position[1];
+    const az = attractor.position[2];
+    const R = attractor.radius;
+    const R2 = R * R;
+    const soft = attractor.softening;
+    const s = attractor.strength;
+    // Force profile: strong-near, zero-at-edge, with a small angular
+    // injection perpendicular to the pull direction so bodies SWIRL
+    // into the well instead of falling straight in. The pure inverse-
+    // square formula the doc proposed is drowned out by dream-mode
+    // wander noise at every reasonable strength — this shape gives
+    // us a force magnitude of order 1/soft at the core that's
+    // comparable to spring forces during dream.
+    //   mag(d) = s * (1 - d/R) / (d + soft)   — per-unit direction
+    //   angular kick = perpendicular rotation of direction (yz plane scaled)
+    const ANGULAR = 0.35; // fraction of radial magnitude rotated 90° in xz
+    for (let i = 0; i < live; i++) {
+      if (pinnedBuf[i]) continue;
+      const pi = i * 3;
+      const dx = ax - positions[pi];
+      const dy = ay - positions[pi + 1];
+      const dz = az - positions[pi + 2];
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 > R2) continue; // finite radius — a local weather system
+      const d = Math.sqrt(d2) + 1e-4;
+      const t = 1 - d / R; // smooth cutoff at edge
+      const mag = (s * t) / (d + soft);
+      // Unit direction from body → attractor.
+      const ux = dx / d;
+      const uy = dy / d;
+      const uz = dz / d;
+      // Radial pull.
+      force[pi] += mag * ux;
+      force[pi + 1] += mag * uy;
+      force[pi + 2] += mag * uz;
+      // Tangential kick in the xz plane (rotation ≈ Y axis) so the
+      // whole field visibly swirls at peak. Sign of `s` carries
+      // through — exhale spins the other way.
+      force[pi] += mag * ANGULAR * -uz;
+      force[pi + 2] += mag * ANGULAR * ux;
+    }
   }
 
   function recomputeCentroids(live) {
@@ -346,5 +498,14 @@ export function createPhysics({
     kickTogether,
     kickApart,
     getEdges,
+    // DREAM_GRAVITY.md — read-only snapshot of the attractor so
+    // main.js can lerp the camera's orbit target toward it. `active`
+    // is a quick gate: non-zero strength means the force is in play
+    // this frame.
+    getAttractor: () => ({
+      position: attractor.position.slice(),
+      strength: attractor.strength,
+      active: Math.abs(attractor.strength) > 0.01,
+    }),
   };
 }
