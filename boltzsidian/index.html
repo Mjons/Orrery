@@ -562,7 +562,8 @@
         min-width: 56px;
         text-align: right;
       }
-      #note-panel .panel-pin {
+      #note-panel .panel-pin,
+      #note-panel .panel-project {
         background: transparent;
         border: 1px solid var(--glass-border);
         color: var(--text-faint);
@@ -573,11 +574,20 @@
         cursor: pointer;
         font-family: inherit;
       }
-      #note-panel .panel-pin:hover {
+      #note-panel .panel-pin:hover,
+      #note-panel .panel-project:hover {
         color: var(--accent);
         border-color: rgba(138, 180, 255, 0.5);
       }
       #note-panel[data-pinned="true"] .panel-pin {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.5);
+        background: rgba(138, 180, 255, 0.08);
+      }
+      /* STAR_CHARTS.md — lit accent state when the note is flagged
+       * as a project hub. The ring glyph (◉) reinforces the
+       * ring-shape semantic; toggles back to ◌ when off. */
+      #note-panel[data-project="true"] .panel-project {
         color: var(--accent);
         border-color: rgba(138, 180, 255, 0.5);
         background: rgba(138, 180, 255, 0.08);
@@ -3840,6 +3850,14 @@
         <h1 class="panel-title"></h1>
         <div class="panel-actions">
           <span class="panel-status" aria-live="polite"></span>
+          <button
+            class="panel-project"
+            type="button"
+            aria-label="Toggle project hub"
+            title="Make this a project hub (arrange satellites in a ring)"
+          >
+            ◌
+          </button>
           <button
             class="panel-pin"
             type="button"

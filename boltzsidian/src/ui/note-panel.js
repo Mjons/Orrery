@@ -16,6 +16,9 @@ export function createNotePanel({
   onSave,
   onDirtyChange,
   onTogglePin,
+  onToggleProject, // async (note, next: boolean) => void — flip
+  // the note's `project: true` frontmatter flag. Caller writes the
+  // change through the saver so the shape cache refreshes next tick.
   onDelete, // async (note) => void — delete the note from disk + vault.
   // Caller is responsible for the native confirm() and for closing
   // the panel; we just call this when the user clicks the button.
@@ -27,6 +30,7 @@ export function createNotePanel({
   const closeBtn = panel.querySelector(".panel-close");
   const modeBtn = panel.querySelector(".panel-mode");
   const pinBtn = panel.querySelector(".panel-pin");
+  const projectBtn = panel.querySelector(".panel-project");
   const deleteBtn = panel.querySelector(".panel-delete");
   const statusEl = panel.querySelector(".panel-status");
   const resizeHandle = panel.querySelector(".panel-resize-handle");
@@ -134,6 +138,20 @@ export function createNotePanel({
 
   closeBtn.addEventListener("click", () => close());
   modeBtn.addEventListener("click", () => toggleMode());
+  if (projectBtn) {
+    projectBtn.addEventListener("click", async () => {
+      if (!current || !onToggleProject) return;
+      const next = !(
+        current.frontmatter && current.frontmatter.project === true
+      );
+      try {
+        await onToggleProject(current, next);
+        reflectProject(next);
+      } catch (err) {
+        console.error("[bz] toggle project failed", err);
+      }
+    });
+  }
   if (pinBtn) {
     pinBtn.addEventListener("click", () => {
       if (!current || !onTogglePin) return;
@@ -168,6 +186,18 @@ export function createNotePanel({
       const label = pinned ? "Unpin note" : "Pin note";
       pinBtn.setAttribute("aria-label", label);
       pinBtn.title = label;
+    }
+  }
+
+  function reflectProject(on) {
+    panel.dataset.project = on ? "true" : "false";
+    if (projectBtn) {
+      projectBtn.textContent = on ? "◉" : "◌";
+      const label = on
+        ? "Unmark as project hub"
+        : "Make this a project hub (arrange satellites in a ring)";
+      projectBtn.setAttribute("aria-label", label);
+      projectBtn.title = label;
     }
   }
 
@@ -261,6 +291,7 @@ export function createNotePanel({
     paintTitle(note, note.title || "Untitled");
     metaEl.innerHTML = buildMeta(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
+    reflectProject(note.frontmatter && note.frontmatter.project === true);
   }
 
   function open(note, { mode: openMode = "read" } = {}) {
@@ -273,6 +304,7 @@ export function createNotePanel({
     lastSavedText = note.rawText || "";
     refreshHeader(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
+    reflectProject(note.frontmatter && note.frontmatter.project === true);
     setMode(openMode);
     panel.classList.add("open");
     panel.setAttribute("aria-hidden", "false");
@@ -674,6 +706,7 @@ export function createNotePanel({
     if (!current || current !== note) return;
     refreshHeader(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
+    reflectProject(note.frontmatter && note.frontmatter.project === true);
     if (mode === "read") bodyEl.innerHTML = renderBody(note);
   }
 

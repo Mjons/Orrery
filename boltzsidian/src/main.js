@@ -599,6 +599,7 @@ const notePanel = createNotePanel({
   onNavigate: (noteId) => focusNote(noteId),
   onSave: handleSave,
   onTogglePin: handleTogglePin,
+  onToggleProject: handleToggleProject,
   // Manual note deletion from the panel header. The panel's click
   // handler fires the native confirm(); by the time we're called the
   // user has already said yes. We reuse Weed's two-stage path:
@@ -2594,6 +2595,37 @@ async function undoUnlink(restore) {
 }
 
 // ── Pin toggle ──────────────────────────────────────────────
+async function handleToggleProject(note, nextProject) {
+  if (!saver) return;
+  const fm = { ...(note.frontmatter || {}) };
+  fm.id = fm.id || note.id;
+  if (!fm.created)
+    fm.created = new Date(note.mtime || Date.now()).toISOString();
+  if (nextProject) {
+    fm.project = true;
+    if (!fm.shape) fm.shape = "ring"; // only supported shape in first cut
+  } else {
+    delete fm.project;
+    delete fm.shape;
+  }
+  const nextText = stringifyFrontmatter(fm, note.body);
+  try {
+    await saver(note, nextText);
+    // Refresh the project-shape cache so physics sees the change on
+    // the next frame instead of waiting for the ~500ms centroid tick.
+    if (vault) projectShapesCache = collectProjectShapes(vault);
+    toast(
+      nextProject
+        ? "Marked as project hub — satellites will ring up"
+        : "Project hub cleared",
+      { duration: 1800 },
+    );
+  } catch (err) {
+    console.error("[bz] project toggle failed", err);
+    toast("Could not update project flag.");
+  }
+}
+
 async function handleTogglePin(note, nextPinned) {
   if (!saver) return;
   const fm = { ...(note.frontmatter || {}) };
