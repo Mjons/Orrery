@@ -2616,6 +2616,11 @@ async function handleToggleProject(note, nextShape) {
     // Refresh the project-shape cache so physics sees the change on
     // the next frame instead of waiting for the ~500ms centroid tick.
     if (vault) projectShapesCache = collectProjectShapes(vault);
+    // One-shot velocity kick so the rearrangement is visible
+    // immediately, not just over seconds of settling. Only when
+    // turning a shape ON (not when clearing) — clearing should
+    // just let spring forces take over naturally.
+    if (valid && physics?.kickShape) physics.kickShape();
     const msg = valid
       ? `Project: ${nextShape} — satellites arranging`
       : "Project hub cleared";

@@ -482,16 +482,15 @@ export function createPhysics({
   }
 
   // STAR_CHARTS.md — pull each satellite of a project hub toward
-  // its ideal position on the chosen shape around the hub.
-  // Stiffness is enough to visibly arrange within a few seconds
-  // but still lets spring forces wobble the figure into a
-  // hand-drawn look. `mix` is a dream-depth fade so the shape
-  // dissolves into drift during sleep.
+  // its ideal position on the chosen shape around the hub. Stiff
+  // enough to win the tug-of-war against spring forces (which pull
+  // satellites toward rest-length equilibria around the hub) but
+  // still damped enough to let repulsion and cross-links perturb
+  // the figure. `mix` is a dream-depth fade.
   //
-  // Raised from 0.06 (barely-visible drift over ~60s) to 0.6 after
-  // real-vault testing showed notes weren't settling fast enough
-  // to read as "it snapped into a ring".
-  const SHAPE_K = 0.6;
+  // Stiffness history: 0.06 was barely visible; 0.6 still lost to
+  // springs; 2.5 finally wins clearly on real vaults.
+  const SHAPE_K = 2.5;
   const _hubTmp = [0, 0, 0];
   function applyShapeForces(shapes, live, mix) {
     for (const shape of shapes) {
@@ -537,6 +536,43 @@ export function createPhysics({
     force[bi + 2] += f * dz;
   }
 
+  // STAR_CHARTS.md — inject one-shot velocities toward ideal ring
+  // positions. Called when a user toggles a note into project mode
+  // so the rearrangement is visible immediately, not just settling
+  // over seconds under the ambient shape force.
+  function kickShape(shapeIdx = null) {
+    const shapes = getProjectShapes ? getProjectShapes() : null;
+    if (!shapes || shapes.length === 0) return;
+    const live = bodies.count;
+    for (let si = 0; si < shapes.length; si++) {
+      if (shapeIdx != null && si !== shapeIdx) continue;
+      const shape = shapes[si];
+      const hubIdx = bodies.indexOfId(shape.hubId);
+      if (hubIdx < 0 || hubIdx >= live) continue;
+      _hubTmp[0] = positions[hubIdx * 3];
+      _hubTmp[1] = positions[hubIdx * 3 + 1];
+      _hubTmp[2] = positions[hubIdx * 3 + 2];
+      const n = shape.satIds.length;
+      for (let i = 0; i < n; i++) {
+        const idx = bodies.indexOfId(shape.satIds[i]);
+        if (idx < 0 || idx >= live) continue;
+        if (pinnedBuf[idx]) continue;
+        const ideal = idealShapePosition(_hubTmp, shape, i);
+        const ai = idx * 3;
+        const dx = ideal[0] - positions[ai];
+        const dy = ideal[1] - positions[ai + 1];
+        const dz = ideal[2] - positions[ai + 2];
+        // Velocity kick proportional to distance — far satellites
+        // travel faster, close ones barely move. Scaled so a 180-
+        // unit gap takes ~0.6s at wake maxSpeed.
+        const KICK = 0.9;
+        velocities[ai] += dx * KICK;
+        velocities[ai + 1] += dy * KICK;
+        velocities[ai + 2] += dz * KICK;
+      }
+    }
+  }
+
   // Push two bodies toward each other briefly, used on link creation so the
   // settling is visible instead of a silent pulse through the buffer.
   function kickTogether(idA, idB, strength = 180) {
@@ -575,6 +611,7 @@ export function createPhysics({
     rebuildEdges,
     refreshEdgesFor,
     kickTogether,
+    kickShape,
     kickApart,
     getEdges,
     // DREAM_GRAVITY.md — read-only snapshot of the attractor so
