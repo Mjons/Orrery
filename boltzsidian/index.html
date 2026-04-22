@@ -761,31 +761,55 @@
         display: none;
       }
       #note-panel .con-section {
-        display: grid;
-        grid-template-columns: 52px 1fr;
-        column-gap: 10px;
-        align-items: start;
+        display: block;
       }
       #note-panel .con-section + .con-section {
         margin-top: 6px;
         padding-top: 6px;
         border-top: 1px dashed rgba(255, 255, 255, 0.06);
       }
-      #note-panel .con-label {
-        font-size: 9px;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: var(--text-faint);
-        text-align: right;
-        user-select: none;
-        padding-top: 4px;
-      }
-      #note-panel .con-label-count {
-        display: block;
-        font-size: 14px;
-        letter-spacing: 0;
+      #note-panel .con-summary {
+        list-style: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 0;
         color: var(--text-dim);
-        margin-top: 2px;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        user-select: none;
+        transition: color 120ms ease;
+      }
+      #note-panel .con-summary::-webkit-details-marker {
+        display: none;
+      }
+      #note-panel .con-summary::before {
+        content: "▸";
+        display: inline-block;
+        width: 10px;
+        font-size: 10px;
+        color: var(--text-faint);
+        transition: transform 120ms ease;
+      }
+      #note-panel details[open] > .con-summary::before {
+        transform: rotate(90deg);
+      }
+      #note-panel .con-summary:hover {
+        color: var(--text);
+      }
+      #note-panel .con-summary-label {
+        letter-spacing: 0.14em;
+      }
+      #note-panel .con-summary-count {
+        font-size: 11px;
+        letter-spacing: 0;
+        color: var(--text-faint);
+      }
+      #note-panel details[open] > .con-row {
+        margin-top: 6px;
+        padding-bottom: 6px;
       }
       #note-panel .con-row {
         display: flex;

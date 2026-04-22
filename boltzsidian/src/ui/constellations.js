@@ -38,6 +38,12 @@ const FOLDER_DOMINANCE = 0.6;
 const HAZE_MIN_PX = 180;
 const HAZE_MAX_PX = 520;
 
+// CONSTELLATION_NAMING.md §1.1 — dedupe + disambiguate tuning.
+// Name collisions try disambiguators in order: distinct top tag →
+// distinct folder path → proximity-merge badge → ordinal suffix.
+const MERGE_PX_THRESHOLD = 140; // on-screen distance for merge-into-one badge
+const ORDINAL_GLYPHS = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨"];
+
 const TMP = new THREE.Vector3();
 
 export function createConstellations({
@@ -103,6 +109,10 @@ export function createConstellations({
 
   const pool = [];
   const clusterIdBySlot = new Array(MAX_CONSTELLATIONS).fill(null);
+  // When a slot renders a merge badge ("Name × 5"), this holds the
+  // merged member metadata so click handlers can respond differently.
+  // null = regular slot pointing at a single cluster.
+  const mergedBySlot = new Array(MAX_CONSTELLATIONS).fill(null);
   for (let i = 0; i < MAX_CONSTELLATIONS; i++) {
     const el = document.createElement("div");
     el.className = "constellation";
@@ -166,6 +176,11 @@ export function createConstellations({
     text.addEventListener("dblclick", (e) => {
       const cid = clusterIdBySlot[i];
       if (cid == null) return;
+      // Merge-badge slots don't represent a single cluster, so there's
+      // nothing to rename. Author of CONSTELLATION_NAMING.md §2 item
+      // "Merge with nearby" — that click path lands in §1.2 alongside
+      // persistence; for now the badge is inert.
+      if (mergedBySlot[i]) return;
       e.preventDefault();
       e.stopPropagation();
       beginEdit(i);
@@ -183,6 +198,10 @@ export function createConstellations({
       // user was panning the camera and happened to release over
       // the label. Only a stationary right-click opens the menu.
       if (wasDragging[2]) return;
+      // Merge badge: rename/batch-link don't have clean semantics
+      // against a compound of clusters. Inert until §1.2 wires an
+      // explicit merge-resolution UI.
+      if (mergedBySlot[i]) return;
       if (e.shiftKey) {
         beginEdit(i);
         return;
@@ -373,11 +392,16 @@ export function createConstellations({
         opacity: fadeIn * dreamFade,
         screenExtent,
         noteCount: cluster.noteIds.length,
+        name: nameCache.get(cluster.id) || `Region ${cluster.id}`,
       });
     }
     ranked.sort((a, b) => b.noteCount - a.noteCount);
 
-    const limit = Math.min(ranked.length, qualityVisibleCap);
+    // CONSTELLATION_NAMING.md §1.1 — collapse duplicate names into
+    // either disambiguated variants or a single merge badge.
+    const display = deduplicateAndDisambiguate(ranked, vault);
+
+    const limit = Math.min(display.length, qualityVisibleCap);
     for (let i = 0; i < MAX_CONSTELLATIONS; i++) {
       const slot = pool[i];
       if (i >= limit) {
@@ -387,12 +411,16 @@ export function createConstellations({
         // clicks aimed at the canvas behind it.
         slot.text.style.pointerEvents = "none";
         clusterIdBySlot[i] = null;
+        mergedBySlot[i] = null;
         continue;
       }
-      const r = ranked[i];
+      const r = display[i];
       const cid = r.cluster.id;
       clusterIdBySlot[i] = cid;
-      const name = nameCache.get(cid) || `Region ${cid}`;
+      mergedBySlot[i] = r.merged
+        ? { count: r.mergedCount, clusterIds: r.mergedClusterIds }
+        : null;
+      const name = r.displayName || nameCache.get(cid) || `Region ${cid}`;
       // Don't overwrite text while the user is typing in this slot —
       // the update loop ticks every 3 frames and would stamp the
       // cached name over the user's in-progress edit, making the
@@ -440,6 +468,7 @@ export function createConstellations({
       if (slot.el.style.opacity !== "0") slot.el.style.opacity = "0";
       slot.text.style.pointerEvents = "none";
       clusterIdBySlot[i] = null;
+      mergedBySlot[i] = null;
     }
   }
 
@@ -689,6 +718,146 @@ function dominantFolder(cluster, vault) {
   }
   if (topCount / ids.length >= FOLDER_DOMINANCE) return top;
   return null;
+}
+
+// CONSTELLATION_NAMING.md §1.1 — pass 2 over the ranked list. Groups
+// entries by their derived name; duplicates are resolved by trying
+// disambiguators in order (tag → folder → proximity merge → ordinal).
+// Returns a new array; singletons are copied through unchanged.
+function deduplicateAndDisambiguate(ranked, vault) {
+  const groups = new Map();
+  for (const r of ranked) {
+    const arr = groups.get(r.name);
+    if (arr) arr.push(r);
+    else groups.set(r.name, [r]);
+  }
+  const out = [];
+  for (const [name, group] of groups) {
+    if (group.length === 1) {
+      out.push({ ...group[0], displayName: name });
+      continue;
+    }
+    // 1. Distinct dominant tags.
+    const tags = group.map((e) => dominantTag(e.cluster, vault));
+    if (allDistinctNonNull(tags)) {
+      for (let i = 0; i < group.length; i++) {
+        out.push({ ...group[i], displayName: `${name} · #${tags[i]}` });
+      }
+      continue;
+    }
+    // 2. Distinct dominant folder paths.
+    const folders = group.map((e) => dominantFolderPath(e.cluster, vault));
+    if (allDistinctNonNull(folders)) {
+      for (let i = 0; i < group.length; i++) {
+        out.push({ ...group[i], displayName: `${name} (${folders[i]}/)` });
+      }
+      continue;
+    }
+    // 3. Proximity merge — if any pair of centroids sits within
+    //    MERGE_PX_THRESHOLD on-screen, collapse the whole collision
+    //    into a single badge. The heaviest cluster (first after the
+    //    ranked sort) is the "representative" for positioning and
+    //    focus-click.
+    if (anyPairClose(group, MERGE_PX_THRESHOLD)) {
+      const rep = group[0];
+      out.push({
+        ...rep,
+        displayName: `${name} × ${group.length}`,
+        merged: true,
+        mergedCount: group.length,
+        mergedClusterIds: group.map((e) => e.cluster.id),
+      });
+      continue;
+    }
+    // 4. Ordinal fallback — honest "these are different; please
+    //    rename them."
+    for (let i = 0; i < group.length; i++) {
+      const suffix = ORDINAL_GLYPHS[i] || `(${i + 1})`;
+      out.push({ ...group[i], displayName: `${name} ${suffix}` });
+    }
+  }
+  // Preserve noteCount-desc ordering so the slot loop keeps picking
+  // meatier clusters first when ranked.length > qualityVisibleCap.
+  out.sort((a, b) => b.noteCount - a.noteCount);
+  return out;
+}
+
+function dominantTag(cluster, vault) {
+  const ids = cluster.noteIds || [];
+  if (ids.length === 0) return null;
+  const counts = new Map();
+  for (const id of ids) {
+    const n = vault.byId?.get(id);
+    const tags = n?.tags;
+    if (!Array.isArray(tags)) continue;
+    for (const t of tags) {
+      if (!t) continue;
+      counts.set(t, (counts.get(t) || 0) + 1);
+    }
+  }
+  let top = null;
+  let topCount = 0;
+  for (const [t, c] of counts) {
+    if (c > topCount || (c === topCount && top != null && t < top)) {
+      top = t;
+      topCount = c;
+    }
+  }
+  // Require at least 2 members to agree — a single tagged note isn't
+  // a signal strong enough to disambiguate a whole region.
+  return topCount >= 2 ? top : null;
+}
+
+// Full folder path (all segments except filename), dominant across the
+// cluster. Distinct from dominantFolder() above, which is top-level
+// only; for disambiguation we want the deeper path because two
+// clusters might share a top-level folder but differ downstream.
+function dominantFolderPath(cluster, vault) {
+  const ids = cluster.noteIds || [];
+  if (ids.length === 0) return null;
+  const counts = new Map();
+  for (const id of ids) {
+    const n = vault.byId?.get(id);
+    if (!n?.path) continue;
+    const segs = n.path.split("/").slice(0, -1);
+    if (segs.length === 0) continue;
+    const full = segs.join("/");
+    counts.set(full, (counts.get(full) || 0) + 1);
+  }
+  let top = null;
+  let topCount = 0;
+  for (const [f, c] of counts) {
+    if (c > topCount) {
+      top = f;
+      topCount = c;
+    }
+  }
+  if (!top) return null;
+  // At least 40% of members must share the path or it doesn't
+  // represent the cluster meaningfully.
+  return topCount / ids.length >= 0.4 ? top : null;
+}
+
+function allDistinctNonNull(arr) {
+  if (arr.some((v) => v == null || v === "")) return false;
+  const seen = new Set();
+  for (const v of arr) {
+    if (seen.has(v)) return false;
+    seen.add(v);
+  }
+  return true;
+}
+
+function anyPairClose(group, thresholdPx) {
+  const t2 = thresholdPx * thresholdPx;
+  for (let i = 0; i < group.length; i++) {
+    for (let j = i + 1; j < group.length; j++) {
+      const dx = group[i].x - group[j].x;
+      const dy = group[i].y - group[j].y;
+      if (dx * dx + dy * dy <= t2) return true;
+    }
+  }
+  return false;
 }
 
 function hexToTriplet(hex) {

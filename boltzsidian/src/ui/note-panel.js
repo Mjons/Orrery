@@ -39,6 +39,8 @@ export function createNotePanel({
   const statusEl = panel.querySelector(".panel-status");
   const resizeHandle = panel.querySelector(".panel-resize-handle");
   const suggestionsPanel = panel.querySelector(".panel-suggestions");
+  // NOTE: connectionsPanel is re-queried inside renderConnections so
+  // the reference survives HMR swaps of the panel HTML.
 
   let current = null;
   let mode = "read";
@@ -337,6 +339,7 @@ export function createNotePanel({
     metaEl.innerHTML = buildMeta(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
     reflectProject(shapeOf(note));
+    renderConnections(note);
   }
 
   function open(note, { mode: openMode = "read" } = {}) {
@@ -387,7 +390,83 @@ export function createNotePanel({
       editorHost = null;
     }
     if (suggestionsPanel) suggestionsPanel.innerHTML = "";
+    const cp = panel.querySelector(".panel-connections");
+    if (cp) cp.innerHTML = "";
     dismissedSuggestions = new Set();
+  }
+
+  // ── Connections (incoming + outgoing links) ─────────────
+  // A permanent section listing every note connected to the currently-
+  // open one. Outgoing = notes this one links to; incoming = notes
+  // that link here. Clicking a chip navigates. Refreshes whenever the
+  // header refreshes (i.e., on open, on frontmatter edits, after
+  // rename). Doesn't follow keystrokes — the link graph is derived
+  // from saved-to-disk state, not draft text.
+  function renderConnections(note) {
+    // Re-query each call so the reference survives HMR swaps of the
+    // panel HTML — caching at module init would strand us with a
+    // null reference if Vite hot-replaced the aside after boot.
+    const cp = panel.querySelector(".panel-connections");
+    if (!cp) return;
+    cp.innerHTML = "";
+    const vault = getVault && getVault();
+    if (!vault || !note) return;
+
+    const fwIds = [...(vault.forward.get(note.id) || [])];
+    const bwIds = [...(vault.backward.get(note.id) || [])];
+    if (fwIds.length === 0 && bwIds.length === 0) return;
+
+    const byTitle = (a, b) => {
+      const ta = vault.byId?.get(a)?.title || "";
+      const tb = vault.byId?.get(b)?.title || "";
+      return ta.localeCompare(tb);
+    };
+
+    const chipFor = (id) => {
+      const target = vault.byId?.get(id);
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "con-chip";
+      if (!target) {
+        chip.classList.add("broken");
+        chip.disabled = true;
+      }
+      chip.title = target?.path || id;
+      const textSpan = document.createElement("span");
+      textSpan.className = "con-chip-text";
+      textSpan.textContent = target?.title || target?.path || id;
+      chip.appendChild(textSpan);
+      if (target && onNavigate) {
+        chip.addEventListener("click", (e) => {
+          e.preventDefault();
+          onNavigate(target.id);
+        });
+      }
+      return chip;
+    };
+
+    const makeSection = (klass, label, count, ids) => {
+      const details = document.createElement("details");
+      details.className = `con-section ${klass}`;
+      const summary = document.createElement("summary");
+      summary.className = "con-summary";
+      summary.innerHTML = `<span class="con-summary-label">${label}</span><span class="con-summary-count">${count}</span>`;
+      details.appendChild(summary);
+      const row = document.createElement("div");
+      row.className = "con-row";
+      for (const id of ids.sort(byTitle)) row.appendChild(chipFor(id));
+      details.appendChild(row);
+      return details;
+    };
+
+    if (fwIds.length > 0) {
+      cp.appendChild(
+        makeSection("con-section-out", "Out", fwIds.length, fwIds),
+      );
+    }
+    if (bwIds.length > 0) {
+      cp.appendChild(makeSection("con-section-in", "In", bwIds.length, bwIds));
+    }
   }
 
   // ── Suggestions row ──────────────────────────────────────
