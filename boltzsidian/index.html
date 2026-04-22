@@ -2712,6 +2712,86 @@
         font-weight: 500;
       }
 
+      /* ── Filter bar — VISIBILITY_FILTER.md ─────────────────── */
+      /* Persistent compact pill at the top-center. F (no modifier)
+       * focuses the input; typing dims non-matching bodies via the
+       * formations pipeline. Stays in the DOM always; switches to an
+       * accent-tinted state when active so the user can't forget
+       * they've narrowed the view. */
+      #filter-bar {
+        position: fixed;
+        top: 18px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 6px 4px 14px;
+        background: var(--glass);
+        backdrop-filter: blur(14px) saturate(140%);
+        -webkit-backdrop-filter: blur(14px) saturate(140%);
+        border: 1px solid var(--glass-border);
+        border-radius: 999px;
+        z-index: 20;
+        font-size: 12px;
+        letter-spacing: 0.02em;
+        min-width: 240px;
+        max-width: min(480px, 70vw);
+        transition:
+          background 160ms ease,
+          border-color 160ms ease,
+          box-shadow 160ms ease;
+      }
+      #filter-bar.active {
+        background: rgba(138, 180, 255, 0.08);
+        border-color: rgba(138, 180, 255, 0.45);
+        box-shadow: 0 0 0 1px rgba(138, 180, 255, 0.18);
+      }
+      #filter-bar .filter-bar-input {
+        flex: 1 1 auto;
+        min-width: 0;
+        background: transparent;
+        border: 0;
+        outline: none;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 0.02em;
+        padding: 4px 2px;
+      }
+      #filter-bar .filter-bar-input::placeholder {
+        color: var(--text-faint);
+      }
+      #filter-bar .filter-bar-count {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        color: var(--text-faint);
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        flex: 0 0 auto;
+        padding: 0 6px;
+      }
+      #filter-bar.active .filter-bar-count {
+        color: var(--accent);
+      }
+      #filter-bar .filter-bar-clear {
+        background: transparent;
+        border: 0;
+        color: var(--text-faint);
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        padding: 4px 8px;
+        border-radius: 999px;
+        transition: background 120ms ease;
+      }
+      #filter-bar .filter-bar-clear:hover {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      #filter-bar:not(.active) .filter-bar-clear {
+        opacity: 0.35;
+      }
+
       /* ── Toast (errors + actions) ───────────────────────── */
       #toast {
         position: fixed;
@@ -3632,6 +3712,11 @@
         <b>↑ ↓</b> navigate · <b>enter</b> open · <b>esc</b> close
       </div>
     </div>
+
+    <div
+      id="filter-bar"
+      aria-label="Filter visible notes by tag or keyword"
+    ></div>
 
     <aside id="ideas-drawer" aria-hidden="true">
       <header class="drawer-head">

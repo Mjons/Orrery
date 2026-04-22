@@ -203,6 +203,38 @@ const MATCHERS = {
     for (const x of vault.backward.get(bestId) || []) out.add(x);
     return out;
   },
+  // VISIBILITY_FILTER.md — user-typed tag filter. Params.tags is an
+  // array of tag strings (no leading '#'). A note matches if it has
+  // ALL requested tags (frontmatter or inline). Empty → null so the
+  // formations loop treats this filter as inactive.
+  tag(vault, _bodies, params) {
+    const wanted = (params?.tags || []).map((t) => String(t).toLowerCase());
+    if (wanted.length === 0) return null;
+    const out = new Set();
+    for (const n of vault.notes) {
+      const all = new Set();
+      const fm = n.frontmatter?.tags;
+      if (Array.isArray(fm)) {
+        for (const t of fm) all.add(String(t).toLowerCase());
+      }
+      for (const t of n.tags || []) all.add(String(t).toLowerCase());
+      if (wanted.every((t) => all.has(t))) out.add(n.id);
+    }
+    return out;
+  },
+  // VISIBILITY_FILTER.md — user-typed keyword filter. Params.phrases
+  // is an array of lowercase substrings. A note matches if its body
+  // OR title contains ALL phrases (AND). Case-insensitive.
+  keyword(vault, _bodies, params) {
+    const phrases = (params?.phrases || []).map((p) => String(p).toLowerCase());
+    if (phrases.length === 0) return null;
+    const out = new Set();
+    for (const n of vault.notes) {
+      const hay = ((n.body || "") + "\n" + (n.title || "")).toLowerCase();
+      if (phrases.every((p) => hay.includes(p))) out.add(n.id);
+    }
+    return out;
+  },
 };
 
 // Helper for the rail UI to populate the Solo-folder picker.

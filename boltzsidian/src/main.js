@@ -80,6 +80,7 @@ import { showAbout } from "./ui/about.js";
 import { showMorningReport } from "./ui/morning-report.js";
 import { createFormations } from "./ui/formations.js";
 import { createFormationsRail } from "./ui/formations-rail.js";
+import { createFilterBar } from "./ui/filter-bar.js";
 import { assignTints } from "./vault/folders.js";
 import { createChorus } from "./layers/chorus.js";
 import { createCaptions } from "./ui/captions.js";
@@ -190,6 +191,7 @@ let linkDrag = null;
 let kmatrix = null;
 let formations = null;
 let formationsRail = null;
+let filterBar = null;
 let chorus = null;
 let captions = null;
 let hover = null;
@@ -1794,6 +1796,17 @@ async function setWorkspace(ws) {
         onBeforeOpen: () => search?.close(),
       });
     }
+    // VISIBILITY_FILTER.md — user-typed tag/keyword filter. Created
+    // once; `refresh()` re-applies the current filter string against
+    // the newly-loaded vault so matches stay in sync.
+    if (!filterBar) {
+      filterBar = createFilterBar({
+        formations,
+        getVault: () => vault,
+      });
+    } else {
+      filterBar.refresh();
+    }
     // Paint the initial (empty) state.
     formations.refresh();
 
@@ -3070,6 +3083,14 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault();
     if (weedDrawer.isOpen()) weedDrawer.close();
     else openWeed();
+  }
+
+  // VISIBILITY_FILTER.md — F focuses the top-center filter bar.
+  // Browsers also bind Ctrl/Cmd+F to find-in-page; we only steal
+  // the BARE F key here, so the native shortcut still works.
+  if (e.key === "f" || e.key === "F") {
+    e.preventDefault();
+    if (filterBar) filterBar.focus();
   }
 
   // Shift+S opens the salience debug palette. Capture only when Shift is

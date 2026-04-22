@@ -71,6 +71,27 @@ const GROUPS = [
     ],
   },
   {
+    title: "Filter",
+    items: [
+      {
+        keys: ["F"],
+        desc: "Focus the top-center filter bar",
+      },
+      {
+        keys: ["#tag"],
+        desc: "Require this tag (frontmatter or inline). Multiple #tags AND.",
+      },
+      {
+        keys: ["word"],
+        desc: "Require this keyword in body or title (case-insensitive).",
+      },
+      {
+        keys: ["Esc"],
+        desc: "Clear the filter if it has content; otherwise blur the bar.",
+      },
+    ],
+  },
+  {
     title: "Dream",
     items: [
       { keys: ["D"], desc: "Show morning report for last dream cycle" },
