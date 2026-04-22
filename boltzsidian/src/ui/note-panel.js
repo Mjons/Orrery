@@ -367,6 +367,8 @@ export function createNotePanel({
     current = null;
     mode = "read";
     bodyEl.innerHTML = "";
+    const cp = panel.querySelector(".panel-connections");
+    if (cp) cp.innerHTML = "";
     panel.classList.remove("open");
     panel.setAttribute("aria-hidden", "true");
     if (onClose) onClose(closed);
@@ -390,8 +392,11 @@ export function createNotePanel({
       editorHost = null;
     }
     if (suggestionsPanel) suggestionsPanel.innerHTML = "";
-    const cp = panel.querySelector(".panel-connections");
-    if (cp) cp.innerHTML = "";
+    // Do NOT clear .panel-connections here. destroyEditor runs twice
+    // during a read-mode open (once at the top of open(), once via
+    // setMode("read")), and the second call would wipe the aside
+    // AFTER refreshHeader already populated it. renderConnections()
+    // re-clears on every call anyway.
     dismissedSuggestions = new Set();
   }
 
