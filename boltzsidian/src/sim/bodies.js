@@ -219,7 +219,12 @@ export function createBodies({
         // Label hover — double the body's size with a steady breathing pulse
         // so the associated star is unmistakable when the user engages a label.
         float labelBoost = 1.0 + aLabelHover * (1.0 + 0.18 * sin(uTime * 4.5));
-        gl_PointSize = baseSize * pulse * selBoost * hoverBoost * labelBoost * (420.0 / -mv.z) * uPixelRatio * 0.5;
+        // Filter match — when the formations/filter pipeline is active,
+        // matched bodies have aGlow = 1.3 (non-matches 0.2, no filter 1.0).
+        // Grow matches 3x so the user's attention snaps to them even
+        // across a dimmed vault. Unaffected when no filter is active.
+        float filterBoost = 1.0 + step(1.1, aGlow) * 2.0;
+        gl_PointSize = baseSize * pulse * selBoost * hoverBoost * labelBoost * filterBoost * (420.0 / -mv.z) * uPixelRatio * 0.5;
         vGlow = aGlow;
         vSelected = aSelected;
         vHover = aHover;
