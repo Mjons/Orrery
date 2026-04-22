@@ -570,8 +570,14 @@ export function createKeywordLinkPicker({ getVault, onApply } = {}) {
       )
         return;
     }
+    // Snapshot before close() — close() nulls the `target` closure
+    // variable, so if we called onApply after close() the callback
+    // would see target === null and blow up on target.title.
+    const appliedTarget = target;
+    const appliedSelection = selection;
     close();
-    if (onApply) onApply({ target, selection });
+    if (onApply)
+      onApply({ target: appliedTarget, selection: appliedSelection });
   }
 }
 
