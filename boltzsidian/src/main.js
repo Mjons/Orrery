@@ -32,6 +32,8 @@ import { createLabels } from "./ui/labels.js";
 import { createConstellations, saveClusterName } from "./ui/constellations.js";
 import { createBatchLinkPicker } from "./ui/batch-link-picker.js";
 import { createKeywordLinkPicker } from "./ui/keyword-link-picker.js";
+import { createWeavePicker } from "./ui/weave-picker.js";
+import { scanWeave } from "./layers/weave.js";
 import { createPickDebug } from "./ui/pick-debug.js";
 import { createSearch } from "./ui/search.js";
 import { createLinkDrag } from "./ui/link-drag.js";
@@ -163,6 +165,7 @@ let labels = null;
 let constellations = null;
 let batchLinkPicker = null;
 let keywordLinkPicker = null;
+let weavePicker = null;
 // Hoisted so openNote() can promote the open note's body into its
 // orange "orrery" state (orbiting planets), not just label-hover.
 let hoverOrbit = null;
@@ -2102,6 +2105,70 @@ async function setWorkspace(ws) {
       },
     });
 
+    // WEAVE.md — network-completion picker. Takes a hub note, scans
+    // its satellite neighborhood for prose mentions of each other,
+    // and splices in-place via the same frontmatter/body/saver path
+    // the keyword-link picker uses.
+    if (weavePicker) weavePicker.dispose();
+    weavePicker = createWeavePicker({
+      getVault: () => vault,
+      runScan: (v, hubId) => scanWeave(v, hubId),
+      onApply: async (proposals) => {
+        if (!saver) return;
+        // Group proposals by source note so each note is parsed and
+        // written once, with all its accepted edits applied end-to-
+        // start for offset stability (same pattern as keyword-link).
+        const byFrom = new Map();
+        for (const p of proposals) {
+          if (!byFrom.has(p.from.id))
+            byFrom.set(p.from.id, { note: p.from, items: [] });
+          byFrom.get(p.from.id).items.push(p);
+        }
+        let wroteNotes = 0;
+        let wroteLinks = 0;
+        let errored = 0;
+        for (const { note, items } of byFrom.values()) {
+          try {
+            const { data, content } = parseFrontmatter(note.rawText);
+            let newBody = content;
+            const sorted = [...items].sort(
+              (a, b) => b.charOffset - a.charOffset,
+            );
+            for (const p of sorted) {
+              // Sanitise the target's title in case it contains
+              // bracket / pipe tokens that would produce a malformed
+              // wikilink when wrapped.
+              const cleanTitle = String(p.to.title || "")
+                .replace(/\[\[|\]\]|\|/g, "")
+                .trim();
+              if (!cleanTitle) continue;
+              const replacement =
+                p.matchedText === cleanTitle
+                  ? `[[${cleanTitle}]]`
+                  : `[[${cleanTitle}|${p.matchedText}]]`;
+              newBody =
+                newBody.slice(0, p.charOffset) +
+                replacement +
+                newBody.slice(p.charOffset + p.matchedText.length);
+              wroteLinks++;
+            }
+            const newRawText = stringifyFrontmatter(data, newBody);
+            await saver(note, newRawText);
+            wroteNotes++;
+          } catch (err) {
+            console.warn("[bz] weave write failed:", err);
+            errored++;
+          }
+        }
+        toast(
+          errored > 0
+            ? `Wove ${wroteLinks} links across ${wroteNotes} notes (${errored} failed — see console).`
+            : `Wove ${wroteLinks} links across ${wroteNotes} notes.`,
+          { duration: 4500 },
+        );
+      },
+    });
+
     // RENDER_QUALITY.md Phase A — by now every visual subsystem is
     // wired (tethers, sparks, labels, constellations). Re-dispatch
     // the current tier so each sees the right pool size + cadence
@@ -3093,6 +3160,28 @@ window.addEventListener("keydown", (e) => {
     if (filterBar) filterBar.focus();
   }
 
+  // WEAVE.md — Shift+O opens the weave picker on the currently
+  // selected note as the hub. No selection → toast. Unshifted O is
+  // reserved for pull-into-orbit (PULL_INTO_ORBIT.md) but not yet
+  // wired.
+  if (e.shiftKey && (e.code === "KeyO" || e.key === "O")) {
+    e.preventDefault();
+    if (!vault) {
+      toast("Open a workspace first.");
+      return;
+    }
+    const hubId = activeNoteId;
+    if (!hubId) {
+      toast("Click a note first — that's the hub to weave around.", {
+        duration: 3000,
+      });
+      return;
+    }
+    const hub = vault.byId?.get(hubId);
+    if (!hub) return;
+    weavePicker?.open?.(hub);
+  }
+
   // Shift+S opens the salience debug palette. Capture only when Shift is
   // the ONLY modifier — leaves Cmd+Shift+S / Alt+Shift+S alone for the
   // browser.
@@ -3253,6 +3342,35 @@ if (import.meta.env && import.meta.env.DEV) {
     // onApply which today just logs; Phase D replaces the log with
     // the real write loop.
     __openKeywordLink: (opts) => keywordLinkPicker?.open?.(opts || {}),
+    // WEAVE.md console hook. Accepts a note id or a title. Opens the
+    // weave picker on that note as the hub. Use this before the
+    // Shift+O hotkey to run a dry-run scan:
+    //   __boltzsidian.__weave("Delphica")        // resolve by title
+    //   __boltzsidian.__weave(note.id)           // resolve by id
+    //   __boltzsidian.__weaveScan("Delphica")    // scan-only, logs proposals
+    __weave: (idOrTitle) => {
+      if (!vault) return console.warn("[bz] no vault loaded");
+      const hub =
+        vault.byId?.get(idOrTitle) ||
+        vault.resolveTitle?.(String(idOrTitle)) ||
+        null;
+      if (!hub) return console.warn("[bz] weave: no note matches", idOrTitle);
+      weavePicker?.open?.(hub);
+    },
+    __weaveScan: (idOrTitle) => {
+      if (!vault) return console.warn("[bz] no vault loaded");
+      const hub =
+        vault.byId?.get(idOrTitle) ||
+        vault.resolveTitle?.(String(idOrTitle)) ||
+        null;
+      if (!hub) return console.warn("[bz] weaveScan: no note matches");
+      const result = scanWeave(vault, hub.id);
+      console.log(
+        `[bz] weave ${hub.title}: ${result.satellites.length} satellites, ${result.proposals.length} proposals`,
+        result,
+      );
+      return result;
+    },
     __parseManifest: (input) => parseManifest(input),
     __serializeManifest: (manifest) => serializeManifest(manifest),
     __synthesizeSingleRootManifest: synthesizeSingleRootManifest,

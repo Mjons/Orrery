@@ -49,6 +49,10 @@ const GROUPS = [
         desc: "Link every mention of a keyword to a target note",
       },
       {
+        keys: ["Shift", "O"],
+        desc: "Weave — propose cross-links between the selected note's satellites",
+      },
+      {
         keys: ["right-click", "constellation"],
         desc: "Batch-link every note in a cluster to a chosen hub",
       },
