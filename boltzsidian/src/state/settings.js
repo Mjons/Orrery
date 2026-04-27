@@ -53,6 +53,11 @@ export const DEFAULT_SETTINGS = {
   // label instead of its individual star titles. Off = no named
   // regions; zoom behaviour on star labels is unchanged.
   show_constellations: true,
+  // Master switch for the dream loop. When false, sleep depth never
+  // rises on its own and Dream Now is a no-op — the universe just keeps
+  // running wake-mode physics. The Sleep Depth slider still works as a
+  // manual physics preview (it's diagnostic, not a trigger).
+  dream_enabled: true,
   // DREAM_GRAVITY.md — invisible wandering attractor during dream
   // mode that pulls bodies into curling arcs. Toggle off for a
   // quieter dream (no gravitational protagonist, just the loose
@@ -113,6 +118,11 @@ export const DEFAULT_SETTINGS = {
   // Phase 5 writes it through the pick flow. Dormant in Phase 1 —
   // present so later phases can read without migrating settings.
   workspace_manifest: null,
+  // SFX. Four cues live in /demo-vault/sfx — click, lock, transition,
+  // accent. On by default; volume kept low so they read as punctuation,
+  // not notification.
+  sfx_enabled: true,
+  sfx_volume: 0.35,
 };
 
 export function loadSettings() {

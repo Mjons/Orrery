@@ -541,3 +541,5 @@ thinking. That's the whole pitch. Everything in this doc is in service of
 that one sentence.
 
 #user #panel #phase
+
+[[TEND_BULK_RESET.md — Why does "Accept all" reset the page after ~150?]]

@@ -454,3 +454,5 @@ Phases 2–4 can ship in any order once Phase 1 lands. Phases 5 and 6 want the e
 The emergence substrate rides alongside: interaction matrix + curl-noise seeding land with Phase 2 (scenes need them); flocking + radiation pressure + supernovae land with Phase 3 (color needs them); "roll the dice" + time-reversal land with Phase 5 (sculpting needs them). Nothing about emergence waits until the end — if a phase lands without its emergence hook, the phase is incomplete.
 
 #phase #feature #done
+
+[[PULL_INTO_ORBIT.md — Click a node, type a word, attach everything that matches]]

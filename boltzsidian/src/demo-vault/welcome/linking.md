@@ -3,7 +3,7 @@ tags: [welcome, gesture]
 pinned: true
 position: [-162, -78, 8]
 tended_on: [tag-infer]
-id: 01KPSB443FDPRP9TVJD20ZHPWK
+id: 01J_welcome_linking
 created: "2026-04-22T00:25:47.349Z"
 ---
 
@@ -13,6 +13,6 @@ Connect two stars so they orbit each other. Two ways: type `[[` inside any note 
 
 **Try it:** press Esc, hold Alt, drag from me to any other star. A thin line appears between us.
 
-_See also: [[Start here]], [[New note]]_
+_See also: [[Start here]], [[New note]], [[hotkeys]]_
 
-#star #a
+#star

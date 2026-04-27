@@ -54,7 +54,7 @@ export function createSalienceLayer({
   getBodies,
   getDreamDepth,
   onSurface, // fired once per NEW surfaced idea
-  onChange, // fired on any surfaced-list mutation (promote/discard)
+  onChange: _onChangeRaw, // fired on any surfaced-list mutation (promote/discard)
   onPairSpawn, // optional — fires once per NEW candidate with the pair
   // midpoint. Used by the Phase 2 spark renderer in DREAM_ENGINE.md §11.9
   // to make bumps visible. Fires BEFORE the model call lands — the spark
@@ -77,6 +77,124 @@ export function createSalienceLayer({
   const surfaced = []; // currently surfaced, not yet promoted/discarded
   const allCandidates = []; // every candidate spawned this session (debug)
   const pairIndex = new Map(); // stable-pair-id → existing candidate
+
+  // Wrap the caller's onChange so every notification also schedules
+  // a persist write. Function declaration so the surrounding code's
+  // existing `if (onChange) onChange()` calls resolve to this hoisted
+  // version regardless of where they sit in the file.
+  function onChange() {
+    persistSurfaced();
+    if (_onChangeRaw) _onChangeRaw();
+  }
+
+  // Per-vault persistence. Surfaced ideas survive browser reload so a
+  // user who walked away mid-session can come back and still promote.
+  // Key is hashed on vault root ids so different workspaces don't share
+  // their lists. Saves are debounced — a flurry during finalizeCycle's
+  // bulk push only writes once. Promoted candidates are excluded
+  // (they've already become real notes; the candidate is bookkeeping).
+  const STORAGE_VERSION = 1;
+  let persistTimer = 0;
+  function getStorageKey() {
+    const v = typeof getVault === "function" ? getVault() : null;
+    const ids = (v?.roots || [])
+      .map((r) => r?.id || "")
+      .filter(Boolean)
+      .sort()
+      .join("|");
+    if (!ids) return null;
+    return `bz.salience.surfaced.v${STORAGE_VERSION}.${ids}`;
+  }
+  function persistSurfaced() {
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = setTimeout(writeSurfacedNow, 500);
+  }
+  function writeSurfacedNow() {
+    persistTimer = 0;
+    const key = getStorageKey();
+    if (!key) return;
+    try {
+      const payload = {
+        v: STORAGE_VERSION,
+        savedAt: Date.now(),
+        items: surfaced.filter((c) => !c.promoted).map(serializeCandidate),
+      };
+      if (payload.items.length === 0) {
+        localStorage.removeItem(key);
+      } else {
+        localStorage.setItem(key, JSON.stringify(payload));
+      }
+    } catch (err) {
+      console.warn("[bz] salience: persist failed", err);
+    }
+  }
+  function loadPersistedSurfaced() {
+    const key = getStorageKey();
+    if (!key) return;
+    let raw;
+    try {
+      raw = localStorage.getItem(key);
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    let payload;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      // Corrupted entry — drop it rather than poison the surface.
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+      return;
+    }
+    if (!payload || payload.v !== STORAGE_VERSION) return;
+    const vault = getVault?.();
+    if (!vault) return;
+    let dropped = 0;
+    for (const item of payload.items || []) {
+      const restored = deserializeCandidate(item, vault);
+      if (!restored) {
+        dropped++;
+        continue;
+      }
+      // Mirror the bookkeeping the live path maintains. pairIndex lets
+      // a re-spawn of the same pair update-in-place rather than
+      // duplicate. allCandidates is debug-only but keeping it
+      // consistent is cheap.
+      pairIndex.set(restored.id, restored);
+      surfaced.push(restored);
+      allCandidates.push(restored);
+    }
+    // Skip the persistSurfaced wrapper here — we just loaded these
+    // items, re-saving them is a no-op write. Notify the drawer
+    // directly so it picks up the restored ideas.
+    if (surfaced.length > 0 && _onChangeRaw) _onChangeRaw();
+    if (dropped > 0) {
+      console.info(
+        `[bz] salience: restored ${surfaced.length} dream idea${surfaced.length === 1 ? "" : "s"}, dropped ${dropped} (parent notes missing)`,
+      );
+    }
+  }
+  // Strip non-serializable bits (parent Note refs become id pointers;
+  // snap is regenerated lazily on demand and oversized for storage).
+  function serializeCandidate(c) {
+    return {
+      ...c,
+      parentA: { id: c.parentA?.id, title: c.parentA?.title },
+      parentB: { id: c.parentB?.id, title: c.parentB?.title },
+      snap: undefined,
+    };
+  }
+  // Reattach parent Note objects from the current vault. If either
+  // parent has been deleted since the save, drop the candidate —
+  // promoting an idea whose parents are gone makes no sense.
+  function deserializeCandidate(raw, vault) {
+    const parentA = vault.byId?.get(raw.parentA?.id);
+    const parentB = vault.byId?.get(raw.parentB?.id);
+    if (!parentA || !parentB) return null;
+    return { ...raw, parentA, parentB };
+  }
   // Pool = candidates generated during the current cycle that haven't
   // been judged yet. DREAM_ENGINE.md §11.3. Set to a live array when a
   // cycle begins (via beginCycle), null at all other times. When null,
@@ -551,6 +669,337 @@ export function createSalienceLayer({
     return surfaced.slice();
   }
 
+  // ── Quality filter (docs/MORNING_REPORT_QUALITY.md) ────────────
+  // Three of the six fixes funnel through here: compositional axis (D),
+  // specificity (B), verifiable next action (E). Fix A (negation-only
+  // counter) lives in runAdversary because it depends on the adversary
+  // output; Fix C is in the prompt; Fix F is in the drawer.
+  //
+  // Drops are silent (logged to console.debug for audit). Fewer, better
+  // outputs > more, mediocre.
+
+  const NEGATION_PREFIXES = [
+    "the claim",
+    "the evidence",
+    "this misapplies",
+    "this conflates",
+    "the pairing",
+    "the pair",
+    "ignoring that",
+    "this assumes",
+    "the model",
+  ];
+  const NEGATION_PHRASES = [
+    " does not ",
+    " doesn't ",
+    " do not ",
+    " don't ",
+    " did not ",
+    " didn't ",
+    " will not ",
+    " won't ",
+    " cannot ",
+    " can't ",
+    " isn't ",
+    " is not ",
+    " aren't ",
+    " are not ",
+    " falsely conflates",
+    " falsely ",
+    " misapplies ",
+    " mistakes ",
+    " confuses ",
+    " ignores that",
+    " they only prove",
+    " only proves ",
+    " only proves",
+    " no evidence that",
+  ];
+  function isNegationOnly(text) {
+    const t = String(text || "")
+      .toLowerCase()
+      .trim();
+    if (!t) return true;
+    for (const p of NEGATION_PREFIXES) if (t.startsWith(p)) return true;
+    for (const p of NEGATION_PHRASES) if (t.includes(p)) return true;
+    return false;
+  }
+
+  // Stopwords for the content-axis check — common English fillers that
+  // would otherwise let any two notes "share" words and slip through.
+  const AXIS_STOPWORDS = new Set([
+    "this",
+    "that",
+    "with",
+    "from",
+    "have",
+    "been",
+    "they",
+    "them",
+    "their",
+    "there",
+    "what",
+    "when",
+    "where",
+    "which",
+    "would",
+    "could",
+    "should",
+    "about",
+    "into",
+    "onto",
+    "after",
+    "before",
+    "some",
+    "more",
+    "than",
+    "then",
+    "also",
+    "just",
+    "only",
+    "very",
+    "much",
+    "most",
+    "such",
+    "even",
+    "still",
+    "every",
+    "other",
+    "another",
+    "these",
+    "those",
+    "thing",
+    "things",
+    "note",
+    "notes",
+  ]);
+
+  function contentTokens(note) {
+    const out = new Set();
+    const text = (note?.title || "") + " " + (note?.body || "");
+    const words = text.toLowerCase().match(/[a-z][a-z'-]{4,}/g) || [];
+    for (const w of words) if (!AXIS_STOPWORDS.has(w)) out.add(w);
+    return out;
+  }
+
+  // Generic / bookkeeping tags that describe note *type*, not content.
+  // Two notes both tagged "#reference" share metadata, not meaning —
+  // pairing them produces noise like "Caffeine Chart · Financial
+  // Projections" with the only axis being the literal tag string. Skip
+  // these when checking for a tag-axis or picking a warp.
+  const GENERIC_AXIS_TAGS = new Set([
+    "reference",
+    "index",
+    "draft",
+    "wip",
+    "todo",
+    "status",
+    "archive",
+    "meta",
+    "note",
+    "notes",
+    "scratch",
+    "inbox",
+    "log",
+    "doc",
+    "docs",
+  ]);
+
+  function hasMeaningfulSharedTag(parentA, parentB) {
+    const tagsA = new Set(
+      (parentA.tags || []).map((t) => String(t).toLowerCase()),
+    );
+    for (const raw of parentB.tags || []) {
+      const t = String(raw).toLowerCase();
+      if (tagsA.has(t) && !GENERIC_AXIS_TAGS.has(t)) return true;
+    }
+    return false;
+  }
+
+  function contentOverlap(parentA, parentB, threshold = 3) {
+    const tokensA = contentTokens(parentA);
+    if (tokensA.size === 0) return 0;
+    const tokensB = contentTokens(parentB);
+    let overlap = 0;
+    for (const w of tokensB) {
+      if (tokensA.has(w)) {
+        overlap++;
+        if (overlap >= threshold) return overlap;
+      }
+    }
+    return overlap;
+  }
+
+  // Two notes count as duplicates (or near-duplicates) when they
+  // shouldn't pair as an "insight" — they're either the same content
+  // copied across two project roots, or one already explicitly links
+  // to the other so the connection is established.
+  function looksLikeDuplicate(parentA, parentB) {
+    const titleA = String(parentA?.title || "")
+      .trim()
+      .toLowerCase();
+    const titleB = String(parentB?.title || "")
+      .trim()
+      .toLowerCase();
+    if (titleA && titleA === titleB) return true;
+    // Jaccard over content tokens — identical bodies score 1.0,
+    // unrelated notes typically < 0.2, real connections rarely > 0.5.
+    // 0.7 is the duplicate floor.
+    const tokensA = contentTokens(parentA);
+    const tokensB = contentTokens(parentB);
+    if (tokensA.size === 0 || tokensB.size === 0) return false;
+    let intersect = 0;
+    for (const w of tokensA) if (tokensB.has(w)) intersect++;
+    const union = tokensA.size + tokensB.size - intersect;
+    if (union > 0 && intersect / union > 0.7) return true;
+    return false;
+  }
+
+  function alreadyLinked(parentA, parentB) {
+    const bodyA = String(parentA?.body || "");
+    const bodyB = String(parentB?.body || "");
+    const titleA = String(parentA?.title || "").trim();
+    const titleB = String(parentB?.title || "").trim();
+    if (!titleA || !titleB) return false;
+    // Match `[[Title]]` and `[[Title|alias]]` forms.
+    const linkA = `[[${titleA}`;
+    const linkB = `[[${titleB}`;
+    if (bodyA.includes(linkB)) return true;
+    if (bodyB.includes(linkA)) return true;
+    return false;
+  }
+
+  function hasAxis(parentA, parentB) {
+    if (!parentA || !parentB) return false;
+    const meaningfulTag = hasMeaningfulSharedTag(parentA, parentB);
+    const folderA = (parentA.path || "").split("/")[0];
+    const folderB = (parentB.path || "").split("/")[0];
+    const sharedFolder = !!(folderA && folderA === folderB);
+    const sharedKind =
+      parentA.kind != null &&
+      parentB.kind != null &&
+      parentA.kind === parentB.kind;
+    const structuralAxis = meaningfulTag || sharedFolder || sharedKind;
+
+    // Cross-root pairs (different project roots in a multi-root
+    // workspace) need both a structural axis AND content overlap —
+    // otherwise we get nonsense bridges like a caffeine chart paired
+    // with a financial index because both happen to be "#reference."
+    const rootA = parentA.rootId;
+    const rootB = parentB.rootId;
+    const crossRoot = rootA && rootB && rootA !== rootB;
+    if (crossRoot) {
+      return structuralAxis && contentOverlap(parentA, parentB, 3) >= 3;
+    }
+    if (structuralAxis) return true;
+    // Same-root, no structural axis — content overlap alone (≥3
+    // shared content keywords) earns surfacing. This is what allows
+    // genuinely surprising cross-domain pairings to land.
+    return contentOverlap(parentA, parentB, 3) >= 3;
+  }
+
+  const ACTION_VERBS = new Set([
+    "add",
+    "link",
+    "create",
+    "write",
+    "rename",
+    "tag",
+    "move",
+    "delete",
+    "merge",
+    "split",
+    "extract",
+    "draft",
+    "note",
+    "connect",
+    "pair",
+  ]);
+  function hasVerifiableNext(candidate) {
+    const next = String(candidate.nextAction || "")
+      .toLowerCase()
+      .trim();
+    if (!next) return false;
+    const titleA = (candidate.parentA?.title || "").toLowerCase();
+    const titleB = (candidate.parentB?.title || "").toLowerCase();
+    const titleAnchored =
+      (titleA && next.includes(titleA)) || (titleB && next.includes(titleB));
+    const firstWord = (next.split(/\s+/)[0] || "").replace(/[^a-z]/g, "");
+    const verbAnchored = ACTION_VERBS.has(firstWord);
+    return titleAnchored || verbAnchored;
+  }
+
+  function computeSpecificity(candidate) {
+    const claim = String(candidate.claim || candidate.seedText || "").trim();
+    if (!claim) return 0;
+    const tokens = claim.match(/[A-Za-z][A-Za-z'-]{3,}/g) || [];
+    if (tokens.length === 0) return 0;
+    const corpus = [
+      candidate.parentA?.title || "",
+      candidate.parentA?.body || "",
+      candidate.parentB?.title || "",
+      candidate.parentB?.body || "",
+    ]
+      .join(" ")
+      .toLowerCase();
+    let hits = 0;
+    let entityHits = 0;
+    for (const tok of tokens) {
+      const lower = tok.toLowerCase();
+      if (corpus.includes(lower)) {
+        hits++;
+        if (/^[A-Z]/.test(tok)) entityHits++;
+      }
+    }
+    const claimNumbers = claim.match(/\b\d+(\.\d+)?\b/g) || [];
+    let numberHits = 0;
+    for (const n of claimNumbers) if (corpus.includes(n)) numberHits++;
+    const score =
+      (hits + entityHits * 0.5 + numberHits * 0.5) / Math.max(1, tokens.length);
+    return Math.min(1, score);
+  }
+
+  function qualityFilter(candidate) {
+    // Duplicate-style pairings (same title cross-root, ≥0.7 Jaccard
+    // body overlap) — these aren't insights, they're the user having
+    // copied the same note into two projects. Drop before the axis
+    // check so massive content overlap doesn't masquerade as signal.
+    if (looksLikeDuplicate(candidate.parentA, candidate.parentB)) {
+      return { drop: true, reason: "duplicate-like pair" };
+    }
+    // Already-linked pairs — the connection is established in the
+    // notes themselves. Surfacing it again is noise.
+    if (alreadyLinked(candidate.parentA, candidate.parentB)) {
+      return { drop: true, reason: "already linked" };
+    }
+    if (!hasAxis(candidate.parentA, candidate.parentB)) {
+      return { drop: true, reason: "no compositional axis" };
+    }
+    const spec = computeSpecificity(candidate);
+    candidate.specificity = spec;
+    if (spec < 0.15) {
+      return {
+        drop: true,
+        reason: `specificity too low (${spec.toFixed(2)})`,
+      };
+    }
+    if (!hasVerifiableNext(candidate)) {
+      return { drop: true, reason: "vague next action" };
+    }
+    return { drop: false };
+  }
+
+  function logDrop(verdict, candidate) {
+    if (typeof console !== "undefined" && console.debug) {
+      console.debug(
+        "[bz] salience: dropped —",
+        verdict.reason,
+        "—",
+        candidate.claim || candidate.seedText || "(no text)",
+      );
+    }
+  }
+
   // Pick salience top-K with diversity guard (no more than 2 from
   // any single parent). Writes into `surfaced`. Used as the sync
   // floor in finalizeCycle and as the fallback if the judge fails.
@@ -567,6 +1016,11 @@ export function createSalienceLayer({
       const countA = parentCount.get(pa) || 0;
       const countB = parentCount.get(pb) || 0;
       if (countA >= 2 || countB >= 2) continue;
+      const verdict = qualityFilter(c);
+      if (verdict.drop) {
+        logDrop(verdict, c);
+        continue;
+      }
       winners.push(c);
       if (pa) parentCount.set(pa, countA + 1);
       if (pb) parentCount.set(pb, countB + 1);
@@ -598,8 +1052,9 @@ export function createSalienceLayer({
     const picked = parsed.picks.map((i) => finalPool[i - 1]).filter(Boolean);
     if (picked.length === 0) return;
 
-    // Apply with the same diversity guard as salience path. Judge
-    // almost always respects it anyway but belt-and-suspenders.
+    // Apply with the same diversity + quality guards as the salience
+    // path. Judge almost always respects diversity anyway, but
+    // belt-and-suspenders, and quality filter is non-negotiable.
     const winners = [];
     const parentCount = new Map();
     for (const c of picked) {
@@ -609,6 +1064,11 @@ export function createSalienceLayer({
       const countA = parentCount.get(pa) || 0;
       const countB = parentCount.get(pb) || 0;
       if (countA >= 2 || countB >= 2) continue;
+      const verdict = qualityFilter(c);
+      if (verdict.drop) {
+        logDrop(verdict, c);
+        continue;
+      }
       winners.push(c);
       if (pa) parentCount.set(pa, countA + 1);
       if (pb) parentCount.set(pb, countB + 1);
@@ -658,6 +1118,24 @@ export function createSalienceLayer({
       candidate.adversaryReason = parsed.reason || "";
       candidate.adversaryBackend = result.backend;
     } else if (parsed.verdict === "replaced" && parsed.counter_claim) {
+      // Fix A (docs/MORNING_REPORT_QUALITY.md) — if the "counter" is
+      // pure negation ("X does not apply", "the claim conflates Y with
+      // Z"), it isn't a sharper reading; it's a refutation pretending
+      // to be one. Drop the entire candidate from surfaced — the
+      // original was weak enough to be replaced and the replacement
+      // doesn't stand on its own. Silence is correct.
+      if (isNegationOnly(parsed.counter_claim)) {
+        const i = surfaced.indexOf(candidate);
+        if (i >= 0) surfaced.splice(i, 1);
+        if (typeof console !== "undefined" && console.debug) {
+          console.debug(
+            "[bz] salience: dropped post-adversary — negation-only counter —",
+            parsed.counter_claim,
+          );
+        }
+        if (onChange) onChange();
+        return;
+      }
       // Counter becomes the new claim. Evidence carries over (same
       // passages, sharper reading). "next" can be replaced too if the
       // counter provided one.
@@ -669,6 +1147,16 @@ export function createSalienceLayer({
       candidate.adversaryReason = parsed.reason || "";
       candidate.adversaryBackend = result.backend;
       candidate.seedBackend = result.backend;
+      // The new claim+next must still pass the quality gate. If the
+      // replacement is vague or unverifiable, drop the candidate.
+      const verdict2 = qualityFilter(candidate);
+      if (verdict2.drop) {
+        const i = surfaced.indexOf(candidate);
+        if (i >= 0) surfaced.splice(i, 1);
+        logDrop(verdict2, candidate);
+        if (onChange) onChange();
+        return;
+      }
     } else {
       return;
     }
@@ -949,6 +1437,12 @@ export function createSalienceLayer({
     if (onChange) onChange();
   }
 
+  // Restore any surfaced ideas saved from prior sessions of THIS
+  // vault. Runs once at init — the layer is recreated on workspace
+  // switch, so each switch gets its own load. Drift handling drops
+  // candidates whose parent notes were deleted in the meantime.
+  loadPersistedSurfaced();
+
   return {
     getSurfaced,
     getAllCandidates,
@@ -971,6 +1465,13 @@ export function createSalienceLayer({
     dispose: () => {
       stopPlaying();
       stop();
+      // Final flush of any debounced write before the layer dies, so
+      // a workspace switch doesn't lose the last few mutations to a
+      // pending timer.
+      if (persistTimer) {
+        clearTimeout(persistTimer);
+        writeSurfacedNow();
+      }
     },
   };
 }

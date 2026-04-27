@@ -25,6 +25,11 @@ export function createNotePanel({
   onDelete, // async (note) => void — delete the note from disk + vault.
   // Caller is responsible for the native confirm() and for closing
   // the panel; we just call this when the user clicks the button.
+  onToggleHush, // async (note, next: boolean) => void — flip the
+  // note's `hushed: true` frontmatter flag. Caller writes through the
+  // saver, removes/adds the body in the field, and shows a toast.
+  // See docs/HUSH.md.
+  modelFace,
 }) {
   const panel = document.getElementById("note-panel");
   const titleEl = panel.querySelector(".panel-title");
@@ -36,6 +41,7 @@ export function createNotePanel({
   const projectBtn = panel.querySelector(".panel-project");
   const weaveBtn = panel.querySelector(".panel-weave");
   const deleteBtn = panel.querySelector(".panel-delete");
+  const hushBtn = panel.querySelector(".panel-hush");
   const statusEl = panel.querySelector(".panel-status");
   const resizeHandle = panel.querySelector(".panel-resize-handle");
   const suggestionsPanel = panel.querySelector(".panel-suggestions");
@@ -176,6 +182,14 @@ export function createNotePanel({
       reflectPin(next);
     });
   }
+  if (hushBtn) {
+    hushBtn.addEventListener("click", () => {
+      if (!current || !onToggleHush) return;
+      const next = !(current.frontmatter && current.frontmatter.hushed);
+      onToggleHush(current, next);
+      reflectHush(next);
+    });
+  }
   if (deleteBtn) {
     deleteBtn.addEventListener("click", async () => {
       if (!current || !onDelete) return;
@@ -202,6 +216,18 @@ export function createNotePanel({
       const label = pinned ? "Unpin note" : "Pin note";
       pinBtn.setAttribute("aria-label", label);
       pinBtn.title = label;
+    }
+  }
+
+  function reflectHush(hushed) {
+    panel.dataset.hushed = hushed ? "true" : "false";
+    if (hushBtn) {
+      hushBtn.textContent = hushed ? "live" : "hush";
+      const label = hushed
+        ? "Bring this note back into the field"
+        : "Hush — hide from the field, keep the file";
+      hushBtn.setAttribute("aria-label", label);
+      hushBtn.title = label;
     }
   }
 
@@ -338,6 +364,7 @@ export function createNotePanel({
     paintTitle(note, note.title || "Untitled");
     metaEl.innerHTML = buildMeta(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
+    reflectHush(!!(note.frontmatter && note.frontmatter.hushed));
     reflectProject(shapeOf(note));
     renderConnections(note);
   }
@@ -352,6 +379,7 @@ export function createNotePanel({
     lastSavedText = note.rawText || "";
     refreshHeader(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
+    reflectHush(!!(note.frontmatter && note.frontmatter.hushed));
     reflectProject(shapeOf(note));
     setMode(openMode);
     panel.classList.add("open");
@@ -669,6 +697,7 @@ export function createNotePanel({
   function setMode(next) {
     if (next !== "read" && next !== "edit") return;
     if (!current) return;
+    const wasMode = mode;
     mode = next;
     panel.dataset.mode = next;
     modeBtn.textContent = next === "edit" ? "Read" : "Edit";
@@ -678,6 +707,8 @@ export function createNotePanel({
       bodyEl.scrollTop = 0;
     } else {
       mountEditor(current);
+      // Wince when entering edit mode — the observer braces for impact.
+      if (wasMode !== "edit" && modelFace) modelFace.react("wince");
     }
   }
 
@@ -835,6 +866,7 @@ export function createNotePanel({
     if (!current || current !== note) return;
     refreshHeader(note);
     reflectPin(!!(note.frontmatter && note.frontmatter.pinned));
+    reflectHush(!!(note.frontmatter && note.frontmatter.hushed));
     reflectProject(shapeOf(note));
     if (mode === "read") bodyEl.innerHTML = renderBody(note);
   }

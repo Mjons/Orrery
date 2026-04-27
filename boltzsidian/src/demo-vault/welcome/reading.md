@@ -1,12 +1,11 @@
 ---
 tags: [welcome, gesture]
-pinned: true
-position: [180, 0, 10]
 tended_on: [tag-infer]
-id: 01KPTB0T8WVWHZKNFZAYG2CBV9
+id: 01J_welcome_reading
 created: "2026-04-22T00:24:09.691Z"
+pinned: true
+position: [183.43, 2.21, 202.29]
 ---
-
 
 # Reading
 
@@ -14,7 +13,6 @@ Click any star to open its contents in a panel on the right. Close with **Esc** 
 
 **Try it:** press Esc now, then click any other star.
 
-_See also: [[Start here]]_
-
+_See also: [[Start here]], [[hotkeys]]_
 
 #star

@@ -30,6 +30,7 @@ export function initSettings({
   onShowAbout,
   onReshowTagPrompt,
   onResetCoachmarks,
+  onReplayFirstRun,
   onResetDemo,
   onSwitchDemo,
   onDreamNow,
@@ -179,6 +180,15 @@ export function initSettings({
         After the app is idle for a while, Sleep Depth ramps up; physics
         loosens, the chorus quiets, and captions are logged for a morning
         report. Move the mouse to wake up.
+      </p>
+      <label class="settings-row">
+        <span>Enabled</span>
+        <input type="checkbox" id="s-dream-enabled" />
+      </label>
+      <p class="settings-hint">
+        Master switch. Off = the universe never falls asleep on its own
+        and Dream Now does nothing. The Sleep depth slider below still
+        works as a manual physics preview.
       </p>
       <label class="settings-row">
         <span>Sleep depth</span>
@@ -463,6 +473,9 @@ export function initSettings({
         <button type="button" id="s-reset-coachmarks" class="ghost">
           Reset coachmarks
         </button>
+        <button type="button" id="s-replay-first-run" class="ghost">
+          Replay first-run tour
+        </button>
         <button type="button" id="s-about" class="ghost">About</button>
       </div>
     </section>
@@ -575,6 +588,14 @@ export function initSettings({
     const { state, phase, depth } = s;
     let label;
     let flag;
+    const enabled = getSettings().dream_enabled !== false;
+    if (!enabled && state === "wake") {
+      label = "DISABLED";
+      flag = "off";
+      dreamStatusEl.textContent = label;
+      dreamStatusEl.dataset.state = flag;
+      return;
+    }
     if (state === "wake") {
       label = "OFF · idle";
       flag = "off";
@@ -601,6 +622,7 @@ export function initSettings({
   const sleepCapVal = pane.querySelector("#s-sleep-cap-val");
   const idleMin = pane.querySelector("#s-idle-min");
   const dreamNowBtn = pane.querySelector("#s-dream-now");
+  const dreamEnabledToggle = pane.querySelector("#s-dream-enabled");
   const dreamGravityToggle = pane.querySelector("#s-dream-gravity");
   const dreamGravityStrength = pane.querySelector("#s-dream-gravity-strength");
   const dreamGravityStrengthVal = pane.querySelector(
@@ -636,6 +658,12 @@ export function initSettings({
   if (resetCoachBtn && onResetCoachmarks) {
     resetCoachBtn.addEventListener("click", () => {
       onResetCoachmarks();
+    });
+  }
+  const replayFirstRunBtn = pane.querySelector("#s-replay-first-run");
+  if (replayFirstRunBtn && onReplayFirstRun) {
+    replayFirstRunBtn.addEventListener("click", () => {
+      onReplayFirstRun();
     });
   }
   if (aboutBtn && onShowAbout) {
@@ -693,6 +721,11 @@ export function initSettings({
   if (dreamNowBtn) {
     dreamNowBtn.addEventListener("click", () => {
       if (onDreamNow) onDreamNow();
+    });
+  }
+  if (dreamEnabledToggle) {
+    dreamEnabledToggle.addEventListener("change", () => {
+      onChange({ dream_enabled: dreamEnabledToggle.checked });
     });
   }
   if (dreamGravityToggle) {
@@ -796,6 +829,9 @@ export function initSettings({
     sleepCap.value = String(capV);
     sleepCapVal.textContent = capV.toFixed(2);
     idleMin.value = String(settings.idle_minutes_to_dream || 10);
+    if (dreamEnabledToggle) {
+      dreamEnabledToggle.checked = settings.dream_enabled !== false;
+    }
     if (dreamGravityToggle) {
       dreamGravityToggle.checked = settings.dream_gravity !== false;
     }

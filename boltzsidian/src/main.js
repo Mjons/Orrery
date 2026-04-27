@@ -37,7 +37,9 @@ import { createWeavePicker } from "./ui/weave-picker.js";
 import { scanWeave } from "./layers/weave.js";
 import { createPickDebug } from "./ui/pick-debug.js";
 import { createSearch } from "./ui/search.js";
+import { createSfx } from "./ui/sfx.js";
 import { createLinkDrag } from "./ui/link-drag.js";
+import { createBodyDrag } from "./ui/body-drag.js";
 import { openVault } from "./vault/vault.js";
 import {
   parseManifest,
@@ -67,6 +69,15 @@ import { initSettings } from "./ui/settings.js";
 import { createNotePanel } from "./ui/note-panel.js";
 import { toast } from "./ui/toast.js";
 import { loadSettings, saveSettings } from "./state/settings.js";
+import {
+  getActSeen,
+  markActReached,
+  recordWelcomeStarOpened,
+  recordUserLinkCreated,
+  resetFirstRun,
+  GRADUATE_THRESHOLD,
+  RETURNING_LINK_THRESHOLD,
+} from "./state/first-run.js";
 import { ensurePermission } from "./vault/fs.js";
 import {
   restoreWorkspace,
@@ -118,12 +129,15 @@ import {
   deleteNoteFile,
 } from "./layers/weed.js";
 import { createWeedDrawer } from "./ui/weed-drawer.js";
+import { createHushedDrawer } from "./ui/hushed-drawer.js";
 import { createBrief } from "./ui/brief.js";
 import { writeDreamLog } from "./layers/dream-log.js";
 import { createUtteranceRouter } from "./layers/utterance/index.js";
 import { showPayloadPreview } from "./ui/payload-preview.js";
 import { createModelFace } from "./ui/model-face.js";
+import { initPanelWatcher } from "./ui/panel-watcher.js";
 import { createDreamBanner } from "./ui/dream-banner.js";
+import { createDreamFaceMotion } from "./ui/dream-face-motion.js";
 
 const TAG_PROMPT_KEY = "boltzsidian.tag_prompt.seen.v1";
 
@@ -196,6 +210,7 @@ let physics = null;
 let tethers = null;
 let sparks = null;
 let linkDrag = null;
+let bodyDrag = null;
 let kmatrix = null;
 let formations = null;
 let formationsRail = null;
@@ -205,6 +220,7 @@ let captions = null;
 let hover = null;
 let dream = null;
 let salienceLayer = null;
+let dreamFaceMotion = null;
 let ideasDrawer = null;
 // Live-tunable salience params. v1 uses the defaults; the `Shift+S`
 // palette mutates this object in place, which takes effect on the next
@@ -223,6 +239,12 @@ let tagPromptActive = false;
 
 const settings = loadSettings();
 applyAccent(settings.accent);
+
+// SFX router — the four cues in /demo-vault/sfx. Wired below at four
+// sites: click on user-initiated note open, lock when a link batch
+// commits, transition when a dream cycle starts, accent when the
+// salience layer surfaces an idea.
+const sfx = createSfx({ getSettings: () => settings });
 
 // Suppress coachmarks while the user is exploring the `welcome` demo —
 // its notes already teach every gesture the coachmarks would point at.
@@ -250,6 +272,10 @@ applyUtteranceBackendSetting(settings.utterance_backend);
 const modelFace = createModelFace();
 utterance.onGenerateStart((p) => modelFace.onGenerateStart(p));
 utterance.onGenerateResult((p) => modelFace.onGenerateResult(p));
+// Watches the five side panels and toggles `body.panels-left-open` /
+// `body.panels-right-open` so the model-face CSS can dodge whichever
+// side is busy. See ui/panel-watcher.js.
+initPanelWatcher();
 
 // Dream banner — polls the dream controller every ~120 ms and paints
 // phase name + progress + live depth at the top of the viewport. Only
@@ -384,6 +410,16 @@ const settingsUI = initSettings({
     coachmarks.resetAll();
     toast("Coachmarks reset — they'll appear again on the next action.");
   },
+  onReplayFirstRun: () => {
+    resetFirstRun();
+    coachmarks.resetAll();
+    try {
+      localStorage.removeItem(WELCOME_SEEN_KEY);
+    } catch {}
+    toast("First-run tour reset. Open the welcome card to replay it.", {
+      duration: 4000,
+    });
+  },
   onResetDemo: async () => {
     if (workspaceKind !== "demo") return;
     try {
@@ -423,6 +459,7 @@ const settingsUI = initSettings({
       return;
     }
     dream.dreamNow();
+    sfx.play("transition");
     toast("Dreaming — move the mouse to wake up early.", { duration: 2500 });
   },
   onDreamPreview: () => {
@@ -590,9 +627,6 @@ const notePanel = createNotePanel({
     if (bodies) bodies.setSelected(null);
     activeNoteId = null;
     if (hoverOrbit) hoverOrbit.setTarget(null);
-    // The observer face slides back to its home side when no note is
-    // open — CSS handles the swap via body.note-open.
-    document.body.classList.remove("note-open");
     if (modelFace) modelFace.lookAt(null, null);
     returnCamera();
   },
@@ -600,6 +634,7 @@ const notePanel = createNotePanel({
   onSave: handleSave,
   onTogglePin: handleTogglePin,
   onToggleProject: handleToggleProject,
+  onToggleHush: handleToggleHushed,
   // WEAVE.md — open the picker on the current note. Starts with
   // the defaults (same-root on, no prefix); the user can toggle
   // scope from inside the modal.
@@ -613,6 +648,7 @@ const notePanel = createNotePanel({
   // deleteNoteFile removes the file on disk via FS Access removeEntry,
   // then removeNoteEverywhere scrubs vault indices + body pool + physics
   // edges + tethers and closes the panel if it was showing this note.
+  modelFace,
   onDelete: async (note) => {
     if (!note || !vault) return;
     // Phase 3C: delete lands on the note's SOURCE root — not
@@ -636,6 +672,7 @@ const notePanel = createNotePanel({
       return;
     }
     removeNoteEverywhere(note.id);
+    if (modelFace) modelFace.react("delete");
     toast(`Deleted ${note.path}`, { duration: 3000 });
   },
 });
@@ -646,7 +683,75 @@ const search = createSearch({
   getBodies: () => bodies,
   onArc: (worldPos) => focusCamera(worldPos),
   onOpen: (noteId) => openNote(noteId),
+  // CONNECT_QUERY.md v1 — verb-prefixed input ("connect …")
+  // resolves to a candidate set in the strip, then commits via this
+  // hook so the apply path lives next to applyBatchLink and shares
+  // the saver / graph-rebuild plumbing.
+  onConnectQuery: (planSnapshot) => applyConnectQuery(planSnapshot),
+  modelFace,
+  // SLASH_COMMANDS.md v1 — five commands. /help is provided by the
+  // search module itself; everything below is wired through main.js
+  // because the verbs touch app-wide state (vault, dream, formations).
+  commands: [
+    {
+      name: "new",
+      args: "[title]",
+      description: "Create a new note. Opens the editor.",
+      run: (rest) => createNewNote({ title: rest }),
+    },
+    {
+      name: "dream",
+      args: "",
+      description: "Kick off a dream cycle now.",
+      run: () => {
+        if (dream?.dreamNow) {
+          dream.dreamNow();
+          sfx.play("transition");
+        } else toast("Dream engine not ready.");
+      },
+    },
+    {
+      name: "formation",
+      args: "<name>",
+      description: "Apply a formation: halo · protostars · galactic-core.",
+      run: (rest) => applyFormationByName(rest),
+    },
+    {
+      name: "clear",
+      args: "",
+      description: "Clear all formations.",
+      run: () => {
+        if (formations) formations.set("all");
+      },
+    },
+  ],
 });
+
+// /formation → fuzzy-match the typed name against the FORMATIONS list.
+// Excludes solo-folder, which needs a folder argument and isn't
+// reachable via a single-word /formation call in v1.
+function applyFormationByName(raw) {
+  if (!formations) {
+    toast("Formations not ready.");
+    return;
+  }
+  const q = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+  if (!q) {
+    toast("Pick a formation: halo · protostars · galactic-core.");
+    return;
+  }
+  const ids = ["halo", "protostars", "galactic-core"];
+  const found =
+    ids.find((id) => id === q) || ids.find((id) => id.startsWith(q));
+  if (!found) {
+    toast(`No formation matches "${raw}".`);
+    return;
+  }
+  formations.set(found);
+}
 
 // ── Ideas drawer + noticed pill ─────────────────────────────
 // Created once; the DOM is always present. Handlers read salienceLayer
@@ -893,6 +998,15 @@ const weedDrawer = createWeedDrawer({
   },
 });
 
+// Hushed drawer (HUSH.md) — list of notes the user has quieted.
+// Restore flips the frontmatter and respawns the body via the same
+// handleToggleHushed handler the per-note button uses.
+const hushedDrawer = createHushedDrawer({
+  getVault: () => vault,
+  onRestore: (note) => handleToggleHushed(note, false),
+  onOpenNote: (noteId) => openNote(noteId),
+});
+
 // Brief — "where you are" panel on workspace open. One-shot per load,
 // dismissable on esc or any nav key.
 const brief = createBrief({
@@ -910,13 +1024,24 @@ function removeNoteEverywhere(noteId) {
     notePanel.close();
   }
   removeNoteFromVault(vault, noteId);
-  if (bodies?.removeBody) bodies.removeBody(noteId);
-  if (physics) physics.rebuildEdges();
-  if (tethers) tethers.rebuild();
-  if (search?.invalidate) search.invalidate();
-  updateStatsHud();
-  stateDirty = true;
-  persistStateSoon();
+  // Brief explode animation then the actual body removal. Physics +
+  // tethers rebuild on completion so they happen exactly once after
+  // the body is gone.
+  const finishDelete = () => {
+    if (physics) physics.rebuildEdges();
+    if (tethers) tethers.rebuild();
+    if (search?.invalidate) search.invalidate();
+    updateStatsHud();
+    stateDirty = true;
+    persistStateSoon();
+  };
+  if (bodies?.explodeBody) bodies.explodeBody(noteId, finishDelete);
+  else if (bodies?.removeBody) {
+    bodies.removeBody(noteId);
+    finishDelete();
+  } else {
+    finishDelete();
+  }
 }
 
 // Load candidates from .universe/prune-candidates.json, subtract the
@@ -1794,6 +1919,27 @@ async function setWorkspace(ws) {
       onCreate: (srcId, dstId) => createLink(srcId, dstId),
     });
 
+    // Phase 0.5 — bare-left drag a body to a new position. Required
+    // precondition for the soft-hold + anchor work that follows. See
+    // docs/PLACEMENT_BUILD.md.
+    bodyDrag = createBodyDrag({
+      canvas,
+      camera,
+      controls,
+      bodies,
+      onRelease: (noteId, finalPos) => {
+        // Rebuild physics edges so any anchored children re-resolve
+        // around the moved body next frame. Tethers also need a
+        // refresh because their endpoints may have moved.
+        if (physics) physics.rebuildEdges();
+        if (tethers) tethers.rebuild();
+        // Mark dirty so persistState captures the new position on
+        // its next debounce.
+        stateDirty = true;
+        persistStateSoon();
+      },
+    });
+
     // Hover controller — drives cursor, gesture hint, and the hover rings
     // on bodies + tethers. Rebuild per workspace so it sees the current
     // bodies/tethers references.
@@ -1802,7 +1948,7 @@ async function setWorkspace(ws) {
       canvas,
       bodies,
       tethers,
-      getIsDragging: () => linkDrag?.isActive,
+      getIsDragging: () => linkDrag?.isActive || bodyDrag?.isActive,
     });
 
     formations = createFormations({
@@ -1945,6 +2091,14 @@ async function setWorkspace(ws) {
     updateSleepHud(0);
     onFrame((dt) => dream && dream.tick(dt));
 
+    // DREAM_FACE.md v1 floor — couple avatar scale/opacity/tilt to
+    // dream depth via three CSS custom properties on #model-face.
+    // Wake transition is hold-then-settle (400ms freeze, 800ms ease
+    // home). Disposed on workspace switch so the rAF loop doesn't
+    // double up.
+    if (dreamFaceMotion) dreamFaceMotion.dispose?.();
+    dreamFaceMotion = createDreamFaceMotion({ dream });
+
     // Salience layer — produces candidate child ideas during dream cycles.
     // Depends on bodies (for positions), vault (for affinities), and
     // dream depth (to gate when it runs).
@@ -1988,6 +2142,7 @@ async function setWorkspace(ws) {
         // the pill in the top-right is the wake-time indicator. Dream-time
         // surfaces reach the morning report via salienceLayer.getSurfaced().
         updateNoticedPill();
+        sfx.play("accent");
       },
       onChange: () => {
         updateNoticedPill();
@@ -2042,6 +2197,7 @@ async function setWorkspace(ws) {
           newName ? `Renamed region to "${newName}"` : "Region name cleared",
           { duration: 2000 },
         );
+        if (newName && modelFace) modelFace.react("constellation-confirmed");
       },
       onBatchLinkRequest: (cluster) => {
         if (!batchLinkPicker) return;
@@ -2369,6 +2525,8 @@ async function handleSave(note, rawText) {
   // First successful edit in the app's lifetime unlocks the next coachmark.
   coachmarks.markSeen("cmd-n");
   coachmarks.schedule("alt-drag");
+  // Quick acknowledgement blink.
+  if (modelFace) modelFace.react("save");
   return result;
 }
 
@@ -2393,6 +2551,7 @@ function handleNoteChanged(note, { renameResult }) {
       { duration: 3500 },
     );
   }
+  if (renameResult?.renamed && modelFace) modelFace.react("rename");
 }
 
 // State persistence is batched — a rapid burst of edits shouldn't thrash
@@ -2426,12 +2585,15 @@ function persistState() {
 }
 
 // ── N: new note ─────────────────────────────────────────────
-function createNewNote() {
+function createNewNote(opts = {}) {
   if (!vault || !saver) {
     toast("Open a workspace first.");
     return;
   }
   if (!bodies) return;
+
+  const rawTitle = typeof opts.title === "string" ? opts.title.trim() : "";
+  const title = rawTitle || "Untitled";
 
   // MULTI_PROJECT_PLAN.md Phase 3E — new notes always land in writeRoot.
   // Path uniqueness is scoped to the writeRoot's notes only so two
@@ -2443,14 +2605,14 @@ function createNewNote() {
       .filter((n) => !n.rootId || n.rootId === writeRootId)
       .map((n) => n.path),
   );
-  const path = uniquePath("", titleToStem("Untitled"), taken);
+  const path = uniquePath("", titleToStem(title), taken);
   const note = makeEmptyNote({
     path,
-    title: "Untitled",
+    title,
     settings,
     rootId: writeRootId,
   });
-  const seed = "# Untitled\n\n";
+  const seed = `# ${title}\n\n`;
   note.body = seed;
   note.rawText = seed;
 
@@ -2506,6 +2668,13 @@ async function createLink(srcId, dstId) {
     if (tethers) tethers.rebuild();
     stateDirty = true;
     persistStateSoon();
+
+    // Self-link or back-to-back link of two notes that already share a
+    // chain → "weird-link" reaction. Otherwise: confirmed-link settle.
+    if (modelFace) {
+      const weird = src.id === dst.id || vault.forward.get(dst.id)?.has(src.id);
+      modelFace.react(weird ? "weird-link" : "link-confirmed");
+    }
 
     coachmarks.markSeen("alt-drag");
     coachmarks.schedule("right-click");
@@ -2640,6 +2809,81 @@ async function handleToggleProject(note, nextShape) {
   }
 }
 
+// Hush a note (or un-hush). Writes `hushed: true` + `hushed_at` to
+// the frontmatter, removes (or re-adds) the body from the field, and
+// shows a toast with an Undo action so the change feels instant but
+// reversible. See docs/HUSH.md.
+async function handleToggleHushed(note, nextHushed) {
+  if (!saver || !note) return;
+  const fm = { ...(note.frontmatter || {}) };
+  fm.id = fm.id || note.id;
+  if (!fm.created)
+    fm.created = new Date(note.mtime || Date.now()).toISOString();
+  // Remember the body's current position so an Undo (or future un-hush)
+  // can respawn it where the user left it. Saved to frontmatter so the
+  // position survives reload too.
+  let savedPos = null;
+  if (nextHushed) {
+    fm.hushed = true;
+    fm.hushed_at = new Date().toISOString();
+    const p = bodies && bodies.positionOf(note.id);
+    if (p) {
+      savedPos = [round(p[0]), round(p[1]), round(p[2])];
+      fm.hushed_position = savedPos;
+    }
+  } else {
+    delete fm.hushed;
+    delete fm.hushed_at;
+    delete fm.hushed_reason;
+    savedPos = Array.isArray(fm.hushed_position) ? fm.hushed_position : null;
+    delete fm.hushed_position;
+  }
+  const nextText = stringifyFrontmatter(fm, note.body);
+  try {
+    await saver(note, nextText);
+  } catch (err) {
+    console.error("[bz] hush toggle failed", err);
+    toast("Could not update hush.");
+    return;
+  }
+  if (nextHushed) {
+    // Tiny implode animation, then the actual removal. Edges +
+    // tethers + search rebuild on the onComplete callback so they
+    // happen exactly once after the body is gone.
+    const finishHush = () => {
+      if (physics) physics.rebuildEdges();
+      if (tethers) tethers.rebuild();
+      if (search?.invalidate) search.invalidate();
+      if (hushedDrawer) hushedDrawer.refresh();
+      updateStatsHud();
+    };
+    if (bodies) bodies.implodeBody(note.id, finishHush);
+    else finishHush();
+    // Close the panel if it was showing this note — the body is gone,
+    // and the user can find the note again from the Hushed drawer.
+    if (activeNoteId === note.id) notePanel.close();
+    toast.actions(`Hushed "${note.title || note.path}".`, [
+      {
+        label: "Undo",
+        kind: "primary",
+        onClick: () => handleToggleHushed(note, false),
+      },
+    ]);
+  } else {
+    // Un-hushing — respawn the body at its saved position (or origin
+    // if we never recorded one).
+    const pos = savedPos || [0, 0, 0];
+    if (bodies) bodies.addBody(note, pos);
+    if (physics) physics.rebuildEdges();
+    if (tethers) tethers.rebuild();
+    if (search?.invalidate) search.invalidate();
+    if (hushedDrawer) hushedDrawer.refresh();
+    toast(`Restored "${note.title || note.path}".`, { duration: 2000 });
+  }
+  if (modelFace) modelFace.react("save");
+  updateStatsHud();
+}
+
 async function handleTogglePin(note, nextPinned) {
   if (!saver) return;
   const fm = { ...(note.frontmatter || {}) };
@@ -2680,9 +2924,6 @@ function openNote(noteId, { mode = "read", skipFocusSnapshot = false } = {}) {
   // center of its own little system. Cleared on panel close.
   activeNoteId = noteId;
   if (hoverOrbit) hoverOrbit.setTarget(noteId);
-  // Slide the observer face to the right so it doesn't sit under the
-  // note panel, and aim its pupils at the focused body.
-  document.body.classList.add("note-open");
   const pos = bodies.positionOf(noteId);
   if (pos) {
     if (skipFocusSnapshot) {
@@ -2705,7 +2946,35 @@ function openNote(noteId, { mode = "read", skipFocusSnapshot = false } = {}) {
   if (!skipFocusSnapshot) {
     coachmarks.markSeen("click-to-open");
     coachmarks.schedule("cmd-n");
+    sfx.play("click");
+    maybeFireGraduateNudge(noteId);
   }
+}
+
+// First-run flow: inside the welcome demo, count unique stars opened.
+// On the GRADUATE_THRESHOLD-th unique open, surface the "ready to point
+// at your own folder?" coachmark with an action button that opens the
+// FS picker. Fires at most once per user — see FIRST_RUN_FLOW.md §3.2
+// and FIRST_RUN_BUILD.md FR3.
+function maybeFireGraduateNudge(noteId) {
+  if (workspaceKind !== "demo" || getDemoTheme() !== "welcome") return;
+  if (getActSeen() >= 3) return;
+  const count = recordWelcomeStarOpened(noteId);
+  if (count < GRADUATE_THRESHOLD) return;
+  coachmarks.schedule("graduate-to-own", {
+    duration: 20000,
+    onAction: async () => {
+      try {
+        const ws = await pickUserWorkspace();
+        markActReached(3);
+        await setWorkspace(ws);
+      } catch (err) {
+        if (err && err.name === "AbortError") return;
+        console.error("[bz] graduate pick failed:", err);
+        toast(err.message ?? "Could not open folder.");
+      }
+    },
+  });
 }
 
 function focusNote(noteId) {
@@ -2836,6 +3105,189 @@ async function applyBatchLink(cluster, target) {
     .filter(Boolean)
     .join(" · ");
   toast(summary, { duration: 4500 });
+  if (written > 0) sfx.play("lock");
+}
+
+// CONNECT_QUERY.md v1 — clique apply path. Each note in the
+// candidate set gets `[[other]]` appended for every other member.
+// Reuses the same composeBatchLinkToken / saver pipeline as
+// applyBatchLink, so collision-proof tokens, read-only declines,
+// and graph rebuilds all behave identically. Returns nothing; the
+// toast carries the summary plus an Undo button (BATCH_UNDO.md
+// Horizon 1 — in-memory diff stack, 30s window).
+async function applyConnectQuery(plan) {
+  if (!vault || !saver || !plan) return;
+  const notes = Array.isArray(plan.notes) ? plan.notes.filter(Boolean) : [];
+  if (notes.length < 2) return;
+
+  // Flush any in-progress edit on the panel so its dirty buffer
+  // doesn't clobber the batch writes on the next autosave tick.
+  if (notePanel.isDirty?.()) notePanel.flushSave();
+
+  // Per-note diff: { noteId, before, after }. Stored on apply so
+  // the toast's Undo button can reverse cleanly even if the saver
+  // is asynchronous about its writes hitting disk.
+  const diffs = [];
+  let written = 0;
+  let alreadyLinked = 0;
+  let readOnlySkipped = 0;
+  let failed = 0;
+
+  for (const source of notes) {
+    if (!source || source._isPhantom) continue;
+    const others = notes.filter((n) => n && n.id !== source.id);
+    if (others.length === 0) continue;
+    const result = appendBatchLinksToBody(source, others, vault);
+    if (!result || result.nextText === source.rawText) {
+      alreadyLinked++;
+      continue;
+    }
+    try {
+      const saved = await saver(source, result.nextText);
+      if (saved?.applied) {
+        written++;
+        diffs.push({
+          noteId: source.id,
+          before: source.rawText,
+          after: result.nextText,
+        });
+      } else if (saved?.reason === "read-only") {
+        readOnlySkipped++;
+      } else {
+        failed++;
+      }
+    } catch (err) {
+      console.warn("[bz] connect-query write failed for", source.path, err);
+      failed++;
+    }
+  }
+
+  if (physics) physics.rebuildEdges();
+  if (tethers) tethers.rebuild();
+  if (search?.invalidate) search.invalidate();
+  updateStatsHud();
+
+  const totalEdges = diffs.length; // one diff entry per source note (each entry holds N-1 link tokens)
+  if (totalEdges === 0) {
+    const summary = [
+      "Connect-query made no new links",
+      alreadyLinked && `${alreadyLinked} already linked`,
+      readOnlySkipped && `${readOnlySkipped} read-only`,
+      failed && `${failed} failed`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    toast(summary, { duration: 4000 });
+    return;
+  }
+
+  const noun = written === 1 ? "note" : "notes";
+  const summary = [
+    `Cliqued ${written} ${noun}`,
+    alreadyLinked && `${alreadyLinked} already linked`,
+    readOnlySkipped && `${readOnlySkipped} read-only`,
+    failed && `${failed} failed`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  toast.actions(
+    summary,
+    [
+      {
+        label: "Undo",
+        kind: "primary",
+        onClick: () => reverseConnectQuery(diffs),
+      },
+    ],
+    { duration: 30000 },
+  );
+  sfx.play("lock");
+}
+
+// BATCH_UNDO.md Horizon 1 — replay each diff in reverse. Drift
+// handling: if a satellite has been edited since apply (current
+// rawText !== diff.after), skip it and surface in the summary so
+// the user knows their later edits were preserved.
+async function reverseConnectQuery(diffs) {
+  if (!vault || !saver || !Array.isArray(diffs) || diffs.length === 0) return;
+
+  if (notePanel.isDirty?.()) notePanel.flushSave();
+
+  let reverted = 0;
+  let drifted = 0;
+  let failed = 0;
+  for (const d of diffs) {
+    const note = vault.byId.get(d.noteId);
+    if (!note) {
+      drifted++;
+      continue;
+    }
+    if (note.rawText !== d.after) {
+      drifted++;
+      continue;
+    }
+    try {
+      const saved = await saver(note, d.before);
+      if (saved?.applied) reverted++;
+      else failed++;
+    } catch (err) {
+      console.warn("[bz] connect-query undo failed for", note.path, err);
+      failed++;
+    }
+  }
+
+  if (physics) physics.rebuildEdges();
+  if (tethers) tethers.rebuild();
+  if (search?.invalidate) search.invalidate();
+  updateStatsHud();
+
+  const noun = reverted === 1 ? "note" : "notes";
+  const parts = [`Reverted ${reverted} ${noun}`];
+  if (drifted) parts.push(`${drifted} edited since, left as-is`);
+  if (failed) parts.push(`${failed} failed`);
+  toast(parts.join(" · "), { duration: 4500 });
+}
+
+// CONNECT_QUERY.md — multi-target variant of appendBatchLinkToBody.
+// Walks `targets`, skipping any that are already linked (forward
+// graph) or already wikilinked in the body (regex match), and
+// appends the surviving tokens as a single block at the body end.
+// Returns `{ nextText, addedIds }`. If no tokens survive,
+// `nextText === note.rawText` so the caller can treat it as
+// already-linked.
+function appendBatchLinksToBody(note, targets, vault) {
+  const addedIds = [];
+  const tokens = [];
+  const body = note.body || "";
+  // Pre-compute the regex per target so we can detect existing
+  // mentions. Targets that are already linked (forward graph) skip
+  // the regex check entirely — graph is authoritative.
+  const forward = vault?.forward?.get(note.id);
+  for (const target of targets) {
+    if (!target || target.id === note.id) continue;
+    if (forward && forward.has(target.id)) continue;
+    const escTitle = escapeRegExp(target.title || "");
+    const escId = escapeRegExp(target.id || "");
+    const alt = [escTitle, escId].filter(Boolean).join("|");
+    if (!alt) continue;
+    const re = new RegExp(
+      `\\[\\[\\s*(${alt})\\s*(?:\\|[^\\]]*)?\\s*\\]\\]`,
+      "i",
+    );
+    if (re.test(body)) continue;
+    tokens.push(composeBatchLinkToken(target, vault));
+    addedIds.push(target.id);
+  }
+  if (tokens.length === 0) {
+    return { nextText: note.rawText, addedIds };
+  }
+  const trimmed = body.replace(/\s+$/, "");
+  const sep = trimmed ? "\n\n" : "";
+  const newBody = `${trimmed}${sep}${tokens.join("\n")}\n`;
+  const fmMatch = note.rawText.match(/^---[\s\S]*?\n---\s*\n/);
+  const nextText = fmMatch ? fmMatch[0] + newBody : newBody;
+  return { nextText, addedIds };
 }
 
 // Compose a wikilink token for batch writes. If the target's title
@@ -2972,26 +3424,59 @@ onFrame((dt, t) => {
 });
 
 // Camera auto-orbit while dreaming. Slow yaw around the current target
-// when depth > 0.2, no user tween active, no panel open — i.e. no one is
-// looking but the mode. See DREAM.md §1 "Camera: auto-orbit + drift".
-// DREAM_GRAVITY.md adds a second term: the orbit target lerps toward
-// the attractor so the viewpoint drifts along with the cluster that's
-// being pulled, instead of rotating around an empty point.
+// when depth > 0.2 and no hard locks are active. See DREAM.md §1
+// "Camera: auto-orbit + drift". DREAM_GRAVITY.md adds a second term:
+// the orbit target lerps toward the attractor so the viewpoint drifts
+// along with the cluster that's being pulled, instead of rotating
+// around an empty point.
+//
+// Hard locks (orbit fully blocked):
+//   - camTween: a user-initiated camera ease is in flight; honour it.
+//   - linkDrag.isActive: dragging a tether — orbit would tilt the
+//     drag axis under the user's hand.
+//
+// Soft lock (orbit runs at reduced speed):
+//   - notePanel.isOpen(): the user is reading. Stillness is good for
+//     reading prose, but ZERO motion forever made the dream feel dead
+//     when the user kept a note open across the cycle. 30% speed
+//     keeps the universe quietly alive without disturbing the read.
+//
+// `window.__dreamOrbitGate` returns the current gate state so a power
+// user can paste it into the console to diagnose "why isn't this
+// orbiting" — cheap diagnostic, never logs unless asked.
+let _lastOrbitGate = "uninitialised";
+window.__dreamOrbitGate = () => _lastOrbitGate;
 const _dreamOrbit = new THREE.Vector3();
 onFrame((dt) => {
-  if (!dream) return;
+  if (!dream) {
+    _lastOrbitGate = "no dream module";
+    return;
+  }
   const depth = dream.getDepth();
-  if (depth < 0.2) return;
-  if (camTween) return;
-  if (notePanel.isOpen()) return;
-  if (linkDrag && linkDrag.isActive) return;
+  if (depth < 0.2) {
+    _lastOrbitGate = `depth ${depth.toFixed(2)} < 0.2`;
+    return;
+  }
+  if (camTween) {
+    _lastOrbitGate = "camTween active";
+    return;
+  }
+  if (linkDrag && linkDrag.isActive) {
+    _lastOrbitGate = "linkDrag active";
+    return;
+  }
+  const panelOpen = notePanel.isOpen();
+  const speedScale = panelOpen ? 0.3 : 1.0;
+  _lastOrbitGate = panelOpen
+    ? `running (panel open, 0.3×) depth=${depth.toFixed(2)}`
+    : `running depth=${depth.toFixed(2)}`;
 
   // DREAM_GRAVITY.md §"First cut" point 5 — orbit target rides the
   // attractor's current position, weighted by depth so the pull is
   // subtle when drifting off and strong at peak generating.
   const att = physics?.getAttractor?.();
   if (att?.active) {
-    const k = Math.min(1, 0.3 * depth * dt);
+    const k = Math.min(1, 0.3 * depth * dt * speedScale);
     const target = controls.target;
     target.x += (att.position[0] - target.x) * k;
     target.y += (att.position[1] - target.y) * k;
@@ -2999,7 +3484,7 @@ onFrame((dt) => {
   }
 
   // Rotate camera position around controls.target, on the Y axis.
-  const yaw = 0.035 * depth * dt;
+  const yaw = 0.035 * depth * dt * speedScale;
   _dreamOrbit.copy(camera.position).sub(controls.target);
   const cos = Math.cos(yaw);
   const sin = Math.sin(yaw);
@@ -3125,6 +3610,39 @@ window.addEventListener("keydown", (e) => {
       return;
     }
     keywordLinkPicker?.open?.({});
+    if (modelFace) modelFace.react("link-picker");
+    return;
+  }
+
+  // Cmd/Ctrl+Shift+H → hush the currently focused note (or un-hush
+  // if it's already hushed). Same priority as the keyword-link picker
+  // so the hotkey works even when the editor has focus. See HUSH.md.
+  if (
+    (e.metaKey || e.ctrlKey) &&
+    e.shiftKey &&
+    (e.key === "h" || e.key === "H")
+  ) {
+    e.preventDefault();
+    const note = activeNoteId ? vault?.byId?.get(activeNoteId) : null;
+    if (!note) {
+      toast("Open a note first.");
+      return;
+    }
+    const next = !(note.frontmatter && note.frontmatter.hushed);
+    handleToggleHushed(note, next);
+    return;
+  }
+
+  // Cmd/Ctrl+Shift+U → open the Hushed drawer. Toggles closed if
+  // already open. (U for "unhide / hUshed" — H is taken by per-note
+  // hush above.)
+  if (
+    (e.metaKey || e.ctrlKey) &&
+    e.shiftKey &&
+    (e.key === "u" || e.key === "U")
+  ) {
+    e.preventDefault();
+    hushedDrawer?.toggle();
     return;
   }
 
@@ -3149,6 +3667,7 @@ window.addEventListener("keydown", (e) => {
       // produces a morning report.
       if (dream) {
         dream.dreamNow();
+        sfx.play("transition");
         toast("Dreaming — move the mouse to wake up early.", {
           duration: 2500,
         });
@@ -3162,6 +3681,7 @@ window.addEventListener("keydown", (e) => {
         salienceLayer,
         onOpenIdeas: () => ideasDrawer?.open(),
       });
+      if (modelFace) modelFace.react("morning-bow");
     }
     return;
   }
@@ -3220,6 +3740,17 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "f" || e.key === "F") {
     e.preventDefault();
     if (filterBar) filterBar.focus();
+  }
+
+  // M — mute / unmute the SFX router. Persisted via the standard
+  // settings flow so the choice survives a reload. Silent on toggle —
+  // the toast carries the state so the user has feedback without an
+  // extra cue stepping on the action.
+  if (e.key === "m" || e.key === "M") {
+    e.preventDefault();
+    settings.sfx_enabled = !settings.sfx_enabled;
+    saveSettings(settings);
+    toast(settings.sfx_enabled ? "SFX on" : "SFX muted", { duration: 1600 });
   }
 
   // WEAVE.md — Shift+O opens the weave picker on the currently

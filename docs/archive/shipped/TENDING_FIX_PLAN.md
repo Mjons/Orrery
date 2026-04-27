@@ -1,8 +1,14 @@
 ---
-tended_on: ["obvious-link:01KPTWFK2AFEGK7SBDQD5V9HGX", "obvious-link:01KPS7VD7K6WKG085QCSXDVHJS", fm-normalise]
+tended_on:
+  [
+    "obvious-link:01KPTWFK2AFEGK7SBDQD5V9HGX",
+    "obvious-link:01KPS7VD7K6WKG085QCSXDVHJS",
+    fm-normalise,
+  ]
 id: 01KPTWFKXNNVRCHH6958NA986D
 created: "2026-04-22T15:12:14.607Z"
 ---
+
 # TENDING_FIX_PLAN.md — The work plan
 
 Follows from the diagnosis in

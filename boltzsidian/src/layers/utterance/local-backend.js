@@ -132,10 +132,20 @@ Rules:
 - evidence_a: a CONTIGUOUS substring of note A's excerpt, copied EXACTLY. 4–20 words. Pick the phrase that most directly supports the claim. If no phrase in the excerpt really supports the claim, output an empty string "" — do not paraphrase, do not stitch.
 - evidence_b: same rules against note B's excerpt. 4–20 words, literal, exact.
 - next: ONE sentence, ≤ 16 words. A concrete thing the user could do with this idea — write a new note, add a link, revise a decision, re-read something. Not fluffy ("think about this"). Actionable.
-- No essay register. Banned words: "recurring," "personification," "manifestation," "suggests that," "serves to," "highlights the," "illustrates," "embodies," "speaks to."
+- VOICE: a friend at a desk with the user, not an academic writing a paper. Specific, human, plain. First person ("you've got X over here, Y over there...") is welcome. Imagine you've just noticed something interesting about the two notes and you're saying it out loud, conversationally. Particularly prized: the kind of observation that combines two seemingly unrelated ideas into one specific insight the user wouldn't have made themselves.
+- No essay register. Banned words: "recurring," "personification," "manifestation," "suggests that," "serves to," "highlights the," "illustrates," "embodies," "speaks to." Banned constructions: "the gap between X and Y", "X and Y together claim", "the relationship between X and Y", "X juxtaposed with Y", any sentence whose verb is "claim" or "assert" with the two notes as subject.
 - Never invent vault content beyond what's in the excerpts / slots.
 - Never prescribe outside the "next" field.
 - No mystical, cosmic, or aphoristic register.
+- NEVER reference the Boltzsidian system, the dream cycle, your run time, when you were invoked, note staleness, "tonight", "this morning", "the hour", or any temporal metadata about how long ago notes were edited or how long until something happens *outside* the notes themselves. The notes' content is your only source. (Astronomy notes naturally talk about cosmic timescales — that's content, not system metadata. The disallowed register is system-clock-aware language like "this hour" or "two days stale.")
+
+More example outputs (study the voice):
+
+{"claim":"binoculars do the wide search; the 25mm Plossl picks up where they leave off — same workflow, two tools.","evidence_a":"Finding things before setting up the big scope","evidence_b":"the one I drop in when I'm trying to locate something","next":"add a link from Binoculars to the Eyepieces section about finder eyepieces."}
+
+{"claim":"you write about Cepheid variables when explaining distance and supernovae when explaining time — the same ladder seen from two stairs.","evidence_a":"the second rung of the cosmic distance ladder","evidence_b":"Nothing visible in our galaxy since","next":"add a 'distance vs time' link from Cepheid variable to Supernova."}
+
+{"claim":"two different problems, same fix: the editor decision and the file-system decision both bet on the user granting one big permission once.","evidence_a":"started being the daily driver","evidence_b":"user grants once","next":"link CodeMirror 6 and File System Access under a 'one-time grant' note."}
 
 Example output:
 
@@ -734,7 +744,10 @@ function buildIdeaSeedUserPrompt(snapshot) {
     parts.push(`A folder: ${snapshot.a_folder}`);
   if (snapshot.b_folder && !snapshot.shared_folder)
     parts.push(`B folder: ${snapshot.b_folder}`);
-  if (snapshot.age_gap) parts.push(`age gap: ${snapshot.age_gap}`);
+  // age_gap deliberately omitted — the model was reading it as
+  // content ("older than an hour", "two days stale") and inventing
+  // system-clock language with no place in the claim. See
+  // docs/MORNING_REPORT_QUALITY.md Fix C.
   const slots = parts.length > 0 ? parts.join(" · ") : "no grounded slots";
 
   const lines = [
@@ -905,7 +918,10 @@ function buildIdeaRewordUserPrompt(snapshot) {
     parts.push(`A folder: ${snapshot.a_folder}`);
   if (snapshot.b_folder && !snapshot.shared_folder)
     parts.push(`B folder: ${snapshot.b_folder}`);
-  if (snapshot.age_gap) parts.push(`age gap: ${snapshot.age_gap}`);
+  // age_gap deliberately omitted — the model was reading it as
+  // content ("older than an hour", "two days stale") and inventing
+  // system-clock language with no place in the claim. See
+  // docs/MORNING_REPORT_QUALITY.md Fix C.
   const slots = parts.length > 0 ? parts.join(" · ") : "no grounded slots";
   return `The dream is playing with an earlier thought. Reword it — same pair, different angle.\n\nOriginal: ${original}\n\nSlots: ${slots}`;
 }

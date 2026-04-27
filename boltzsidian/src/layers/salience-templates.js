@@ -184,28 +184,47 @@ function excerptFor(note) {
   return words.slice(0, EXCERPT_MAX_WORDS).join(" ") + "…";
 }
 
+// Generic / bookkeeping tags excluded from warp candidates — see
+// salience-layer.js GENERIC_AXIS_TAGS for the full rationale. "#reference
+// loud tonight" is meaningless to the model and led to garbage claims
+// pairing two reference docs by their tag rather than their content.
+const GENERIC_WARP_TAGS = new Set([
+  "reference",
+  "index",
+  "draft",
+  "wip",
+  "todo",
+  "status",
+  "archive",
+  "meta",
+  "note",
+  "notes",
+  "scratch",
+  "inbox",
+  "log",
+  "doc",
+  "docs",
+]);
+
 // Enumerate the slots of a note that are legal warp candidates. Warp
 // never invents content — only ever re-highlights something that's
-// already true about the note. Currently: each real tag, the top-level
-// folder, and a coarse age-class label. Extend here when new per-note
-// slots become available.
+// already true about the note. Currently: each non-generic tag and
+// the top-level folder. Extend here when new per-note slots become
+// available.
 function describeWarpCandidates(note, folder) {
   const out = [];
   if (Array.isArray(note.tags)) {
-    for (const t of note.tags) if (t) out.push(`tag → #${t}`);
+    for (const t of note.tags) {
+      if (!t) continue;
+      if (GENERIC_WARP_TAGS.has(String(t).toLowerCase())) continue;
+      out.push(`tag → #${t}`);
+    }
   }
   if (folder) out.push(`folder → ${folder}`);
-  if (note.mtime) {
-    const days = (Date.now() - note.mtime) / (1000 * 60 * 60 * 24);
-    let label;
-    if (days < 1) label = "fresh";
-    else if (days < 3) label = "a couple of days stale";
-    else if (days < 8) label = "about a week stale";
-    else if (days < 21) label = "weeks stale";
-    else if (days < 60) label = "a month or two stale";
-    else label = "months stale";
-    out.push(`age → ${label}`);
-  }
+  // age intentionally NOT a warp candidate — the model was reading the
+  // picked label ("a couple of days stale") as content and writing it
+  // verbatim into the claim. See docs/MORNING_REPORT_QUALITY.md Fix C.
+  // Tags + folders are user content; mtime is system telemetry.
   return out;
 }
 

@@ -97,10 +97,18 @@ export function createDream({
       15_000,
       (Number(settings.idle_minutes_to_dream) || 10) * 60_000,
     );
+    const dreamEnabled = settings.dream_enabled !== false;
+
+    // Master kill-switch. If dreaming is disabled mid-cycle, fire the
+    // wake ramp so depth returns to 0 and phase listeners get their
+    // cleanup pass — same shape as a normal wake, just user-triggered.
+    if (!dreamEnabled && (state === "falling" || state === "dreaming")) {
+      beginWake("dream disabled");
+    }
 
     // ── State transitions ────────────────────────────────
     if (state === "wake") {
-      if (t - idleSince > idleMs) enterFalling();
+      if (dreamEnabled && t - idleSince > idleMs) enterFalling();
       target = 0;
     } else if (state === "falling") {
       // Ramp depth up to the warming phase's starting target. Once we
@@ -194,6 +202,10 @@ export function createDream({
   // user experiences the real dream shape, not a compressed test. Moving
   // the mouse still wakes it early.
   function dreamNow() {
+    if (getSettings().dream_enabled === false) {
+      pushEvent("dream now (disabled)", depth);
+      return;
+    }
     if (state === "dreaming" || state === "falling") {
       pushEvent("dream now (already dreaming)", depth);
       graceUntil = now() + DREAM_NOW_GRACE_MS;

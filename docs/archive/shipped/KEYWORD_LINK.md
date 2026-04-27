@@ -2,6 +2,7 @@
 id: 01KR0000KEYWORDLINK000000
 created: 2026-04-22
 ---
+
 # KEYWORD_LINK.md — Wrap every mention of a keyword as a wikilink to a picked target
 
 Sibling to [[BATCH_LINK]]. BATCH_LINK scopes selection by
@@ -60,7 +61,7 @@ target." KEYWORD_LINK fills it.
 6. User reviews, unchecks one false-positive, clicks **Apply**.
 7. App runs the write loop at Chill pace (250 ms per file).
 8. Toast summary: `Linked 11 mentions of "pipeline" to [[Pipeline
-   V2]] · 1 skipped by you · 1 already linked`.
+V2]] · 1 skipped by you · 1 already linked`.
 
 Done. No note panel opened, no file hand-edited.
 
@@ -369,7 +370,7 @@ For discoverability. Same modal.
 ### Phase A — Core matcher · ~1 h
 
 1. New pure helper `wrapKeywordInBody(body, { keyword,
-   targetToken, caseSensitive }) → { nextBody, matches }` in
+targetToken, caseSensitive }) → { nextBody, matches }` in
    `src/layers/keyword-link.js` (new module).
 2. Excluded-regions scrub (code fences / inline code / wikilinks /
    markdown links / URLs / frontmatter).
@@ -379,8 +380,8 @@ For discoverability. Same modal.
 ### Phase B — Vault scan + preview data · ~1 h
 
 1. `scanVaultForKeyword(vault, { keyword, targetId, scope,
-   caseSensitive }) → { matches: [{ note, occurrences }],
-   alreadyLinked: [...] }`.
+caseSensitive }) → { matches: [{ note, occurrences }],
+alreadyLinked: [...] }`.
 2. Builds the list of (note, per-paragraph byte offsets).
 3. Filters self-link + already-linked (unless user opted in).
 4. Pure — no writes.
@@ -397,7 +398,7 @@ For discoverability. Same modal.
 ### Phase D — Apply loop · ~45 min
 
 1. `applyKeywordLink(selection, target, saver) → { written,
-   skipped, readOnly, failed }`.
+skipped, readOnly, failed }`.
 2. Reuses `isBulkInProgress` + abort flag from
    TEND_BULK_CONCURRENCY.
 3. Respects `tend_bulk_pace` (yields at user's preferred

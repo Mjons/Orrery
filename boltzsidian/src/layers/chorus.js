@@ -51,6 +51,12 @@ export function createChorus({
   let lastEmitAt = 0;
   let tickHandle = 0;
   let lastShouldEmit = false;
+  let lastDreamDepth = 0;
+  // Short tail when the dream wakes — dream-mode lifetimes can run
+  // 20–40s, which leaves bubbles stuck on screen long after the field
+  // has gone quiet. On wake transitions, we cap remaining lifetime to
+  // this so the bubbles fade with the dream.
+  const WAKE_FADE_MS = 1500;
   // Phase 7: one in-flight utterance at a time. A Claude or WebLLM call
   // may take ~700 ms; without this guard, a second tick could fire a
   // parallel request before the first lands.
@@ -85,6 +91,22 @@ export function createChorus({
     const settings = getSettings();
     const d = dreamDepth();
     const shouldEmit = enabled || d > 0.1;
+
+    // Wake transition — when dream depth drops back near zero, retro-
+    // shorten any in-flight observers' lifetimes so the bubbles fade
+    // with the dream instead of lingering for another 20–40 seconds.
+    // (Dream-mode lifetimes are scaled by `(1 + d * 2)`, so without
+    // this they outlive the dream by a long way.)
+    if (lastDreamDepth > 0.3 && d < 0.1) {
+      const now = Date.now();
+      for (const o of active) {
+        const remaining = o.lifetime - (now - o.bornAt);
+        if (remaining > WAKE_FADE_MS) {
+          o.lifetime = now - o.bornAt + WAKE_FADE_MS;
+        }
+      }
+    }
+    lastDreamDepth = d;
 
     // If we just stopped being eligible to emit (e.g. waking up from a
     // dream while the user's toggle is off), clear active so the DOM
@@ -247,12 +269,21 @@ export function createChorus({
     tick();
   }
 
+  // Manual dismiss — called by the captions UI when the user clicks
+  // the × on a bubble. Removes the observer from active so the caption
+  // renderer fades it on its next tick.
+  function dismiss(observerId) {
+    const i = active.findIndex((o) => o.id === observerId);
+    if (i >= 0) active.splice(i, 1);
+  }
+
   return {
     setEnabled,
     isEnabled: () => enabled,
     getActive: () => active,
     getBuffer: () => buffer.slice(),
     forceEmit,
+    dismiss,
     templateCount: TEMPLATES.length,
   };
 }

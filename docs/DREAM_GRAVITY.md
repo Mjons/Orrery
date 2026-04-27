@@ -2,7 +2,7 @@
 
 Sibling to [DREAM.md](DREAM.md) and [DREAM_ENGINE.md](DREAM_ENGINE.md).
 DREAM.md specifies the _mood_ of sleep (physics looseness, tether fade,
-ambience). DREAM_ENGINE.md specifies the _cognitive cycle_ (warming →
+ambience). DREAM*ENGINE.md specifies the \_cognitive cycle* (warming →
 generating → playing → discerning). This doc specifies the **visual
 spectacle** — what the user watches while the engine thinks.
 

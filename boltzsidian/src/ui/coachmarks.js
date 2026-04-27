@@ -35,6 +35,17 @@ const LIBRARY = {
   pin: {
     text: "Pin the open note to freeze its orbit.",
   },
+  // First-run graduation. Fires inside the welcome demo when the user
+  // has opened ~5 stars — the engagement signal that they've grasped
+  // the model and are ready to point at their own folder. Unlike every
+  // other coachmark, this one bypasses the welcome-vault suppression
+  // because the welcome vault is exactly the place it should fire. See
+  // FIRST_RUN_FLOW.md §3.2 and FIRST_RUN_BUILD.md FR3.
+  "graduate-to-own": {
+    text: "You've got the hang of this. Ready to see your own notes as a sky?",
+    actionLabel: "Open my folder",
+    bypassWelcomeSuppression: true,
+  },
 };
 
 function loadDismissed() {
@@ -53,6 +64,7 @@ export function createCoachmarks({ isSuppressed = () => false } = {}) {
   const dismissed = loadDismissed();
   const queue = [];
   let currentId = null;
+  let currentOptions = null;
   let host = null;
   let hideTimer = 0;
 
@@ -69,21 +81,36 @@ export function createCoachmarks({ isSuppressed = () => false } = {}) {
       </div>
       <span class="cm-arrow"></span>
     `;
-    host
-      .querySelector(".cm-dismiss")
-      .addEventListener("click", () => dismissCurrent());
+    host.querySelector(".cm-dismiss").addEventListener("click", () => {
+      // If the active coachmark carries an action (e.g. "Open my folder"),
+      // run it before dismissing. Failure of the action must still let
+      // the coachmark close — don't trap the user in it.
+      const mark = currentId ? LIBRARY[currentId] : null;
+      const onAction = currentOptions?.onAction;
+      if (mark?.actionLabel && typeof onAction === "function") {
+        try {
+          onAction();
+        } catch (err) {
+          console.error("[bz] coachmark action failed:", err);
+        }
+      }
+      dismissCurrent();
+    });
     document.body.appendChild(host);
     return host;
   }
 
   function schedule(id, options = {}) {
-    if (!LIBRARY[id]) return false;
+    const mark = LIBRARY[id];
+    if (!mark) return false;
     if (dismissed.has(id)) return false;
     // In the welcome tutorial vault, the vault IS the coachmark — the
     // user is reading stars whose job is to teach the same gestures
     // these tooltips would. Double-instructing is noise. See
-    // ONBOARDING.md §9.
-    if (isSuppressed(id)) return false;
+    // ONBOARDING.md §9. Marks tagged `bypassWelcomeSuppression` are
+    // the documented exception (the graduation nudge is *meant* to
+    // fire there).
+    if (isSuppressed(id) && !mark.bypassWelcomeSuppression) return false;
     if (currentId === id || queue.some((q) => q.id === id)) return false;
     queue.push({ id, options });
     flush();
@@ -103,8 +130,22 @@ export function createCoachmarks({ isSuppressed = () => false } = {}) {
     if (!mark) return;
     ensureHost();
     currentId = id;
+    currentOptions = options;
 
     host.querySelector(".cm-text").textContent = mark.text;
+
+    // If the mark carries an action (e.g. graduate-to-own), the dismiss
+    // button doubles as the CTA. Otherwise it's the standard ✓.
+    const btn = host.querySelector(".cm-dismiss");
+    if (mark.actionLabel) {
+      btn.textContent = mark.actionLabel;
+      btn.setAttribute("aria-label", mark.actionLabel);
+      btn.classList.add("cm-action");
+    } else {
+      btn.textContent = "✓";
+      btn.setAttribute("aria-label", "Dismiss");
+      btn.classList.remove("cm-action");
+    }
 
     // Position — either anchored to an element's bounding rect or the
     // bottom-centre of the viewport. The anchor can be a DOM node, a
@@ -127,6 +168,7 @@ export function createCoachmarks({ isSuppressed = () => false } = {}) {
     }
     host.classList.remove("show");
     currentId = null;
+    currentOptions = null;
     if (hideTimer) {
       clearTimeout(hideTimer);
       hideTimer = 0;

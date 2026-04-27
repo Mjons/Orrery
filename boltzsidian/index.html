@@ -564,7 +564,8 @@
       }
       #note-panel .panel-pin,
       #note-panel .panel-project,
-      #note-panel .panel-weave {
+      #note-panel .panel-weave,
+      #note-panel .panel-hush {
         background: transparent;
         border: 1px solid var(--glass-border);
         color: var(--text-faint);
@@ -575,11 +576,26 @@
         cursor: pointer;
         font-family: inherit;
       }
+      #note-panel .panel-hush {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 5px 8px;
+      }
       #note-panel .panel-pin:hover,
       #note-panel .panel-project:hover,
-      #note-panel .panel-weave:hover {
+      #note-panel .panel-weave:hover,
+      #note-panel .panel-hush:hover {
         color: var(--accent);
         border-color: rgba(138, 180, 255, 0.5);
+      }
+      /* Hushed notes are invisible from the field — but the panel can
+       * still be opened from the Hushed drawer. The button label flips
+       * to "live" so the user sees the inverse action. */
+      #note-panel[data-hushed="true"] .panel-hush {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.5);
+        background: rgba(138, 180, 255, 0.08);
       }
       #note-panel[data-pinned="true"] .panel-pin {
         color: var(--accent);
@@ -1667,6 +1683,127 @@
         background: rgba(198, 102, 100, 0.08);
       }
 
+      /* ── Hushed drawer (left side, mirrors Weed shape) ───── */
+      #hushed-drawer {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 460px;
+        max-width: 92vw;
+        background: var(--glass-strong);
+        backdrop-filter: blur(22px) saturate(140%);
+        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        border-right: 1px solid var(--glass-border);
+        transform: translateX(-100%);
+        transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        z-index: 28;
+      }
+      #hushed-drawer.open {
+        transform: translateX(0);
+      }
+      #hushed-drawer .drawer-head {
+        padding: 22px 24px 14px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      #hushed-drawer .drawer-title {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin: 0 0 6px;
+      }
+      #hushed-drawer .drawer-sub {
+        font-size: 12px;
+        color: var(--text-faint);
+        margin: 0;
+        max-width: 320px;
+        line-height: 1.45;
+      }
+      #hushed-drawer .drawer-close {
+        margin-left: auto;
+        background: transparent;
+        border: none;
+        color: var(--text-faint);
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 4px;
+      }
+      #hushed-drawer .drawer-close:hover {
+        color: var(--text);
+      }
+      #hushed-drawer .drawer-empty {
+        padding: 18px 24px;
+        font-size: 12px;
+        color: var(--text-faint);
+      }
+      #hushed-drawer.has-items .drawer-empty {
+        display: none;
+      }
+      #hushed-drawer .hushed-list {
+        flex: 1 1 auto;
+        overflow-y: auto;
+      }
+      #hushed-drawer .hushed-row {
+        padding: 12px 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      #hushed-drawer .hushed-row[data-state="applying"] {
+        opacity: 0.4;
+        pointer-events: none;
+      }
+      #hushed-drawer .hushed-title {
+        color: var(--text);
+        text-decoration: none;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        font-size: 13px;
+      }
+      #hushed-drawer .hushed-title:hover {
+        color: var(--accent);
+      }
+      #hushed-drawer .hushed-path {
+        font-size: 11px;
+        color: var(--text-faint);
+      }
+      #hushed-drawer .hushed-meta {
+        font-size: 11px;
+        color: var(--text-dim);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        line-height: 1.45;
+      }
+      #hushed-drawer .hushed-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      #hushed-drawer .hushed-btn {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: var(--text-dim);
+        font-family: inherit;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      #hushed-drawer .hushed-btn:hover {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.45);
+      }
+
       /* ── Brief panel (centred glass, non-modal) ─────────── */
       /* Shown once on workspace open when brief_on_open. Unlike the
        * modal overlays above, Brief does NOT paint a scrim — the
@@ -1824,13 +1961,23 @@
         height: 70vmin;
         z-index: 3; /* behind bodies/tethers/UI, above starfield */
         pointer-events: none;
-        opacity: 0.5;
+        /* Baseline 0.5 multiplied by dream-driven opacity. ui/dream-
+         * face-motion.js dips the multiplier on the trough of the
+         * dream breath so the face gets quieter when the dream
+         * deepens. Defaults to 1 when the loop isn't running. */
+        opacity: calc(0.5 * var(--mface-dream-opacity, 1));
         /* Base tilt + a small extra rotation that tracks the user's
          * focus. JS updates --mface-look-tilt (±3°) every frame so the
-         * face appears to lean slightly toward whatever you're doing. */
-        transform: rotate(
-          calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg))
-        );
+         * face appears to lean slightly toward whatever you're doing.
+         * Dream phase additionally drives a slow scale breath and a
+         * tilt oscillation via two more custom properties. */
+        transform: scale(var(--mface-dream-scale, 1))
+          rotate(
+            calc(
+              var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg) +
+                var(--mface-dream-tilt-osc, 0deg)
+            )
+          );
         transform-origin: 70% 60%;
         /* Tilt-shift — top and bottom fade to transparent so the face
          * reads as a slice of a larger field, not a disk in a box. */
@@ -1863,7 +2010,7 @@
           filter 600ms ease;
         /* Slow hue drift so the face never reads as the same static
          * object. Resets on backend change via a class toggle in JS. */
-        animation: mface-huecycle 90s ease-in-out infinite;
+        animation: mface-huecycle 180s ease-in-out infinite;
       }
       /* Amorphous cloud behind the face features. Stack of radial
        * gradients that each breathe on their own phase — the
@@ -1911,17 +2058,44 @@
             transparent 60%
           );
         filter: blur(18px);
-        animation: mface-cloud-breathe 11s ease-in-out infinite;
+        animation: mface-cloud-breathe 22s ease-in-out infinite;
       }
-      /* Note panel lives on the right; face slides to the right
-       * quadrant so it sits just behind / beside the reader instead
-       * of being squeezed off-screen on the opposite side. */
-      body.note-open #model-face {
+      /* Side-panel avoidance. The face dodges whichever side is busy
+       * so the reader isn't covered. Body classes are toggled by
+       * ui/panel-watcher.js based on which of the five side panels
+       * are open.
+       *
+       *   right-only open  → face stays on the LEFT (default)
+       *   left-only open   → face moves to the RIGHT
+       *   both open        → face shrinks and drops to lower centre
+       */
+      body.panels-left-open:not(.panels-right-open) #model-face {
         left: auto;
         right: -8vmin;
-        transform: rotate(
-          calc(var(--mface-tilt, 14deg) * -1 + var(--mface-look-tilt, 0deg))
-        );
+        transform: scale(var(--mface-dream-scale, 1))
+          rotate(
+            calc(
+              var(--mface-tilt, 14deg) * -1 + var(--mface-look-tilt, 0deg) +
+                var(--mface-dream-tilt-osc, 0deg)
+            )
+          );
+      }
+      body.panels-left-open.panels-right-open #model-face {
+        /* Both sides busy — sit in the strip of viewport between the
+         * two panels' inner edges. Smaller so it doesn't dominate, but
+         * fully on-screen and readable. */
+        left: 50%;
+        right: auto;
+        bottom: 6vh;
+        width: 32vmin;
+        height: 32vmin;
+        opacity: calc(0.45 * var(--mface-dream-opacity, 1));
+        transform: translateX(-50%) scale(var(--mface-dream-scale, 1))
+          rotate(
+            calc(
+              var(--mface-look-tilt, 0deg) + var(--mface-dream-tilt-osc, 0deg)
+            )
+          );
       }
       /* Respect reduced motion — no drift, no breathing. */
       @media (prefers-reduced-motion: reduce) {
@@ -1984,7 +2158,7 @@
       }
       #model-face .mface[data-expression="thinking"] .mface-halo {
         opacity: 0.25;
-        animation: mface-pulse 1.2s ease-in-out infinite;
+        animation: mface-pulse 2.4s ease-in-out infinite;
       }
       #model-face .mface[data-expression="snarky"] .mface-halo,
       #model-face .mface[data-expression="dreaming"] .mface-halo,
@@ -1992,7 +2166,7 @@
         opacity: 0.42;
       }
       #model-face .mface[data-expression="speculating"] .mface-halo {
-        animation: mface-flash 0.6s ease-out 1;
+        animation: mface-flash 1.4s ease-out 1;
       }
       /* Only the currently-named expression group is visible. */
       #model-face .mface-expr {
@@ -2079,22 +2253,22 @@
       }
       /* Dreaming breathes; speculating flashes once; thinking blinks. */
       #model-face .mface[data-expression="dreaming"] {
-        animation: mface-breathe 3s ease-in-out infinite;
+        animation: mface-breathe 6s ease-in-out infinite;
       }
       #model-face
         .mface[data-expression="thinking"]
         .mface-mouth-dot:nth-child(3) {
-        animation: mface-blink 1s steps(2, end) infinite;
+        animation: mface-blink 2.4s steps(2, end) infinite;
       }
       #model-face
         .mface[data-expression="thinking"]
         .mface-mouth-dot:nth-child(4) {
-        animation: mface-blink 1s steps(2, end) infinite 0.2s;
+        animation: mface-blink 2.4s steps(2, end) infinite 0.4s;
       }
       #model-face
         .mface[data-expression="thinking"]
         .mface-mouth-dot:nth-child(5) {
-        animation: mface-blink 1s steps(2, end) infinite 0.4s;
+        animation: mface-blink 2.4s steps(2, end) infinite 0.8s;
       }
       @keyframes mface-pulse {
         0%,
@@ -2187,25 +2361,79 @@
           calc(var(--mface-eye-dy, 0) * 1px)
         );
       }
-      #model-face .mface-expr .mface-scribble {
-        /* Critical: without transform-box: fill-box, SVG children
-         * resolve `transform-origin: center` against the outer
-         * viewBox (0,0) — so a blink scales toward the face center
-         * and the eye visibly "flies up" instead of closing in place.
-         * fill-box anchors each scribble to its own bounding box. */
+      /* Eye-grp wrappers anchor scale/skew animations to each eye's
+       * bounding box, so per-side pulses don't fly toward the face
+       * centre. The scribbles inside also get fill-box anchoring for
+       * their own scale animations. */
+      #model-face .mface-eye-grp,
+      #model-face .mface-mouth-grp {
         transform-box: fill-box;
         transform-origin: center;
-        animation: mface-slow-blink 11s ease-in-out infinite;
       }
-      #model-face .mface-expr .mface-scribble:nth-child(2) {
-        animation-delay: 0.08s;
+      #model-face .mface-expr .mface-scribble {
+        transform-box: fill-box;
+        transform-origin: center;
       }
-      /* Bulge — occasional surprised-eyes pop. Swells both eye scribbles
-       * to ~2.4× over ~480ms, holds a beat, deflates back. Overrides the
-       * slow-blink for the duration via the [data-bulge="1"] selector. */
+      /* JS drives blink timing now (Poisson-distributed schedule with
+       * occasional doubles). The pulse below targets the per-eye groups
+       * so both eyes close in sync but each animates from its OWN
+       * bounding box — no fly-up artefact. */
+      @keyframes mface-eye-blink {
+        0%,
+        100% {
+          transform: scaleY(1);
+        }
+        45%,
+        55% {
+          transform: scaleY(0.08);
+        }
+      }
+      #model-face .mface[data-pulse-blink="1"] .mface-eye-grp {
+        animation: mface-eye-blink 420ms ease-in-out 1;
+      }
+      @keyframes mface-blink-slow {
+        0%,
+        100% {
+          transform: scaleY(1);
+        }
+        50% {
+          transform: scaleY(0.08);
+        }
+      }
+      #model-face .mface[data-pulse-blink-slow="1"] .mface-eye-grp {
+        animation: mface-blink-slow 620ms ease-in-out 1;
+      }
+      /* Double blink — close-open-close-open in ~360ms. */
+      @keyframes mface-blink-double {
+        0%,
+        100% {
+          transform: scaleY(1);
+        }
+        20%,
+        25% {
+          transform: scaleY(0.08);
+        }
+        50% {
+          transform: scaleY(1);
+        }
+        70%,
+        80% {
+          transform: scaleY(0.08);
+        }
+      }
+      #model-face .mface[data-pulse-blink-double="1"] .mface-eye-grp {
+        animation: mface-blink-double 760ms ease-in-out 1;
+      }
+      /* Bulge — surprised-eyes pop. Used for ambient tics AND for the
+       * delete reaction (the scribble swells, the cloud puffs out then
+       * deflates). Anchored to per-eye groups so each eye scales from
+       * its own centre. */
       @keyframes mface-bulge {
         0% {
           transform: scale(1);
+        }
+        12% {
+          transform: scale(0.85);
         }
         42% {
           transform: scale(2.4);
@@ -2217,14 +2445,552 @@
           transform: scale(1);
         }
       }
-      #model-face .mface[data-bulge="1"] .mface-expr .mface-scribble {
-        animation: mface-bulge 3150ms cubic-bezier(0.22, 1, 0.36, 1) 1;
+      #model-face .mface[data-pulse-bulge="1"] .mface-eye-grp {
+        animation: mface-bulge 2000ms cubic-bezier(0.4, 0, 0.2, 1) 1;
+      }
+      #model-face .mface[data-pulse-bulge="1"] .mface-eye-grp[data-side="r"] {
+        animation-delay: 140ms;
+      }
+      /* Cloud puff on bulge — momentary swell + deflate of the
+       * amorphous backdrop. Scales the ::before instead of the SVG so
+       * the cloud reacts but the scribbles don't double-scale. */
+      @keyframes mface-cloud-puff {
+        0%,
+        100% {
+          transform: scale(1) translate(0, 0);
+          filter: blur(18px);
+          opacity: 1;
+        }
+        40% {
+          transform: scale(1.18) translate(0, -1%);
+          filter: blur(26px);
+          opacity: 1;
+        }
+      }
+      #model-face[data-pulse-bulge="1"]::before,
+      body
+        :is(:not(.panels-left-open), .panels-right-open)
+        #model-face:where([data-pulse-bulge="1"])::before {
+        animation: mface-cloud-puff 1700ms ease-out 1;
+      }
+      /* Wince — empty-trash flinch. Eyes flatten to lines, mouth bends
+       * down. Different from bulge: bulge = surprise, wince = ouch. */
+      @keyframes mface-wince-eye {
+        0%,
+        100% {
+          transform: scaleY(1);
+        }
+        30%,
+        70% {
+          transform: scaleY(0.12);
+        }
+      }
+      @keyframes mface-wince-mouth {
+        0%,
+        100% {
+          transform: translateY(0) scaleY(1);
+        }
+        40%,
+        60% {
+          transform: translateY(2px) scaleY(0.6);
+        }
+      }
+      #model-face .mface[data-pulse-wince="1"] .mface-eye-grp {
+        animation: mface-wince-eye 800ms ease-in-out 1;
+      }
+      #model-face .mface[data-pulse-wince="1"] .mface-mouth-grp {
+        animation: mface-wince-mouth 800ms ease-in-out 1;
+      }
+      /* Brow — single-side eyebrow lift on weird-link. Skews + lifts
+       * the LEFT eye group only. Settles back over 900ms. */
+      @keyframes mface-brow {
+        0%,
+        100% {
+          transform: translateY(0) skewY(0deg);
+        }
+        30% {
+          transform: translateY(-2.5px) skewY(-6deg);
+        }
+        70% {
+          transform: translateY(-2.5px) skewY(-6deg);
+        }
+      }
+      #model-face .mface[data-pulse-brow="1"] .mface-eye-grp[data-side="l"] {
+        animation: mface-brow 1700ms ease-in-out 1;
+      }
+      /* Pursed lip on rename — mouth compresses horizontally then back. */
+      @keyframes mface-pursed {
+        0%,
+        100% {
+          transform: scaleX(1);
+        }
+        50% {
+          transform: scaleX(0.6);
+        }
+      }
+      #model-face .mface[data-pulse-pursed="1"] .mface-mouth-grp {
+        animation: mface-pursed 800ms ease-in-out 1;
+      }
+      /* Squint — held while a long search query is active. Slow
+       * fade in / out so the narrow doesn't snap. */
+      #model-face .mface[data-pulse-squint="1"] .mface-eye-grp {
+        transform: scaleY(0.55);
+        transition: transform 600ms ease;
+      }
+      /* Search-empty sympathy — mouth flips to a sad arc briefly. */
+      @keyframes mface-search-empty {
+        0%,
+        100% {
+          transform: scaleY(1) translateY(0);
+        }
+        40%,
+        70% {
+          transform: scaleY(-0.6) translateY(4px);
+        }
+      }
+      #model-face .mface[data-pulse-search-empty="1"] .mface-mouth-grp {
+        animation: mface-search-empty 1300ms ease-in-out 1;
+      }
+      /* Tag-flicker — quick single-side eyebrow twitch (subliminal). */
+      @keyframes mface-tag-flicker {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-2.5px);
+        }
       }
       #model-face
-        .mface[data-bulge="1"]
-        .mface-expr
-        .mface-scribble:nth-child(2) {
-        animation-delay: 120ms;
+        .mface[data-pulse-tag-flicker="1"]
+        .mface-eye-grp[data-side="l"] {
+        animation: mface-tag-flicker 320ms ease-in-out 1;
+      }
+      /* Tether-snap — wide eyes for ~500ms. */
+      @keyframes mface-tether-snap {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        25%,
+        75% {
+          transform: scale(1.25);
+        }
+      }
+      #model-face .mface[data-pulse-tether-snap="1"] .mface-eye-grp {
+        animation: mface-tether-snap 1100ms ease-out 1;
+      }
+      /* Lean-collide — face tilts a little extra toward the impending
+       * collision. Applied to the mount, not the SVG, so the cloud
+       * follows. Anticipation curve. */
+      @keyframes mface-lean-collide {
+        0%,
+        100% {
+          transform: rotate(
+            calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg))
+          );
+        }
+        60% {
+          transform: rotate(
+            calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg) + 6deg)
+          );
+        }
+      }
+      #model-face[data-pulse-lean-collide="1"] {
+        animation: mface-lean-collide 1300ms cubic-bezier(0.4, 0, 0.2, 1) 1;
+      }
+      /* Flash — supernova mirror. One bright halo cycle. */
+      @keyframes mface-flash-pulse {
+        0% {
+          opacity: 0.9;
+          filter: blur(3px);
+        }
+        100% {
+          opacity: 0.3;
+          filter: blur(6px);
+        }
+      }
+      #model-face .mface[data-pulse-flash="1"] .mface-halo {
+        animation: mface-flash-pulse 1300ms ease-out 1;
+        opacity: 0.42;
+      }
+      /* Constellation pride — bigger, slower cloud breath. */
+      @keyframes mface-constellation-pride {
+        0%,
+        100% {
+          transform: scale(1) translate(0, 0);
+        }
+        50% {
+          transform: scale(1.08) translate(0, -1%);
+        }
+      }
+      #model-face[data-pulse-constellation-pride="1"]::before {
+        animation: mface-constellation-pride 2400ms ease-in-out 1;
+      }
+      /* Pre-think inhale — cloud contracts ~4% for ~140ms before the
+       * thinking expression takes over. Tiny anticipation beat. */
+      @keyframes mface-inhale {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        70% {
+          transform: scale(0.96);
+        }
+      }
+      #model-face[data-pulse-inhale="1"]::before {
+        animation: mface-inhale 320ms ease-in 1;
+      }
+      /* Recoil — result lands. Slow tilt drift that settles back. No
+       * springy overshoot; the gentle giant absorbs the result, he
+       * doesn't snap to attention. */
+      @keyframes mface-recoil {
+        0% {
+          transform: rotate(
+            calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg))
+          );
+        }
+        35% {
+          transform: rotate(
+            calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg) - 3deg)
+          );
+        }
+        70% {
+          transform: rotate(
+            calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg) + 1deg)
+          );
+        }
+        100% {
+          transform: rotate(
+            calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg))
+          );
+        }
+      }
+      #model-face[data-pulse-recoil="1"] {
+        animation: mface-recoil 1500ms cubic-bezier(0.4, 0, 0.2, 1) 1;
+      }
+      /* When a side panel is open, the mount uses the inverted tilt
+       * (left version) — recoil needs to mirror the kick direction. */
+      body.panels-left-open:not(.panels-right-open)
+        #model-face[data-pulse-recoil="1"] {
+        animation: mface-recoil 1500ms cubic-bezier(0.4, 0, 0.2, 1) 1 reverse;
+      }
+      /* Snarky-double — brow lifts another notch on entry. */
+      @keyframes mface-snarky-double {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        45% {
+          transform: translateY(-3px);
+        }
+      }
+      #model-face .mface[data-pulse-snarky-double="1"] .mface-brow-arch {
+        animation: mface-snarky-double 700ms ease-out 1;
+      }
+      /* Template-defeat — slow exhale. Cloud sags, halo dims. */
+      @keyframes mface-template-defeat {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(0.92);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      #model-face[data-pulse-template-defeat="1"]::before {
+        animation: mface-template-defeat 4000ms ease-in-out 1;
+      }
+      /* Backend-swap — quick crossfade by easing the cloud color
+       * through a brightness dip. Glows already retint via CSS vars;
+       * this sells the transition. */
+      @keyframes mface-backend-swap {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.55;
+        }
+      }
+      #model-face[data-pulse-backend-swap="1"]::before {
+        animation: mface-backend-swap 1100ms ease-in-out 1;
+      }
+      /* Cost-flinch — eyes narrow briefly. */
+      @keyframes mface-cost-flinch {
+        0%,
+        100% {
+          transform: scaleY(1);
+        }
+        50% {
+          transform: scaleY(0.55);
+        }
+      }
+      #model-face .mface[data-pulse-cost-flinch="1"] .mface-eye-grp {
+        animation: mface-cost-flinch 280ms ease-in-out 1;
+      }
+      /* Bow — tilt drops 5° then returns. Used on morning-report open. */
+      @keyframes mface-bow {
+        0%,
+        100% {
+          transform: rotate(
+            calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg))
+          );
+        }
+        50% {
+          transform: rotate(
+            calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg) - 5deg)
+          );
+        }
+      }
+      #model-face[data-pulse-bow="1"] {
+        animation: mface-bow 1600ms ease-in-out 1;
+      }
+      /* Perk — welcome-back. Cloud puffs slightly + eyes widen. */
+      @keyframes mface-perk-cloud {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.06);
+        }
+      }
+      @keyframes mface-perk-eyes {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.18);
+        }
+      }
+      #model-face[data-pulse-perk="1"]::before {
+        animation: mface-perk-cloud 1000ms ease-out 1;
+      }
+      #model-face .mface[data-pulse-perk="1"] .mface-eye-grp {
+        animation: mface-perk-eyes 1000ms ease-out 1;
+      }
+      /* First-action — quick blink + tilt nod. Lightweight greeting. */
+      @keyframes mface-first-action {
+        0%,
+        100% {
+          transform: rotate(
+            calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg))
+          );
+        }
+        50% {
+          transform: rotate(
+            calc(var(--mface-tilt, 14deg) + var(--mface-look-tilt, 0deg) - 3deg)
+          );
+        }
+      }
+      #model-face[data-pulse-first-action="1"] {
+        animation: mface-first-action 1200ms ease-in-out 1;
+      }
+      /* Stretch — wake-up yawn. Cloud expands 12% over 1.2s and back. */
+      @keyframes mface-stretch {
+        0%,
+        100% {
+          transform: scale(1);
+          filter: blur(18px);
+        }
+        50% {
+          transform: scale(1.12);
+          filter: blur(22px);
+        }
+      }
+      #model-face[data-pulse-stretch="1"]::before {
+        animation: mface-stretch 2400ms ease-in-out 1;
+      }
+      /* Weather-sigh — slower-than-usual cloud breath, like a sigh. */
+      @keyframes mface-weather-sigh {
+        0%,
+        100% {
+          transform: scale(1);
+          filter: blur(18px);
+        }
+        40% {
+          transform: scale(1.04);
+          filter: blur(24px);
+        }
+        70% {
+          transform: scale(0.96);
+          filter: blur(15px);
+        }
+      }
+      #model-face[data-pulse-weather-sigh="1"]::before {
+        animation: mface-weather-sigh 22000ms ease-in-out 1;
+      }
+      /* Microsmile — mouth bumps up a touch in idle. */
+      @keyframes mface-microsmile {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        40%,
+        60% {
+          transform: translateY(-1.5px);
+        }
+      }
+      #model-face .mface[data-pulse-microsmile="1"] .mface-mouth-grp {
+        animation: mface-microsmile 4200ms ease-in-out 1;
+      }
+      /* Settle — link confirmed. One slow cloud breath. */
+      @keyframes mface-settle {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.04);
+        }
+      }
+      #model-face[data-pulse-settle="1"]::before {
+        animation: mface-settle 1700ms ease-in-out 1;
+      }
+      /* Look-up — link picker open. Quick eye-widen as the gaze swings. */
+      @keyframes mface-look-up {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        45% {
+          transform: scale(1.12);
+        }
+      }
+      #model-face .mface[data-pulse-look-up="1"] .mface-eye-grp {
+        animation: mface-look-up 900ms ease-out 1;
+      }
+      /* Anticipate — tiny pre-pulse used by the delete reaction. The
+       * eyes pull IN ~10% just before they bulge OUT. Reads as Pixar
+       * anticipation rather than a sudden pop. */
+      @keyframes mface-anticipate {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        100% {
+          transform: scale(0.88);
+        }
+      }
+      #model-face .mface[data-pulse-anticipate="1"] .mface-eye-grp {
+        animation: mface-anticipate 220ms ease-in 1 forwards;
+      }
+      /* Per-keystroke "hmm" cycle for Cmd+K typing. Six small,
+       * asymmetric hesitations that rotate as the user types — the
+       * avatar appears to follow each letter, mumbling along. Each
+       * targets a different scribble so they don't conflict with each
+       * other or with the larger pulses (search-empty, squint).
+       * Amplitudes are tiny — these are micro-beats, not gestures. */
+      @keyframes mface-hmm-up {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        45%,
+        55% {
+          transform: translateY(-2px);
+        }
+      }
+      @keyframes mface-hmm-down {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        45%,
+        55% {
+          transform: translateY(1.5px);
+        }
+      }
+      @keyframes mface-hmm-right {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        45%,
+        55% {
+          transform: translateX(2px);
+        }
+      }
+      @keyframes mface-hmm-skew-l {
+        0%,
+        100% {
+          transform: translateX(0) rotate(0deg);
+        }
+        45%,
+        55% {
+          transform: translateX(-2px) rotate(-3deg);
+        }
+      }
+      @keyframes mface-hmm-skew-r {
+        0%,
+        100% {
+          transform: translateX(0) rotate(0deg);
+        }
+        45%,
+        55% {
+          transform: translateX(2px) rotate(3deg);
+        }
+      }
+      /* hmm-up-l — left eye scribble peeks up. */
+      #model-face
+        .mface[data-pulse-hmm-up-l="1"]
+        .mface-eye-grp[data-side="l"]
+        .mface-scribble {
+        animation: mface-hmm-up 600ms ease-in-out 1;
+      }
+      /* hmm-up-r — right eye scribble peeks up. */
+      #model-face
+        .mface[data-pulse-hmm-up-r="1"]
+        .mface-eye-grp[data-side="r"]
+        .mface-scribble {
+        animation: mface-hmm-up 600ms ease-in-out 1;
+      }
+      /* hmm-down-l — left eye scribble drifts down (one-side puzzled). */
+      #model-face
+        .mface[data-pulse-hmm-down-l="1"]
+        .mface-eye-grp[data-side="l"]
+        .mface-scribble {
+        animation: mface-hmm-down 600ms ease-in-out 1;
+      }
+      /* hmm-right-r — right eye scribble drifts right (subtle eye-roll). */
+      #model-face
+        .mface[data-pulse-hmm-right-r="1"]
+        .mface-eye-grp[data-side="r"]
+        .mface-scribble {
+        animation: mface-hmm-right 600ms ease-in-out 1;
+      }
+      /* hmm-skew-l — mouth skews left (skeptical pursing). */
+      #model-face .mface[data-pulse-hmm-skew-l="1"] .mface-mouth {
+        animation: mface-hmm-skew-l 700ms ease-in-out 1;
+      }
+      /* hmm-skew-r — mouth skews right (the other skeptical). */
+      #model-face .mface[data-pulse-hmm-skew-r="1"] .mface-mouth {
+        animation: mface-hmm-skew-r 700ms ease-in-out 1;
+      }
+      /* Mouth scribble needs fill-box anchoring so its skew rotates
+       * around its own centre instead of the SVG origin. */
+      #model-face .mface-mouth {
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+      /* Window-blur — eyes flatten slowly to 70% when the user looks
+       * elsewhere. Long ease so the change is felt, not seen. */
+      #model-face .mface[data-window-blur="1"] .mface-eye-grp {
+        transform: scaleY(0.7);
+        transition: transform 1400ms ease;
+      }
+      /* Sleep-depth halo dimming. JS sets --mface-sleep-dim 0..1; the
+       * halo opacity interpolates so the transition into sleep feels
+       * gradual instead of step-changing. */
+      #model-face .mface-halo {
+        opacity: calc(0.12 * (1 - var(--mface-sleep-dim, 0)) + 0.04);
       }
 
       /* ── Settings status pill ──────────────────────────── */
@@ -2858,6 +3624,307 @@
         color: var(--text-dim);
         font-weight: 500;
       }
+      #search-strip .search-input-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #search-strip .search-input-row input {
+        flex: 1;
+        min-width: 0;
+      }
+      #search-strip .search-help {
+        flex: 0 0 auto;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 1px solid rgba(138, 180, 255, 0.4);
+        background: rgba(138, 180, 255, 0.08);
+        color: var(--accent);
+        font: 600 13px / 1 inherit;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        transition:
+          color 140ms ease,
+          border-color 140ms ease,
+          background 140ms ease,
+          transform 140ms ease;
+      }
+      #search-strip .search-help:hover {
+        background: rgba(138, 180, 255, 0.18);
+        transform: scale(1.08);
+      }
+      #search-strip .search-help[aria-expanded="true"] {
+        background: var(--accent);
+        color: #0a0c10;
+        border-color: var(--accent);
+      }
+      #search-strip .search-help-popover {
+        display: none;
+        margin-top: 4px;
+        padding: 12px 14px 12px 16px;
+        border-radius: 10px;
+        background: rgba(8, 10, 14, 0.65);
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      #search-strip .search-help-popover.open {
+        display: block;
+      }
+      /* SLASH_COMMANDS.md v1 — command list shown when input starts with `/`.
+       * Mutually exclusive with .search-summary; mode swap also tints the
+       * input's bottom border accent so the user knows which namespace
+       * they're in. */
+      #search-strip .search-commands {
+        display: none;
+        margin-top: 4px;
+        padding: 4px 4px;
+      }
+      #search-strip.command-mode .search-commands {
+        display: block;
+      }
+      #search-strip.command-mode .search-summary {
+        display: none;
+      }
+      #search-strip.command-mode .search-input-row input {
+        border-bottom: 1px solid rgba(138, 180, 255, 0.5);
+      }
+      #search-strip .search-command-row {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding: 6px 10px;
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1.45;
+        cursor: pointer;
+        color: var(--text-dim);
+      }
+      #search-strip .search-command-row:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      #search-strip .search-command-row.active {
+        background: rgba(138, 180, 255, 0.12);
+        color: var(--text);
+      }
+      #search-strip .search-command-row .cmd-name {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        color: var(--accent);
+        font-weight: 500;
+        flex: 0 0 auto;
+      }
+      #search-strip .search-command-row .cmd-args {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        color: var(--text-faint);
+        flex: 0 0 auto;
+      }
+      #search-strip .search-command-row .cmd-desc {
+        flex: 1 1 auto;
+        text-align: right;
+        color: var(--text-faint);
+        font-size: 11px;
+      }
+      #search-strip .search-command-row.active .cmd-desc {
+        color: var(--text-dim);
+      }
+      #search-strip .search-commands-empty {
+        padding: 6px 10px;
+        font-size: 11px;
+        color: var(--text-faint);
+        font-style: italic;
+      }
+      #search-strip .search-help-title {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin-bottom: 6px;
+      }
+      #search-strip .search-help-popover ul {
+        list-style: none;
+        margin: 0 0 8px;
+        padding: 0;
+      }
+      #search-strip .search-help-popover ul:last-child {
+        margin-bottom: 0;
+      }
+      #search-strip .search-help-popover li {
+        padding: 2px 0;
+      }
+      #search-strip .search-help-section {
+        font-size: 9px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        margin: 4px 0 4px;
+        opacity: 0.7;
+      }
+      #search-strip .search-help-section:first-of-type {
+        margin-top: 2px;
+      }
+      #search-strip .search-help-popover li b {
+        color: var(--text);
+        font-weight: 500;
+      }
+      #search-strip .search-help-popover li i {
+        color: var(--accent);
+        font-style: normal;
+      }
+      #search-strip .search-help-popover code {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+        font-size: 11px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+      }
+
+      /* ── Connect-query plan pane — CONNECT_QUERY.md v1 ────── */
+      /* Surfaces under the search-strip when the user types a verb-
+       * prefixed query (`connect …`). Lists matched notes with per-
+       * row checkboxes, an edge-count footer, and Apply/Cancel. */
+      #search-strip .search-plan {
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 0 4px;
+        border-top: 1px solid var(--glass-border);
+        margin-top: 6px;
+      }
+      #search-strip.plan-mode .search-plan {
+        display: flex;
+      }
+      #search-strip.plan-mode .search-summary,
+      #search-strip.plan-mode .search-hint {
+        display: none;
+      }
+      #search-strip .search-plan-summary {
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        color: var(--text-dim);
+        padding: 0 2px;
+      }
+      #search-strip .search-plan-summary b {
+        color: var(--text);
+        font-weight: 500;
+      }
+      #search-strip .search-plan-summary .term {
+        color: var(--accent);
+        margin-right: 4px;
+      }
+      #search-strip .search-plan-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1px;
+        max-height: 240px;
+        overflow-y: auto;
+        font-size: 13px;
+        padding: 2px 0;
+      }
+      #search-strip .search-plan-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 5px 6px;
+        border-radius: 4px;
+        cursor: pointer;
+        color: var(--text);
+      }
+      #search-strip .search-plan-row:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      #search-strip .search-plan-row input[type="checkbox"] {
+        accent-color: var(--accent);
+        width: 13px;
+        height: 13px;
+        margin: 0;
+        flex: 0 0 auto;
+      }
+      #search-strip .search-plan-row .plan-title {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #search-strip .search-plan-row .plan-meta {
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+        flex: 0 0 auto;
+      }
+      #search-strip .search-plan-row.unchecked .plan-title {
+        color: var(--text-faint);
+        text-decoration: line-through;
+      }
+      #search-strip .search-plan-empty {
+        padding: 10px 6px;
+        color: var(--text-faint);
+        font-size: 12px;
+      }
+      #search-strip .search-plan-warn {
+        font-size: 11px;
+        color: #ffb866;
+        padding: 4px 6px;
+        background: rgba(255, 184, 102, 0.06);
+        border-radius: 4px;
+        letter-spacing: 0.02em;
+      }
+      #search-strip .search-plan-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 4px 0 0;
+      }
+      #search-strip .search-plan-edges {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      #search-strip .search-plan-btn-row {
+        display: flex;
+        gap: 8px;
+      }
+      #search-strip .search-plan-btn {
+        background: transparent;
+        border: 1px solid var(--glass-border);
+        color: var(--text-dim);
+        font: 500 11px / 1 inherit;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 6px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition:
+          color 140ms ease,
+          border-color 140ms ease,
+          background 140ms ease;
+      }
+      #search-strip .search-plan-btn:hover {
+        color: var(--text);
+        border-color: rgba(255, 255, 255, 0.18);
+      }
+      #search-strip .search-plan-btn-primary {
+        color: var(--accent);
+        border-color: rgba(138, 180, 255, 0.4);
+        background: rgba(138, 180, 255, 0.06);
+      }
+      #search-strip .search-plan-btn-primary:hover {
+        background: rgba(138, 180, 255, 0.12);
+        border-color: rgba(138, 180, 255, 0.6);
+      }
+      #search-strip .search-plan-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
 
       /* ── Filter bar — VISIBILITY_FILTER.md ─────────────────── */
       /* Persistent compact pill at the top-center. F (no modifier)
@@ -2887,7 +3954,19 @@
         transition:
           background 160ms ease,
           border-color 160ms ease,
-          box-shadow 160ms ease;
+          box-shadow 160ms ease,
+          opacity 200ms ease,
+          transform 200ms ease;
+      }
+      /* Idle = empty input AND nothing inside the bar focused. The bar
+       * fades out and lifts a few pixels so the top of the screen stays
+       * clean. F still summons it (focus() works regardless of opacity),
+       * and typing or pasting that produces an `.active` filter brings
+       * it back automatically. */
+      #filter-bar:not(.active):not(:focus-within) {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-8px);
+        pointer-events: none;
       }
       #filter-bar.active {
         background: rgba(138, 180, 255, 0.08);
@@ -3022,11 +4101,123 @@
         -webkit-backdrop-filter: blur(8px);
         border-radius: 8px;
         opacity: 0;
-        transition: opacity 320ms ease;
+        transition: opacity 800ms ease;
         will-change: transform, opacity;
       }
       #chorus .caption.show {
         opacity: 1;
+      }
+      /* When the avatar is on, captions emerge BESIDE the face as
+       * amorphous talk-bubbles instead of pinning over each body.
+       * They never block the avatar's silhouette — JS picks the open
+       * side of the viewport and offsets the bubble outward. The
+       * bubble's tint follows --bubble-color (set by JS from the
+       * face's --mface-cloud-color) so it retints with the backend. */
+      #chorus .caption.from-mouth {
+        --bubble-tint: var(--bubble-color, #8ab4ff);
+        max-width: 320px;
+        padding: 7px 14px;
+        color: rgba(232, 235, 244, 0.96);
+        text-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+        background:
+          radial-gradient(
+            ellipse 78% 64% at 50% 60%,
+            color-mix(in srgb, var(--bubble-tint) 18%, transparent) 0%,
+            transparent 75%
+          ),
+          rgba(14, 17, 28, 0.42);
+        border: 1px solid
+          color-mix(in srgb, var(--bubble-tint) 38%, transparent);
+        border-radius: 22px 22px 26px 22px / 18px 22px 24px 18px;
+        backdrop-filter: blur(12px) saturate(140%);
+        -webkit-backdrop-filter: blur(12px) saturate(140%);
+        box-shadow:
+          0 0 24px -6px color-mix(in srgb, var(--bubble-tint) 35%, transparent),
+          inset 0 0 18px color-mix(in srgb, var(--bubble-tint) 10%, transparent);
+        animation: caption-bubble-breathe 12s ease-in-out infinite;
+      }
+      /* Tail — a tiny cloud tendril that points back toward the
+       * mouth. Pseudo-element so it inherits the tint cleanly. The
+       * tail anchors to whichever side of the bubble points back
+       * toward the face, set via [data-bubble-side] from JS. */
+      #chorus .caption.from-mouth::after {
+        content: "";
+        position: absolute;
+        bottom: -8px;
+        width: 18px;
+        height: 18px;
+        background: radial-gradient(
+          circle at 30% 30%,
+          color-mix(in srgb, var(--bubble-tint) 28%, transparent) 0%,
+          color-mix(in srgb, var(--bubble-tint) 12%, transparent) 50%,
+          transparent 80%
+        );
+        filter: blur(3px);
+        pointer-events: none;
+      }
+      /* Bubbles to the right of the face → tail points to the LEFT
+       * (back toward the mouth). Mirror for the left side. */
+      #chorus .caption.from-mouth[data-bubble-side="right"]::after {
+        left: -6px;
+        transform: rotate(45deg);
+      }
+      #chorus .caption.from-mouth[data-bubble-side="left"]::after {
+        right: -6px;
+        transform: rotate(45deg);
+      }
+      /* Subtle amorphous breath — radius shifts slightly so the bubble
+       * feels alive instead of geometric. */
+      @keyframes caption-bubble-breathe {
+        0%,
+        100% {
+          border-radius: 22px 22px 26px 22px / 18px 22px 24px 18px;
+        }
+        50% {
+          border-radius: 26px 22px 22px 24px / 22px 18px 22px 24px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #chorus .caption.from-mouth {
+          animation: none;
+        }
+      }
+      /* Per-bubble dismiss button. Hidden until the bubble is hovered
+       * so the chorus stays calm; appears in the top-right corner of
+       * the bubble when the user wants to nudge one out of the way.
+       * The host #chorus is pointer-events: none so the button must
+       * re-enable them. */
+      #chorus .caption .caption-close {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        line-height: 14px;
+        font-size: 14px;
+        font-family: inherit;
+        color: rgba(232, 235, 244, 0.78);
+        background: rgba(14, 17, 28, 0.78);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 50%;
+        cursor: pointer;
+        opacity: 0;
+        pointer-events: auto;
+        transition:
+          opacity 160ms ease,
+          background 160ms ease;
+      }
+      #chorus .caption:hover .caption-close,
+      #chorus .caption .caption-close:focus-visible {
+        opacity: 1;
+      }
+      #chorus .caption .caption-close:hover {
+        background: rgba(40, 44, 60, 0.92);
+      }
+      /* The text span sits inline so the close button can absolute
+       * position over the corner without disrupting the layout. */
+      #chorus .caption .caption-text {
+        display: inline;
       }
 
       /* ── Formations rail ────────────────────────────────── */
@@ -3296,6 +4487,21 @@
       }
       #coachmark .cm-dismiss:hover {
         color: var(--accent);
+      }
+      #coachmark .cm-dismiss.cm-action {
+        color: var(--accent);
+        border: 1px solid rgba(138, 180, 255, 0.45);
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        font-weight: 500;
+      }
+      #coachmark .cm-dismiss.cm-action:hover {
+        background: rgba(138, 180, 255, 0.12);
+      }
+      #coachmark .cm-body:has(.cm-action) {
+        max-width: 380px;
       }
 
       /* ── Overlay modals (tag-prompt, about, morning) ────── */
@@ -3848,15 +5054,98 @@
     <div id="settings" aria-hidden="true"></div>
 
     <div id="search-strip" aria-hidden="true">
-      <input
-        type="text"
-        placeholder="search the universe"
-        spellcheck="false"
-        autocomplete="off"
-      />
+      <div class="search-input-row">
+        <input
+          type="text"
+          placeholder="search the universe"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="search-help"
+          aria-label="search tips"
+          aria-expanded="false"
+        >
+          ?
+        </button>
+      </div>
       <div class="search-summary" aria-live="polite"></div>
+      <div class="search-commands" aria-live="polite"></div>
       <div class="search-hint">
         <b>↑ ↓</b> navigate · <b>enter</b> open · <b>esc</b> close
+      </div>
+      <div class="search-help-popover">
+        <div class="search-help-title">Search tips</div>
+        <p class="search-help-section">What it searches</p>
+        <ul>
+          <li>
+            Looks at every note's <b>title</b>, <b>#tags</b>, and <b>body</b> —
+            you don't pick a field, just type the word.
+          </li>
+          <li>
+            <b>Title and #tag</b> hits rank above body hits, so a note
+            <i>called</i> "Redshift" beats one that just mentions it.
+          </li>
+        </ul>
+        <p class="search-help-section">How to type</p>
+        <ul>
+          <li>
+            <b>Partial words</b> match — <code>obs</code> finds <i>Obsidian</i>.
+          </li>
+          <li>
+            <b>Typos are forgiven</b> — <code>vauls</code> still finds
+            <i>vault</i>.
+          </li>
+          <li>
+            <b>Multiple words</b> broaden the search —
+            <code>dream sleep</code> matches notes mentioning either.
+          </li>
+        </ul>
+        <p class="search-help-section">While you type</p>
+        <ul>
+          <li>
+            The universe <b>dims to your hits</b> — only matching stars stay
+            bright. Empty input restores everything.
+          </li>
+          <li>
+            The camera <b>arcs to the top hit</b> as you narrow. Use
+            <b>↑ ↓</b> to walk down the list and the camera follows.
+          </li>
+        </ul>
+        <p class="search-help-section">Connect mode</p>
+        <ul>
+          <li>
+            Start with <code>connect</code> (or <code>link</code>) and a
+            comma-list to batch-link notes:
+            <code>connect cepheid, polaris, parallax</code> finds notes that
+            mention all three and offers to wikilink them to each other.
+          </li>
+          <li>
+            A <b>preview pane</b> opens — uncheck anything that doesn't belong,
+            then <b>Enter</b> applies. The toast that follows holds an
+            <b>Undo</b> for 30 seconds.
+          </li>
+        </ul>
+        <p class="search-help-section">Commands</p>
+        <ul>
+          <li>
+            Type <code>/</code> as the first character to switch into
+            <b>command mode</b>. Pick a verb, hit <b>Enter</b> to run it.
+          </li>
+          <li>
+            v1 commands: <code>/help</code>, <code>/new [title]</code>,
+            <code>/dream</code>, <code>/formation &lt;name&gt;</code>,
+            <code>/clear</code>.
+          </li>
+        </ul>
+        <p class="search-help-section">Keys</p>
+        <ul>
+          <li>
+            <b>Cmd/Ctrl + K</b> open or close · <b>↑ ↓</b> walk hits ·
+            <b>Enter</b> open (or apply, in connect mode) · <b>Esc</b> close.
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -3963,6 +5252,24 @@
       <div class="weed-list"></div>
     </aside>
 
+    <aside id="hushed-drawer" aria-hidden="true">
+      <header class="drawer-head">
+        <div>
+          <h1 class="drawer-title">Hushed</h1>
+          <p class="drawer-sub">
+            Notes you've quieted. Still on disk, still linked to — just out of
+            the field. Restore brings them back.
+          </p>
+        </div>
+        <button class="drawer-close" type="button" aria-label="Close">×</button>
+      </header>
+      <div class="drawer-empty">
+        No hushed notes. Anything you hush will show up here, ready to come
+        back.
+      </div>
+      <div class="hushed-list"></div>
+    </aside>
+
     <button
       id="noticed-pill"
       class="noticed-pill"
@@ -4010,6 +5317,14 @@
             title="Pin position"
           >
             ◯
+          </button>
+          <button
+            class="panel-hush"
+            type="button"
+            aria-label="Hush note"
+            title="Hush — hide from the field, keep the file (Cmd+Shift+H)"
+          >
+            hush
           </button>
           <button class="panel-mode" type="button" aria-label="Toggle edit">
             Edit

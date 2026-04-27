@@ -42,7 +42,13 @@ export function createBodies({
   renderer,
   getSettings,
 }) {
-  const live = vault.notes.length;
+  // Hushed notes (HUSH.md) live on disk but stay out of the field —
+  // not spawned, not in physics, not in chorus or dream. Filter at
+  // seed time; addBody / removeBody handle the live transitions.
+  const seedNotes = vault.notes.filter(
+    (n) => !(n.frontmatter && n.frontmatter.hushed),
+  );
+  const live = seedNotes.length;
   const capacity = live + HEADROOM;
 
   const pos = new Float32Array(capacity * 3);
@@ -82,7 +88,7 @@ export function createBodies({
   }
 
   for (let i = 0; i < live; i++) {
-    const note = vault.notes[i];
+    const note = seedNotes[i];
     const p = positions[note.id] || [0, 0, 0];
     writeSlot(i, {
       note,
@@ -546,6 +552,148 @@ export function createBodies({
     geom.getAttribute("aSelected").needsUpdate = true;
   }
 
+  // ── Implode / explode effects ─────────────────────────────
+  // Tiny per-body visual cues fired right before a body is yanked
+  // from the field. Implode = fade + shrink (hush). Explode = brief
+  // flash, expand, then fade (delete). Both finish with removeBody +
+  // an onComplete callback the caller uses to rebuild edges/tethers.
+  //
+  // Implementation: maintain a small `pendingEffects` queue; a self-
+  // starting rAF loop ticks each effect's progress, mutates the body's
+  // mass + glow attributes in place, and removes the body when done.
+  // No main-loop wiring required.
+  const pendingEffects = [];
+  let effectsRafHandle = 0;
+
+  function startEffectsLoopIfNeeded() {
+    if (effectsRafHandle) return;
+    const tick = () => {
+      effectsRafHandle = 0;
+      const now = performance.now();
+      let glowDirty = false;
+      let massDirty = false;
+      for (let k = pendingEffects.length - 1; k >= 0; k--) {
+        const fx = pendingEffects[k];
+        const i = indexOf.get(fx.noteId);
+        if (i == null) {
+          // Body already removed by something else — clean up.
+          pendingEffects.splice(k, 1);
+          if (fx.onComplete) {
+            try {
+              fx.onComplete();
+            } catch (err) {
+              console.warn("[bz] effect onComplete threw", err);
+            }
+          }
+          continue;
+        }
+        // Preroll: the explode case waits ~200 ms before the visible
+        // animation begins so the closing note panel doesn't hide
+        // the flash behind itself. During preroll the body looks
+        // unchanged.
+        const elapsed = now - fx.startMs - (fx.delayMs || 0);
+        if (elapsed < 0) {
+          // Still in preroll — schedule the next frame and move on.
+          continue;
+        }
+        const t = Math.min(1, elapsed / fx.durationMs);
+        if (fx.kind === "implode") {
+          // Quiet exit: glow + mass both ramp toward zero with a
+          // gentle ease-out, the body shrinks and dims simultaneously.
+          const ease = 1 - (1 - t) * (1 - t); // easeOutQuad
+          glow[i] = fx.startGlow * (1 - ease);
+          mass[i] = fx.startMass * (1 - ease);
+        } else if (fx.kind === "explode") {
+          // Three-phase: instant flash → sustained brightness +
+          // swelling mass → fast collapse. Glow stays above the
+          // shader's filterBoost threshold (1.1) for most of the
+          // animation so the body holds at ~3× rendered size while
+          // bright, instead of immediately decaying. Reads as
+          // "pop, hang, gone."
+          const flashEnd = 0.06;
+          const collapseStart = 0.85;
+          if (t < flashEnd) {
+            const u = t / flashEnd;
+            glow[i] = fx.startGlow + (2.8 - fx.startGlow) * u;
+            mass[i] = fx.startMass * (1 + u * 0.4);
+          } else if (t < collapseStart) {
+            const u = (t - flashEnd) / (collapseStart - flashEnd);
+            // Sustain bright, swell mass slowly. Adds drift toward
+            // outward velocity if we ever wire it.
+            glow[i] = 2.8;
+            mass[i] = fx.startMass * (1.4 + u * 0.9);
+          } else {
+            const u = (t - collapseStart) / (1 - collapseStart);
+            const ease = u * u; // easeInQuad — collapses fast
+            glow[i] = 2.8 * (1 - ease);
+            mass[i] = fx.startMass * 2.3 * (1 - ease);
+          }
+        }
+        glowDirty = true;
+        massDirty = true;
+        if (t >= 1) {
+          pendingEffects.splice(k, 1);
+          removeBody(fx.noteId);
+          if (fx.onComplete) {
+            try {
+              fx.onComplete();
+            } catch (err) {
+              console.warn("[bz] effect onComplete threw", err);
+            }
+          }
+        }
+      }
+      if (glowDirty) geom.getAttribute("aGlow").needsUpdate = true;
+      if (massDirty) geom.getAttribute("aMass").needsUpdate = true;
+      if (pendingEffects.length > 0) {
+        effectsRafHandle = requestAnimationFrame(tick);
+      }
+    };
+    effectsRafHandle = requestAnimationFrame(tick);
+  }
+
+  function implodeBody(noteId, onComplete) {
+    const i = indexOf.get(noteId);
+    if (i == null) {
+      // No body to implode — fire onComplete immediately so callers
+      // don't end up waiting forever.
+      if (onComplete) onComplete();
+      return;
+    }
+    pendingEffects.push({
+      noteId,
+      kind: "implode",
+      startMs: performance.now(),
+      durationMs: 500,
+      startGlow: glow[i],
+      startMass: mass[i],
+      onComplete,
+    });
+    startEffectsLoopIfNeeded();
+  }
+
+  function explodeBody(noteId, onComplete) {
+    const i = indexOf.get(noteId);
+    if (i == null) {
+      if (onComplete) onComplete();
+      return;
+    }
+    pendingEffects.push({
+      noteId,
+      kind: "explode",
+      startMs: performance.now(),
+      // 220 ms preroll lets the closing note panel slide off the
+      // canvas before the flash, so the body's pop isn't hidden.
+      // Matches the panel's 220ms transform transition.
+      delayMs: 220,
+      durationMs: 1100,
+      startGlow: glow[i],
+      startMass: mass[i],
+      onComplete,
+    });
+    startEffectsLoopIfNeeded();
+  }
+
   // Debug hook — returns a read-only snapshot of the picker's internal
   // state, refreshing the projection + screen-radius cache first. Feeds
   // the pick-debug overlay (see ui/pick-debug.js) so we can eyeball
@@ -574,6 +722,8 @@ export function createBodies({
     indexOfId,
     addBody,
     removeBody,
+    implodeBody,
+    explodeBody,
     updateBody,
     refreshAllKinds,
     refreshAllFolderTints,

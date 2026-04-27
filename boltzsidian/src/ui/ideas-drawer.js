@@ -280,13 +280,23 @@ export function createIdeasDrawer({
     return btn;
   }
 
+  // Fix F (docs/MORNING_REPORT_QUALITY.md) — score numbers invite the
+  // user to second-guess the system rather than judge the suggestion.
+  // Hidden by default; enable with `?debug=salience` in the URL during
+  // tuning runs.
   function scoreLabel(c) {
+    const debugScores =
+      typeof location !== "undefined" &&
+      location.search.includes("debug=salience");
+    if (!debugScores) return "";
     const parts = [];
     if (Number.isFinite(c.salience))
       parts.push(`salience ${c.salience.toFixed(2)}`);
     if (Number.isFinite(c.novelty))
       parts.push(`novelty ${c.novelty.toFixed(2)}`);
     if (Number.isFinite(c.reach)) parts.push(`reach ${c.reach.toFixed(2)}`);
+    if (Number.isFinite(c.specificity))
+      parts.push(`specificity ${c.specificity.toFixed(2)}`);
     return parts.join(" · ");
   }
 

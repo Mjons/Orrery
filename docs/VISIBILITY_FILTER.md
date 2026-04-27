@@ -1,3 +1,8 @@
+---
+id: 01KPV94RTN3EWH7TDXZ1TV9PKS
+created: "2026-04-22T18:50:17.002Z"
+---
+
 # VISIBILITY_FILTER.md — Hide/dim nodes by keyword or tag
 
 Sibling to [FORMATIONS.md](FORMATIONS.md) (curated lens presets) and
@@ -239,3 +244,5 @@ of the sim fades, and they pan around reading the remaining shape
 without having to remember what's hidden.
 
 #filter #formations #search #phase
+
+[[Delphica]]

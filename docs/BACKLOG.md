@@ -36,8 +36,13 @@ onboarding polish, and the visible structural-tidy loop.
 - [[BATCH_LINK]] v1 (constellation-scoped) → right-click a constellation → link members (`src/ui/batch-link-picker.js`).
 - [[AMBIENCE]] → cluster auras and post stack (`src/sim/ambience.js`, `post.js`, `sparks.js`).
 - [[LABELS]] / [[PICKING]] → label toggle, hover, pick-debug, hover-orbit (`src/ui/labels.js`, `hover.js`, `pick-debug.js`, `sim/hover-orbit.js`).
+- [[KEYWORD_LINK]] / [[WEAVE]] / [[CONNECT_QUERY]] → keyword-driven link suggestion + connect-query layer (`src/layers/{keyword-link,weave,connect-query}.js` + matching pickers in `src/ui/`).
+- [[DREAM_THEMES]] → per-night theme picker (`src/layers/dream-theme.js`).
+- [[RENDER_QUALITY]] / [[SEARCH]] / [[FIRST_RUN_FLOW]] → quality monitor + HUD, full-text search, welcome flow (all live in `src/sim/render-quality.js`, `src/ui/search.js`, `coachmarks.js`, `tag-prompt.js`).
+- [[TENDING_FIX_PLAN]] → tended_on stamp + atomic write fixes from the post-Phase-6.5 audit (`src/layers/tend-apply.js`).
 - [[DOCS_AGENT]] → external agent spec; used to prep demo vaults, no app code needed.
-- [[SPEC]] / [[ROADMAP]] / [[STREAM_SETUP]] / [[LAUNCH]] / [[WEB_DEMO]] / [[BODY_COUNT]] / sim docs → **out of scope for Boltzsidian**; they belong to the `main`-branch sim.
+- All of the above now live under [[archive/shipped]]; the original wikilinks still resolve.
+- [[SPEC]] / [[ROADMAP]] / [[STREAM_SETUP]] / [[LAUNCH]] / [[WEB_DEMO]] / [[BODY_COUNT]] / sim docs → **out of scope for Boltzsidian**; they belong to the `main`-branch sim. Now under [[sim/]].
 
 ## Partial — specced in layers, some shipped
 
@@ -92,8 +97,7 @@ onboarding polish, and the visible structural-tidy loop.
 
 ## Notes
 
-- **Docs folder mixes two products.** The `docs/` folder contains both sim-branch docs ([[FOLLOW_CAM]], [[CINEMATIC]], [[LAUNCH]], [[SPEC]], [[ROADMAP]], etc.) and Boltzsidian docs ([[BUILD_PLAN]], [[WORKSPACE]], [[DREAM_ENGINE]], etc.). Nothing marks which is which. Anyone auditing without context will misclassify about 40% of the folder. Worth a `docs/README.md` index or a `sim/` / `boltzsidian/` split.
-- **Filename quirks.** `CINEMATIC_MODES.md-—-Director-Flavours.md`, `MOVIE.md-—-Film-Mode.md`, `SCENES_CLUSTERS.md-—-Famous-Cluster-Scene-Pack.md` all have the trailing `-—-Subtitle.md` pattern. Wikilinks to them are ugly and fragile. Rename to plain `CINEMATIC_MODES.md` / `MOVIE.md` / `SCENES_CLUSTERS.md`.
+- **Folder layout.** As of 2026-04-25 `docs/` is split: shipped feature docs live in [[archive/shipped]], debugging postmortems in [[archive/postmortems]], sim-branch docs in `sim/`, and the metaphor stack in `speculative/`. The root holds active backlog + operational. See [[README]] for the index.
 - **[[SALIENCE]] vs [[BUILD_PLAN]] Phase 6.** Phase 6 was renamed from "Meaning filter" to "Salience layer" and explicitly ships as a flat filter with the sheath as deferred v2. The speculative [[SALIENCE]] doc still reads as though the sheath is the default. Not wrong, just worth a note at the top that v1 is a filter.
 - **[[STATES]] §4 Brief and [[BUILD_PLAN]] Phase 6.7** use slightly different "forgotten" pick rules. Both probably fine in practice but cross-check before the first Brief-on-open user reports.
 - **[[MULTI_PROJECT]] §1.1–§1.4** document approaches that were explicitly not chosen. Safe to either fold into [[MULTI_PROJECT_PLAN]] as an appendix or trim; today they're a live grep-trap for anyone searching multi-project design decisions.

@@ -604,3 +604,5 @@ so we know what space we're in:
 That last one is the line that sells it.
 
 #phase #user #feature
+
+[[Approval Gate: Implementation Exploration]]

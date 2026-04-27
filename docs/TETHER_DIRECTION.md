@@ -2,6 +2,7 @@
 id: 01KR0000TETHERDIRECTION00
 created: 2026-04-22
 ---
+
 # TETHER_DIRECTION.md — Color incoming vs outgoing on the side they come from
 
 Today a tether between two bodies is drawn as a single accent-
@@ -102,7 +103,7 @@ simplicity.
 Each vertex gets a new attribute:
 
 ```js
-aDirectionT: Float32Array(segCount * 2)  // 0 at source, 1 at target
+aDirectionT: Float32Array(segCount * 2); // 0 at source, 1 at target
 ```
 
 - `aDirectionT[i*2]` = 0 (vertex at source end).
@@ -290,3 +291,5 @@ gradient, so direction is readable at any zoom without breaking
 the one-accent rule and without adding geometry.
 
 #tethers #direction #graph #visual
+
+[[DREAM_THEMES.md — Telling the dream what to dream about]]
